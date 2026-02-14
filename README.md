@@ -6,6 +6,10 @@ WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass
 
 WaxOn does not perform noise reduction, de-essing, or any other restoration — it's a first-step ingest processor that gets your raw recordings into a consistent, workable format before further prep or editing.
 
+## Download
+
+**[WaxOn v1.7 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.7.dmg)**
+
 ## Features
 
 - **High-Pass Filter**: Configurable cutoff (20–150 Hz, default 70 Hz) removes DC offset, low-frequency rumble, and handling noise
