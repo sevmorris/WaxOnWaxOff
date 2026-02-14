@@ -10,6 +10,12 @@ WaxOn does not perform noise reduction, de-essing, or any other restoration — 
 
 **[WaxOn v1.7 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.7.dmg)**
 
+**Note:** macOS may block the app on first launch with a malware warning. This is because the app is not notarized with Apple. To fix, run this after mounting the DMG and dragging WaxOn to Applications:
+
+```
+xattr -cr /Applications/WaxOn.app
+```
+
 ## Features
 
 - **High-Pass Filter**: Configurable cutoff (20–150 Hz, default 70 Hz) removes DC offset, low-frequency rumble, and handling noise
