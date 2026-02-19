@@ -92,10 +92,30 @@ struct ContentView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                WaveformView(waveformData: file.waveform)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.black.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                if file.isProcessed, file.outputWaveform != nil {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Input")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        WaveformView(waveformData: file.waveform)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(.black.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        Text("Output")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        WaveformView(waveformData: file.outputWaveform)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(.black.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                } else {
+                    WaveformView(waveformData: file.waveform)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.black.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
             }
             .padding()
         } else {

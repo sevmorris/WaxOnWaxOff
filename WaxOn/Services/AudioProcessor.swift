@@ -15,28 +15,50 @@ private struct LoudnormStats {
 
 actor AudioProcessor {
     let settings: WaxOnSettings
+    let onFileStarted: (@Sendable (UUID) -> Void)?
 
-    init(settings: WaxOnSettings) {
+    init(settings: WaxOnSettings, onFileStarted: (@Sendable (UUID) -> Void)? = nil) {
         self.settings = settings
+        self.onFileStarted = onFileStarted
     }
 
     func run(inputs: [JobInput]) async throws -> [JobResult] {
         guard !inputs.isEmpty else { return [] }
 
         let tools = try await FFmpegManager.shared.ensureTools()
-        var results: [JobResult] = []
+        let maxConcurrent = 3
 
-        for input in inputs {
-            try Task.checkCancellation()
-            if let result = try await processOne(input.url, tools: tools) {
-                results.append(JobResult(id: input.id, input: input.url, output: result.output))
+        return try await withThrowingTaskGroup(of: JobResult?.self) { group in
+            var results: [JobResult] = []
+            var index = 0
+
+            func addNext() {
+                guard index < inputs.count else { return }
+                let input = inputs[index]
+                index += 1
+                group.addTask {
+                    try Task.checkCancellation()
+                    await self.onFileStarted?(input.id)
+                    return try await self.processOne(input.url, id: input.id, tools: tools)
+                }
             }
-        }
 
-        return results
+            for _ in 0..<min(maxConcurrent, inputs.count) {
+                addNext()
+            }
+
+            for try await result in group {
+                if let result {
+                    results.append(result)
+                }
+                addNext()
+            }
+
+            return results
+        }
     }
 
-    private func processOne(_ input: URL, tools: FFmpegManager.Paths) async throws -> JobResult? {
+    private func processOne(_ input: URL, id: UUID, tools: FFmpegManager.Paths) async throws -> JobResult? {
         let fm = FileManager.default
         guard fm.fileExists(atPath: input.path) else {
             throw ProcessingError.invalidInput
@@ -84,7 +106,8 @@ actor AudioProcessor {
         let limiterInput: URL
         if settings.loudnormEnabled {
             let target = settings.loudnormTarget
-            let analyzeAf = "loudnorm=I=\(target):TP=-1:LRA=20:print_format=json"
+            let tp = settings.limitDb
+            let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
             let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
                 "-i", midURL.path, "-af", analyzeAf,
@@ -94,7 +117,7 @@ actor AudioProcessor {
             let stats = try parseLoudnormStats(analysisOutput)
 
             let normURL = work.appendingPathComponent("\(stem)_norm.wav")
-            let normAf = "loudnorm=I=\(target):TP=-1:LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
+            let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
 
             try await runFFmpeg(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
@@ -141,7 +164,7 @@ actor AudioProcessor {
         }
         try fm.moveItem(at: tmpURL, to: finalURL)
 
-        return JobResult(input: input, output: finalURL)
+        return JobResult(id: id, input: input, output: finalURL)
     }
 
     private nonisolated func runFFmpeg(exe: String, args: [String]) async throws {
@@ -160,15 +183,21 @@ actor AudioProcessor {
             process.standardOutput = FileHandle.nullDevice
             process.standardError = stderrPipe
 
-            process.terminationHandler = { proc in
-                let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                let msg = String(data: data, encoding: .utf8) ?? ""
-                let exitCode = proc.terminationStatus
+            // Read pipe data asynchronously BEFORE waiting for termination
+            let readTask = Task.detached { () -> Data in
+                stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            }
 
-                if exitCode != 0 {
-                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                } else {
-                    continuation.resume(returning: ())
+            process.terminationHandler = { proc in
+                let exitCode = proc.terminationStatus
+                Task {
+                    let data = await readTask.value
+                    let msg = String(data: data, encoding: .utf8) ?? ""
+                    if exitCode != 0 {
+                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
+                    } else {
+                        continuation.resume(returning: ())
+                    }
                 }
             }
 
@@ -196,15 +225,21 @@ actor AudioProcessor {
             process.standardOutput = FileHandle.nullDevice
             process.standardError = stderrPipe
 
-            process.terminationHandler = { proc in
-                let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                let msg = String(data: data, encoding: .utf8) ?? ""
-                let exitCode = proc.terminationStatus
+            // Read pipe data asynchronously BEFORE waiting for termination
+            let readTask = Task.detached { () -> Data in
+                stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            }
 
-                if exitCode != 0 {
-                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                } else {
-                    continuation.resume(returning: msg)
+            process.terminationHandler = { proc in
+                let exitCode = proc.terminationStatus
+                Task {
+                    let data = await readTask.value
+                    let msg = String(data: data, encoding: .utf8) ?? ""
+                    if exitCode != 0 {
+                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
+                    } else {
+                        continuation.resume(returning: msg)
+                    }
                 }
             }
 
@@ -267,6 +302,13 @@ actor AudioProcessor {
 
     private func bestOutputDir(for input: URL) -> URL {
         let fm = FileManager.default
+
+        // Use custom output directory if set
+        if let customPath = settings.outputDirectoryPath {
+            let customURL = URL(fileURLWithPath: customPath, isDirectory: true)
+            if fm.isWritableFile(atPath: customURL.path) { return customURL }
+        }
+
         let here = input.deletingLastPathComponent()
         if fm.isWritableFile(atPath: here.path) { return here }
 

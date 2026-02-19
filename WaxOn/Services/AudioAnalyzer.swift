@@ -3,16 +3,9 @@ import AVFoundation
 
 enum AudioAnalyzer {
     static func analyze(url: URL) async throws -> AudioStats {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                do {
-                    let stats = try performAnalysis(url: url)
-                    continuation.resume(returning: stats)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await Task.detached {
+            try performAnalysis(url: url)
+        }.value
     }
 
     private static func performAnalysis(url: URL) throws -> AudioStats {
@@ -46,7 +39,6 @@ enum AudioAnalyzer {
         var peak: Double = 0
         var totalFrames: Int = 0
 
-        // Read entire file for accurate peak detection
         while file.framePosition < frameCount {
             do {
                 try file.read(into: buffer)
@@ -63,7 +55,6 @@ enum AudioAnalyzer {
 
             let frames = Int(buffer.frameLength)
             for frame in 0..<frames {
-                // For RMS: average channels (mono mix)
                 var monoSample: Float = 0
                 for channel in 0..<channels {
                     monoSample += channelData[channel][frame]
@@ -72,7 +63,6 @@ enum AudioAnalyzer {
                 let doubleMono = Double(monoSample)
                 sumSquares += doubleMono * doubleMono
 
-                // For peak: find max across all channels independently
                 for channel in 0..<channels {
                     let channelSample = abs(Double(channelData[channel][frame]))
                     peak = max(peak, channelSample)

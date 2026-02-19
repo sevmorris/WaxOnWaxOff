@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct FileListView: View {
     @Bindable var viewModel: ContentViewModel
@@ -11,6 +12,9 @@ struct FileListView: View {
             }
             .onDelete { offsets in
                 viewModel.removeFiles(at: offsets)
+            }
+            .onMove { source, destination in
+                viewModel.moveFiles(from: source, to: destination)
             }
         }
     }
@@ -25,6 +29,11 @@ struct FileRowView: View {
                 Text(file.url.lastPathComponent)
                     .font(.body)
 
+                if case .processing = file.status {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+
                 if file.isProcessed {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
@@ -33,6 +42,17 @@ struct FileRowView: View {
                         Text("Complete")
                             .font(.caption)
                             .foregroundStyle(.green)
+                    }
+
+                    if let outputURL = file.outputURL {
+                        Button {
+                            NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                        } label: {
+                            Image(systemName: "folder")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Reveal in Finder")
                     }
                 }
             }
@@ -50,6 +70,10 @@ struct FileRowView: View {
                 .foregroundStyle(.secondary)
         case .analyzing:
             Text("Calculating stats...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .processing:
+            Text("Processing...")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .ready(let stats):

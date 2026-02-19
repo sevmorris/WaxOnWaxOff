@@ -15,13 +15,24 @@ final class ContentViewModel {
     var showAdvanced = false
     private var processingTask: Task<Void, Never>?
 
+    private static let validExtensions: Set<String> = [
+        "wav", "aif", "aiff", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac"
+    ]
+
     init() {
         self.settings = WaxOnSettings.load()
     }
 
     func addFiles(_ urls: [URL]) {
         let audioURLs = urls.filter { $0.isFileURL }
-        let newFiles = audioURLs.map { FileItem(url: $0) }
+        let valid = audioURLs.filter { Self.validExtensions.contains($0.pathExtension.lowercased()) }
+        let rejected = audioURLs.count - valid.count
+
+        if rejected > 0 {
+            alertMessage = "\(rejected) file\(rejected == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, mp3, flac, m4a, ogg, opus, caf, wma, aac."
+        }
+
+        let newFiles = valid.map { FileItem(url: $0) }
         files.append(contentsOf: newFiles)
 
         for file in newFiles {
@@ -46,6 +57,10 @@ final class ContentViewModel {
         selectedFileIDs.subtract(deletedIDs)
     }
 
+    func moveFiles(from source: IndexSet, to destination: Int) {
+        files.move(fromOffsets: source, toOffset: destination)
+    }
+
     func process() {
         guard !files.isEmpty else { return }
         isProcessing = true
@@ -62,13 +77,27 @@ final class ContentViewModel {
 
         processingTask = Task {
             do {
-                let processor = AudioProcessor(settings: currentSettings)
+                let processor = AudioProcessor(settings: currentSettings) { [weak self] id in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        if let index = self.files.firstIndex(where: { $0.id == id }) {
+                            self.files[index].status = .processing
+                        }
+                    }
+                }
                 let results = try await processor.run(inputs: inputs)
 
                 for result in results {
                     if let id = result.id,
                        let index = files.firstIndex(where: { $0.id == id }) {
                         files[index].status = .processed(outputURL: result.output)
+                    }
+                }
+
+                // Generate output waveforms
+                for result in results {
+                    if let id = result.id {
+                        generateOutputWaveform(id: id, url: result.output)
                     }
                 }
 
@@ -116,6 +145,19 @@ final class ContentViewModel {
                 }
             } catch {
                 // Waveform generation failed silently - not critical
+            }
+        }
+    }
+
+    private func generateOutputWaveform(id: UUID, url: URL) {
+        Task {
+            do {
+                let waveform = try await WaveformGenerator.generate(url: url)
+                if let currentIndex = files.firstIndex(where: { $0.id == id }) {
+                    files[currentIndex].outputWaveform = waveform
+                }
+            } catch {
+                // Not critical
             }
         }
     }

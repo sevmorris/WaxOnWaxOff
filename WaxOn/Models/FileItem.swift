@@ -9,6 +9,7 @@ struct AudioStats: Equatable, Sendable {
 enum FileStatus: Equatable, Sendable {
     case pending
     case analyzing
+    case processing
     case ready(AudioStats)
     case processed(outputURL: URL)
     case error(String)
@@ -19,6 +20,7 @@ struct FileItem: Identifiable, Equatable {
     let url: URL
     var status: FileStatus
     var waveform: WaveformData?
+    var outputWaveform: WaveformData?
     var analysisStats: AudioStats?
 
     init(url: URL) {
@@ -45,6 +47,6 @@ struct FileItem: Identifiable, Equatable {
     }
 
     static func == (lhs: FileItem, rhs: FileItem) -> Bool {
-        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform?.peaks.count == rhs.waveform?.peaks.count
+        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform?.peaks.count == rhs.waveform?.peaks.count && lhs.outputWaveform?.peaks.count == rhs.outputWaveform?.peaks.count
     }
 }

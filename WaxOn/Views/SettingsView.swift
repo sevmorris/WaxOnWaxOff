@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @Bindable var viewModel: ContentViewModel
@@ -113,9 +114,75 @@ struct SettingsView: View {
             }
 
             GridRow {
+                Text("Attack")
+                HStack {
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.settings.attackMs) },
+                            set: { viewModel.settings.attackMs = Int($0) }
+                        ),
+                        in: 1...50,
+                        step: 1
+                    )
+                    Text(viewModel.settings.attackMs == 5
+                         ? "\(viewModel.settings.attackMs) ms · default"
+                         : "\(viewModel.settings.attackMs) ms")
+                        .frame(width: 110, alignment: .trailing)
+                }
+            }
+
+            GridRow {
+                Text("Release")
+                HStack {
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.settings.releaseMs) },
+                            set: { viewModel.settings.releaseMs = Int($0) }
+                        ),
+                        in: 10...200,
+                        step: 5
+                    )
+                    Text(viewModel.settings.releaseMs == 50
+                         ? "\(viewModel.settings.releaseMs) ms · default"
+                         : "\(viewModel.settings.releaseMs) ms")
+                        .frame(width: 110, alignment: .trailing)
+                }
+            }
+
+            GridRow {
                 Text("Phase Rotate")
                 Toggle("150 Hz allpass", isOn: $viewModel.settings.phaseRotationEnabled)
                     .toggleStyle(.switch)
+            }
+
+            GridRow {
+                Text("Output Dir")
+                HStack {
+                    if let path = viewModel.settings.outputDirectoryPath {
+                        Text(path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .font(.caption)
+                        Button("Reset") {
+                            viewModel.settings.outputDirectoryPath = nil
+                        }
+                        .controlSize(.small)
+                    } else {
+                        Text("Next to source file")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Choose…") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseDirectories = true
+                        panel.canChooseFiles = false
+                        panel.allowsMultipleSelection = false
+                        if panel.runModal() == .OK, let url = panel.url {
+                            viewModel.settings.outputDirectoryPath = url.path
+                        }
+                    }
+                    .controlSize(.small)
+                }
             }
         }
     }

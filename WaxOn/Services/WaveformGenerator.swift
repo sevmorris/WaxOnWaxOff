@@ -8,16 +8,9 @@ struct WaveformData: Sendable, Equatable {
 
 enum WaveformGenerator {
     static func generate(url: URL, targetSamples: Int = 500) async throws -> WaveformData {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let data = try processAudio(url: url, targetSamples: targetSamples)
-                    continuation.resume(returning: data)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        try await Task.detached {
+            try processAudio(url: url, targetSamples: targetSamples)
+        }.value
     }
 
     private static func processAudio(url: URL, targetSamples: Int) throws -> WaveformData {

@@ -28,6 +28,7 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     var loudnormTarget: Double = -30.0
     var dcBlockHz: Int = 70
     var phaseRotationEnabled: Bool = false
+    var outputDirectoryPath: String? = nil
 
     private static let storageKey = "WaxOnSettings"
 
