@@ -1,8 +1,7 @@
 <p align="center">
-  <img src="assets/icon.png" width="128" alt="WaxOn icon">
+  <img src="assets/header.png" alt="WaxOn">
 </p>
 
-# WaxOn
 
 **Podcast Audio Prep for macOS**
 
