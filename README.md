@@ -11,7 +11,7 @@ WaxOn does not perform noise reduction, de-essing, or any other restoration — 
 
 ## Download
 
-**[WaxOn v1.8 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.8.dmg)**
+**[WaxOn v1.9 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.9.dmg)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
