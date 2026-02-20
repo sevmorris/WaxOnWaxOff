@@ -25,10 +25,9 @@ WaxOn does not perform noise reduction, de-essing, or any other restoration — 
 
 ## Features
 
-- **High-Pass Filter**: Configurable cutoff (20–150 Hz, default 70 Hz) removes DC offset, low-frequency rumble, and handling noise
-- **Loudness Normalization**: Optional two-pass EBU R128 normalization with configurable target (-35 to -16 LUFS, default -30). Uses linear gain for transparent level matching across files. True peak target respects your limiter ceiling setting.
-- **Brick-Wall Limiting**: Configurable ceiling (-6 to -0.1 dB) with adjustable attack (1–50 ms) and release (10–200 ms)
-- **True Peak Limiting**: Optional oversampled limiting (up to 8x) to catch inter-sample peaks
+- **High-Pass Filter**: Configurable cutoff (40–90 Hz, default 80 Hz) removes low-frequency rumble and handling noise
+- **Loudness Normalization**: Optional two-pass EBU R128 normalization with configurable target (-35 to -16 LUFS, default -30). Uses linear gain for transparent level matching across files. True peak target respects your ceiling setting.
+- **Brick-Wall Limiting**: Configurable ceiling (-6 to -1 dB) with 2x oversampled true peak limiting
 - **Phase Rotation**: Optional 150 Hz allpass filter to reduce crest factor and improve headroom
 - **Mono or Stereo Output**: Mono with left/right channel selection, or stereo passthrough
 - **Sample Rate Conversion**: 44.1 kHz or 48 kHz output
@@ -67,14 +66,10 @@ Example: `episode-01-44kwaxon-1dB.wav`
 
 ## Advanced Settings
 
-- **High Pass**: High-pass filter cutoff frequency (default 70 Hz, range 20–150 Hz)
-- **True Peak**: Enable oversampled peak detection
-- **Oversample**: Oversampling factor for true peak limiting (1–8x)
+- **High Pass**: High-pass filter cutoff frequency (default 80 Hz, range 40–90 Hz)
 - **Loudness Norm**: Enable EBU R128 loudness normalization
 - **Target**: Integrated loudness target (default -30 LUFS, range -35 to -16 LUFS)
 - **Phase Rotate**: 150 Hz allpass filter for crest factor reduction
-- **Attack**: Limiter attack time (default 5 ms, range 1–50 ms)
-- **Release**: Limiter release time (default 50 ms, range 10–200 ms)
 - **Output Directory**: Set a custom output folder (default: saves alongside source files)
 
 ## Processing Pipeline
@@ -83,7 +78,7 @@ WaxOn uses FFmpeg with a multi-pass pipeline:
 
 1. **High-pass filtering**, channel selection (if mono), phase rotation (if enabled), and resampling to target sample rate
 2. **Loudness normalization** (if enabled) — two-pass EBU R128 analysis followed by linear gain application
-3. **Brick-wall limiting** with optional oversampling for true peak control
+3. **Brick-wall limiting** with 2x oversampled true peak control
 
 Output format: 24-bit WAV
 
