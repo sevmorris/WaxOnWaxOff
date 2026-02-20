@@ -51,6 +51,7 @@ struct HelpView: View {
                     definition("Loudness Norm", "When enabled, normalizes integrated loudness to the target level using EBU R128 measurement. Applies a single linear gain — no dynamic compression — so dynamics are fully preserved.")
                     definition("Target", "Integrated loudness target for normalization (default -30 LUFS, range -35 to -16 LUFS). Lower values leave more headroom for editing.")
                     definition("Phase Rotate", "150 Hz allpass filter that rotates phase relationships between harmonics, reducing the crest factor (peak-to-RMS ratio) of speech. This gives the limiter more headroom to work with, resulting in cleaner limiting. Enabled by default.")
+                    definition("Output Directory", "Custom output folder for processed files. Defaults to the same directory as the source file.")
                 }
                 Spacer()
             }
