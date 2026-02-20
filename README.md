@@ -19,14 +19,19 @@ xattr -cr /Applications/WaxOn.app
 ## Features
 
 - **High-Pass Filter**: Configurable cutoff (20–150 Hz, default 70 Hz) removes DC offset, low-frequency rumble, and handling noise
-- **Loudness Normalization**: Optional two-pass EBU R128 normalization with configurable target (-35 to -16 LUFS, default -30). Uses linear gain for transparent level matching across files
-- **Brick-Wall Limiting**: Configurable ceiling (-6 to -0.1 dB) to tame wild transients
+- **Loudness Normalization**: Optional two-pass EBU R128 normalization with configurable target (-35 to -16 LUFS, default -30). Uses linear gain for transparent level matching across files. True peak target respects your limiter ceiling setting.
+- **Brick-Wall Limiting**: Configurable ceiling (-6 to -0.1 dB) with adjustable attack (1–50 ms) and release (10–200 ms)
 - **True Peak Limiting**: Optional oversampled limiting (up to 8x) to catch inter-sample peaks
 - **Phase Rotation**: Optional 150 Hz allpass filter to reduce crest factor and improve headroom
 - **Mono or Stereo Output**: Mono with left/right channel selection, or stereo passthrough
 - **Sample Rate Conversion**: 44.1 kHz or 48 kHz output
 - **Drag & Drop**: Drop audio files onto the window to process
-- **Batch Processing**: Process multiple files at once
+- **Batch Processing**: Process multiple files in parallel (up to 3 concurrent jobs) with per-file progress
+- **Input Validation**: Unsupported file formats are rejected automatically
+- **File Reordering**: Drag to reorder files in the processing queue
+- **Custom Output Directory**: Optionally set a dedicated output folder
+- **Reveal in Finder**: Click to reveal processed output files
+- **Waveform Preview**: Select a file to view its waveform with dB scale
 
 ## System Requirements
 
@@ -43,7 +48,7 @@ xattr -cr /Applications/WaxOn.app
    - **Limiter**: Ceiling level (e.g., -1.0 dB)
 3. Drag and drop audio files onto the window
 4. Click "Process"
-5. Output files are saved alongside the originals with a `-waxon` suffix
+5. Output files are saved alongside the originals with a `-waxon` suffix (or to your configured output directory)
 
 ## Output Naming
 
@@ -61,6 +66,9 @@ Example: `episode-01-44kwaxon-1dB.wav`
 - **Loudness Norm**: Enable EBU R128 loudness normalization
 - **Target**: Integrated loudness target (default -30 LUFS, range -35 to -16 LUFS)
 - **Phase Rotate**: 150 Hz allpass filter for crest factor reduction
+- **Attack**: Limiter attack time (default 5 ms, range 1–50 ms)
+- **Release**: Limiter release time (default 50 ms, range 10–200 ms)
+- **Output Directory**: Set a custom output folder (default: saves alongside source files)
 
 ## Processing Pipeline
 
