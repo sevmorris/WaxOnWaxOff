@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="128" alt="WaxOn icon">
+</p>
+
 # WaxOn
 
 **Podcast Audio Prep for macOS**
@@ -83,6 +87,12 @@ WaxOn uses FFmpeg with a multi-pass pipeline:
 3. **Brick-wall limiting** with optional oversampling for true peak control
 
 Output format: 24-bit WAV
+
+## Companion App
+
+[WaxOff](https://github.com/sevmorris/WaxOff) finalizes your podcast mix for distribution — EBU R128 loudness normalization, optional phase rotation, and MP3 encoding.
+
+**Workflow**: Raw recordings → **WaxOn** → Edit in DAW → **WaxOff** → Distribute
 
 ## License
 
