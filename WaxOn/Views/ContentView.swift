@@ -43,7 +43,7 @@ struct ContentView: View {
             }
             SettingsView(viewModel: viewModel)
         }
-        .frame(minWidth: 900, minHeight: 520)
+        .frame(minWidth: 900, minHeight: 620)
         .padding(.bottom)
         .dropDestination(for: URL.self) { urls, _ in
             viewModel.addFiles(urls)

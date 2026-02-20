@@ -132,14 +132,11 @@ actor AudioProcessor {
 
         try Task.checkCancellation()
 
-        var oversampleSr = sr
-        if settings.truePeakEnabled {
-            oversampleSr = sr * max(1, settings.truePeakOversample)
-        }
+        let oversampleSr = sr * 2
 
         let step2Af = [
             "aresample=\(oversampleSr)",
-            "alimiter=limit=\(limitAmp):attack=\(settings.attackMs):release=\(settings.releaseMs):level=disabled",
+            "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
             "aresample=\(sr)"
         ].joined(separator: ",")
 

@@ -39,10 +39,10 @@ struct SettingsView: View {
                 }
 
                 GridRow {
-                    Text("Limiter")
+                    Text("Ceiling")
                     HStack {
-                        Slider(value: $viewModel.settings.limitDb, in: -6 ... -0.1, step: 0.1)
-                        Text(String(format: "%.1f dB", viewModel.settings.limitDb))
+                        Slider(value: $viewModel.settings.limitDb, in: -6 ... -1, step: 1)
+                        Text(String(format: "%.0f dB", viewModel.settings.limitDb))
                             .frame(width: 80, alignment: .trailing)
                     }
                 }
@@ -71,28 +71,14 @@ struct SettingsView: View {
                             get: { Double(viewModel.settings.dcBlockHz) },
                             set: { viewModel.settings.dcBlockHz = Int($0) }
                         ),
-                        in: 20...150,
+                        in: 40...90,
                         step: 5
                     )
-                    Text(viewModel.settings.dcBlockHz == 70
+                    Text(viewModel.settings.dcBlockHz == 80
                          ? "\(viewModel.settings.dcBlockHz) Hz · default"
                          : "\(viewModel.settings.dcBlockHz) Hz")
                         .frame(width: 110, alignment: .trailing)
                 }
-            }
-
-            GridRow {
-                Text("True Peak")
-                Toggle("Enable", isOn: $viewModel.settings.truePeakEnabled)
-                    .toggleStyle(.switch)
-            }
-
-            GridRow {
-                Text("Oversample")
-                Stepper(value: $viewModel.settings.truePeakOversample, in: 1...8) {
-                    Text("\(viewModel.settings.truePeakOversample)x")
-                }
-                .disabled(!viewModel.settings.truePeakEnabled)
             }
 
             GridRow {
@@ -114,42 +100,6 @@ struct SettingsView: View {
             }
 
             GridRow {
-                Text("Attack")
-                HStack {
-                    Slider(
-                        value: Binding(
-                            get: { Double(viewModel.settings.attackMs) },
-                            set: { viewModel.settings.attackMs = Int($0) }
-                        ),
-                        in: 1...50,
-                        step: 1
-                    )
-                    Text(viewModel.settings.attackMs == 5
-                         ? "\(viewModel.settings.attackMs) ms · default"
-                         : "\(viewModel.settings.attackMs) ms")
-                        .frame(width: 110, alignment: .trailing)
-                }
-            }
-
-            GridRow {
-                Text("Release")
-                HStack {
-                    Slider(
-                        value: Binding(
-                            get: { Double(viewModel.settings.releaseMs) },
-                            set: { viewModel.settings.releaseMs = Int($0) }
-                        ),
-                        in: 10...200,
-                        step: 5
-                    )
-                    Text(viewModel.settings.releaseMs == 50
-                         ? "\(viewModel.settings.releaseMs) ms · default"
-                         : "\(viewModel.settings.releaseMs) ms")
-                        .frame(width: 110, alignment: .trailing)
-                }
-            }
-
-            GridRow {
                 Text("Phase Rotate")
                 Toggle("150 Hz allpass", isOn: $viewModel.settings.phaseRotationEnabled)
                     .toggleStyle(.switch)
@@ -168,7 +118,7 @@ struct SettingsView: View {
                         }
                         .controlSize(.small)
                     } else {
-                        Text("Next to source file")
+                        Text("Same as source")
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
