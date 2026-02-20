@@ -12,7 +12,6 @@ final class ContentViewModel {
     }
     var isProcessing = false
     var alertMessage: String?
-    var showAdvanced = false
     private var processingTask: Task<Void, Never>?
 
     private static let validExtensions: Set<String> = [

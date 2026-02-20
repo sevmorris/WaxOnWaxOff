@@ -35,7 +35,7 @@ struct HelpView: View {
                 section("Processing Pipeline") {
                     text("WaxOn uses FFmpeg with a multi-pass pipeline:")
                     numberedList([
-                        "High-pass filtering, channel selection (if mono), phase rotation (if enabled), and resampling to the target sample rate.",
+                        "High-pass filtering, channel selection (if mono), phase rotation, and resampling to the target sample rate.",
                         "Loudness normalization (if enabled) — two-pass EBU R128 analysis followed by linear gain application.",
                         "Brick-wall limiting with 2x oversampled true peak control."
                     ])
@@ -44,13 +44,12 @@ struct HelpView: View {
                 section("Main Settings") {
                     definition("Sample Rate", "Output sample rate — 44.1 kHz or 48 kHz.")
                     definition("Output", "Mono (with left/right channel selection) or Stereo passthrough.")
-                    definition("Ceiling", "Brick-wall limiter ceiling, from -6 dB to -1 dB. Controls the maximum peak level of the output.")
+                    definition("Ceiling", "Brick-wall limiter ceiling, from -3 dB to -1 dB. Controls the maximum peak level of the output.")
                 }
-                section("Advanced Settings") {
+                section("Additional Settings") {
                     definition("High Pass", "High-pass filter cutoff frequency (default 80 Hz, range 40–90 Hz). Removes low-frequency rumble, HVAC hum, and handling noise.")
                     definition("Loudness Norm", "When enabled, normalizes integrated loudness to the target level using EBU R128 measurement. Applies a single linear gain — no dynamic compression — so dynamics are fully preserved.")
                     definition("Target", "Integrated loudness target for normalization (default -30 LUFS, range -35 to -16 LUFS). Lower values leave more headroom for editing.")
-                    definition("Phase Rotate", "150 Hz allpass filter that rotates phase relationships between harmonics, reducing the crest factor (peak-to-RMS ratio) of speech. This gives the limiter more headroom to work with, resulting in cleaner limiting. Enabled by default.")
                     definition("Output Directory", "Custom output folder for processed files. Defaults to the same directory as the source file.")
                 }
                 Spacer()

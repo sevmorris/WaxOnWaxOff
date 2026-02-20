@@ -81,7 +81,7 @@ actor AudioProcessor {
         let channelSuffix = isStereo ? "stereo" : "mono"
         let midURL = work.appendingPathComponent("\(stem)_\(rateTag)24_\(channelSuffix).wav")
 
-        let phaseFilter = settings.phaseRotationEnabled ? "allpass=f=150:t=q:w=0.707," : ""
+        let phaseFilter = "allpass=f=200:t=q:w=0.707,"
 
         let step1Af: String
         let outputChannelCount: String

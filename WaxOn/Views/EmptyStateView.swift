@@ -12,23 +12,16 @@ struct EmptyStateView: View {
                     .font(.title2)
                     .bold()
 
-                Text("WaxOn prepares podcast recordings for editing in a DAW. It applies high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting, outputting clean 24-bit WAV files ready for import.")
+                Text("Drag and drop audio files here to get started.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 500)
             }
 
-            VStack(spacing: 4) {
-                Text("To get started:")
-                    .font(.headline)
-                    .padding(.top, 8)
-
-                Label("Drag and drop audio files here", systemImage: "arrow.down.doc")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+            Text("See Help menu for details on settings and processing.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
