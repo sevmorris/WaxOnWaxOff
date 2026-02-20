@@ -9,6 +9,10 @@ WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass
 
 WaxOn does not perform noise reduction, de-essing, or any other restoration — it's a first-step ingest processor that gets your raw recordings into a consistent, workable format before further prep or editing.
 
+## Design Philosophy
+
+WaxOn is intentionally minimal. It does one thing — prepares raw podcast recordings for editing — and exposes only the controls that matter for that job. Sensible defaults handle the rest. Drop your files in, hit Process, and get back to editing.
+
 ## Download
 
 **[WaxOn v1.9 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.9.dmg)**
