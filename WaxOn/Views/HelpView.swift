@@ -5,6 +5,14 @@ struct HelpView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
+                section("Design Philosophy") {
+                    text("""
+                    WaxOn is intentionally minimal. It does one thing — prepares raw \
+                    podcast recordings for editing — and exposes only the controls that \
+                    matter for that job. Sensible defaults handle the rest. Drop your \
+                    files in, hit Process, and get back to editing.
+                    """)
+                }
                 section("Getting Started") {
                     text("""
                     WaxOn prepares raw podcast recordings for editing in a DAW. \
