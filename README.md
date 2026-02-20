@@ -15,7 +15,7 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 
 ## Download
 
-**[WaxOn v1.9 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.9.dmg)**
+**[WaxOn v2.0 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.0.dmg)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
@@ -31,8 +31,8 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 
 - **High-Pass Filter**: Configurable cutoff (40–90 Hz, default 80 Hz) removes low-frequency rumble and handling noise
 - **Loudness Normalization**: Optional two-pass EBU R128 normalization with configurable target (-35 to -16 LUFS, default -30). Uses linear gain for transparent level matching across files. True peak target respects your ceiling setting.
-- **Brick-Wall Limiting**: Configurable ceiling (-6 to -1 dB) with 2x oversampled true peak limiting
-- **Phase Rotation**: Optional 150 Hz allpass filter to reduce crest factor and improve headroom
+- **Brick-Wall Limiting**: Configurable ceiling (-3 to -1 dB) with 2x oversampled true peak limiting
+- **Phase Rotation**: Automatic 200 Hz allpass to reduce peak asymmetry and improve headroom
 - **Mono or Stereo Output**: Mono with left/right channel selection, or stereo passthrough
 - **Sample Rate Conversion**: 44.1 kHz or 48 kHz output
 - **Drag & Drop**: Drop audio files onto the window to process
@@ -68,19 +68,18 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 
 Example: `episode-01-44kwaxon-1dB.wav`
 
-## Advanced Settings
+## Additional Settings
 
 - **High Pass**: High-pass filter cutoff frequency (default 80 Hz, range 40–90 Hz)
 - **Loudness Norm**: Enable EBU R128 loudness normalization
 - **Target**: Integrated loudness target (default -30 LUFS, range -35 to -16 LUFS)
-- **Phase Rotate**: 150 Hz allpass filter for crest factor reduction
 - **Output Directory**: Set a custom output folder (default: saves alongside source files)
 
 ## Processing Pipeline
 
 WaxOn uses FFmpeg with a multi-pass pipeline:
 
-1. **High-pass filtering**, channel selection (if mono), phase rotation (if enabled), and resampling to target sample rate
+1. **High-pass filtering**, channel selection (if mono), phase rotation, and resampling to target sample rate
 2. **Loudness normalization** (if enabled) — two-pass EBU R128 analysis followed by linear gain application
 3. **Brick-wall limiting** with 2x oversampled true peak control
 
