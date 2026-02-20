@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = ContentViewModel()
+    @State private var fileListWidth: CGFloat = 250
 
     private var selectedFile: FileItem? {
         guard viewModel.selectedFileIDs.count == 1,
@@ -14,9 +15,29 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             headerView
-            HSplitView {
+            HStack(spacing: 0) {
                 fileListSection
-                    .frame(minWidth: 300)
+                    .frame(width: fileListWidth)
+
+                Rectangle()
+                    .fill(Color.primary.opacity(0.15))
+                    .frame(width: 4)
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        if hovering {
+                            NSCursor.resizeLeftRight.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                let newWidth = fileListWidth + value.translation.width
+                                fileListWidth = max(150, min(newWidth, 600))
+                            }
+                    )
+
                 waveformSection
                     .frame(minWidth: 300)
             }
@@ -92,30 +113,10 @@ struct ContentView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                if file.isProcessed, file.outputWaveform != nil {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Input")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        WaveformView(waveformData: file.waveform)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(.black.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        Text("Output")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        WaveformView(waveformData: file.outputWaveform)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(.black.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                } else {
-                    WaveformView(waveformData: file.waveform)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(.black.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
+                WaveformView(waveformData: file.waveform)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.black.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .padding()
         } else {

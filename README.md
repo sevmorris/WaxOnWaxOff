@@ -8,7 +8,7 @@ WaxOn does not perform noise reduction, de-essing, or any other restoration — 
 
 ## Download
 
-**[WaxOn v1.7 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.7.dmg)**
+**[WaxOn v1.8 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v1.8.dmg)**
 
 **Note:** macOS may block the app on first launch with a malware warning. This is because the app is not notarized with Apple. To fix, run this after mounting the DMG and dragging WaxOn to Applications:
 

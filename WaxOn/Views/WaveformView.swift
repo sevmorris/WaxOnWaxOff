@@ -41,13 +41,11 @@ struct WaveformView: View {
                     let amplitude = pow(10, db / 20)
                     let yOffset = (1 - amplitude) * midY
 
-                    // Top label (positive side)
                     Text(formatDb(db))
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .position(x: 16, y: yOffset)
 
-                    // Bottom label (mirrored, only for 0 dB)
                     if db == 0 {
                         Text(formatDb(db))
                             .font(.system(size: 9, design: .monospaced))
@@ -64,20 +62,16 @@ struct WaveformView: View {
             let midY = geometry.size.height / 2
 
             Path { path in
-                // Center line (0 amplitude)
                 path.move(to: CGPoint(x: 0, y: midY))
                 path.addLine(to: CGPoint(x: geometry.size.width, y: midY))
 
-                // dB level lines
                 for db in dbLevels {
                     let amplitude = pow(10, db / 20)
                     let yOffset = (1 - amplitude) * midY
 
-                    // Top line
                     path.move(to: CGPoint(x: 0, y: yOffset))
                     path.addLine(to: CGPoint(x: geometry.size.width, y: yOffset))
 
-                    // Bottom line (mirrored)
                     path.move(to: CGPoint(x: 0, y: geometry.size.height - yOffset))
                     path.addLine(to: CGPoint(x: geometry.size.width, y: geometry.size.height - yOffset))
                 }
@@ -102,20 +96,16 @@ struct WaveformShape: Shape {
 
         guard !data.peaks.isEmpty else { return path }
 
-        let midY = rect.midY
         let sampleWidth = rect.width / CGFloat(data.peaks.count)
-
-        // Draw the waveform as mirrored peaks
+        let midY = rect.midY
         path.move(to: CGPoint(x: 0, y: midY))
 
-        // Top half (positive)
         for (index, peak) in data.peaks.enumerated() {
             let x = CGFloat(index) * sampleWidth + sampleWidth / 2
             let height = CGFloat(peak) * rect.height / 2
             path.addLine(to: CGPoint(x: x, y: midY - height))
         }
 
-        // Continue to bottom half (mirrored)
         for (index, peak) in data.peaks.enumerated().reversed() {
             let x = CGFloat(index) * sampleWidth + sampleWidth / 2
             let height = CGFloat(peak) * rect.height / 2
@@ -129,7 +119,7 @@ struct WaveformShape: Shape {
 }
 
 #Preview {
-    WaveformView(waveformData: WaveformData(samples: [], peaks: [0.8, 0.5, 0.9, 0.3, 0.7, 0.6, 0.4]))
+    WaveformView(waveformData: WaveformData(samples: [], peaks: [0.8, 0.5, 0.9, 0.3, 0.7, 0.6, 0.4], channelCount: 1))
         .frame(height: 100)
         .padding()
 }

@@ -183,21 +183,23 @@ actor AudioProcessor {
             process.standardOutput = FileHandle.nullDevice
             process.standardError = stderrPipe
 
-            // Read pipe data asynchronously BEFORE waiting for termination
-            let readTask = Task.detached { () -> Data in
-                stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            // Read pipe on GCD to avoid blocking the cooperative thread pool
+            var stderrData = Data()
+            let readGroup = DispatchGroup()
+            readGroup.enter()
+            DispatchQueue.global(qos: .utility).async {
+                stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                readGroup.leave()
             }
 
             process.terminationHandler = { proc in
+                readGroup.wait()
                 let exitCode = proc.terminationStatus
-                Task {
-                    let data = await readTask.value
-                    let msg = String(data: data, encoding: .utf8) ?? ""
-                    if exitCode != 0 {
-                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                    } else {
-                        continuation.resume(returning: ())
-                    }
+                let msg = String(data: stderrData, encoding: .utf8) ?? ""
+                if exitCode != 0 {
+                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
+                } else {
+                    continuation.resume(returning: ())
                 }
             }
 
@@ -225,21 +227,23 @@ actor AudioProcessor {
             process.standardOutput = FileHandle.nullDevice
             process.standardError = stderrPipe
 
-            // Read pipe data asynchronously BEFORE waiting for termination
-            let readTask = Task.detached { () -> Data in
-                stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            // Read pipe on GCD to avoid blocking the cooperative thread pool
+            var stderrData = Data()
+            let readGroup = DispatchGroup()
+            readGroup.enter()
+            DispatchQueue.global(qos: .utility).async {
+                stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                readGroup.leave()
             }
 
             process.terminationHandler = { proc in
+                readGroup.wait()
                 let exitCode = proc.terminationStatus
-                Task {
-                    let data = await readTask.value
-                    let msg = String(data: data, encoding: .utf8) ?? ""
-                    if exitCode != 0 {
-                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                    } else {
-                        continuation.resume(returning: msg)
-                    }
+                let msg = String(data: stderrData, encoding: .utf8) ?? ""
+                if exitCode != 0 {
+                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
+                } else {
+                    continuation.resume(returning: msg)
                 }
             }
 

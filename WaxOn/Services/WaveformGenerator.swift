@@ -4,13 +4,21 @@ import AVFoundation
 struct WaveformData: Sendable, Equatable {
     let samples: [Float]  // Normalized -1 to 1
     let peaks: [Float]    // Peak values for each sample point
+    let channelCount: Int // Number of channels in source audio
 }
 
 enum WaveformGenerator {
     static func generate(url: URL, targetSamples: Int = 500) async throws -> WaveformData {
-        try await Task.detached {
-            try processAudio(url: url, targetSamples: targetSamples)
-        }.value
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let data = try processAudio(url: url, targetSamples: targetSamples)
+                    continuation.resume(returning: data)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private static func processAudio(url: URL, targetSamples: Int) throws -> WaveformData {
@@ -92,6 +100,6 @@ enum WaveformGenerator {
             peaks.append(bucketPeaks[i])
         }
 
-        return WaveformData(samples: samples, peaks: peaks)
+        return WaveformData(samples: samples, peaks: peaks, channelCount: channels)
     }
 }

@@ -3,9 +3,16 @@ import AVFoundation
 
 enum AudioAnalyzer {
     static func analyze(url: URL) async throws -> AudioStats {
-        try await Task.detached {
-            try performAnalysis(url: url)
-        }.value
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    let stats = try performAnalysis(url: url)
+                    continuation.resume(returning: stats)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private static func performAnalysis(url: URL) throws -> AudioStats {
