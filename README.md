@@ -93,6 +93,6 @@ Output format: 24-bit WAV
 
 ## License
 
-Copyright © 2026 Seven Morris
+Copyright © 2026 Seven Morris. This app was designed and directed by Seven Morris, with code primarily generated through AI collaboration using [OpenClaw](https://openclaw.ai) and Claude (Anthropic).
 
 This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License v3.0](LICENSE).
