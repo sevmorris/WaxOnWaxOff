@@ -47,6 +47,6 @@ struct FileItem: Identifiable, Equatable {
     }
 
     static func == (lhs: FileItem, rhs: FileItem) -> Bool {
-        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform?.peaks.count == rhs.waveform?.peaks.count && lhs.outputWaveform?.peaks.count == rhs.outputWaveform?.peaks.count
+        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform == rhs.waveform && lhs.outputWaveform == rhs.outputWaveform
     }
 }

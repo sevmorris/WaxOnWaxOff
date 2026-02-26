@@ -165,100 +165,132 @@ actor AudioProcessor {
     }
 
     private nonisolated func runFFmpeg(exe: String, args: [String]) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let fm = FileManager.default
-            guard fm.fileExists(atPath: exe) else {
-                continuation.resume(throwing: ProcessingError.ffmpegNotFound)
-                return
-            }
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: exe) else {
+            throw ProcessingError.ffmpegNotFound
+        }
 
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: exe)
-            process.arguments = args
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: exe)
+        process.arguments = args
+        process.standardInput = FileHandle.nullDevice
 
-            let stderrPipe = Pipe()
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = stderrPipe
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let stderrPipe = Pipe()
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = stderrPipe
 
-            // Read pipe on GCD to avoid blocking the cooperative thread pool
-            var stderrData = Data()
-            let readGroup = DispatchGroup()
-            readGroup.enter()
-            DispatchQueue.global(qos: .utility).async {
-                stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                readGroup.leave()
-            }
+                // Read pipe on GCD to avoid blocking the cooperative thread pool
+                var stderrData = Data()
+                let readGroup = DispatchGroup()
+                readGroup.enter()
+                DispatchQueue.global(qos: .utility).async {
+                    stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    readGroup.leave()
+                }
 
-            process.terminationHandler = { proc in
-                readGroup.wait()
-                let exitCode = proc.terminationStatus
-                let msg = String(data: stderrData, encoding: .utf8) ?? ""
-                if exitCode != 0 {
-                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                } else {
-                    continuation.resume(returning: ())
+                process.terminationHandler = { proc in
+                    readGroup.wait()
+                    if proc.terminationReason == .uncaughtSignal {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    let exitCode = proc.terminationStatus
+                    let msg = String(data: stderrData, encoding: .utf8) ?? ""
+                    if exitCode == 0 {
+                        continuation.resume(returning: ())
+                    } else {
+                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
+                    }
+                }
+
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
                 }
             }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
-            }
+        } onCancel: {
+            process.terminate()
         }
     }
 
     private nonisolated func runFFmpegCapture(exe: String, args: [String]) async throws -> String {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-            let fm = FileManager.default
-            guard fm.fileExists(atPath: exe) else {
-                continuation.resume(throwing: ProcessingError.ffmpegNotFound)
-                return
-            }
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: exe) else {
+            throw ProcessingError.ffmpegNotFound
+        }
 
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: exe)
-            process.arguments = args
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: exe)
+        process.arguments = args
+        process.standardInput = FileHandle.nullDevice
 
-            let stderrPipe = Pipe()
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = stderrPipe
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                let stderrPipe = Pipe()
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = stderrPipe
 
-            // Read pipe on GCD to avoid blocking the cooperative thread pool
-            var stderrData = Data()
-            let readGroup = DispatchGroup()
-            readGroup.enter()
-            DispatchQueue.global(qos: .utility).async {
-                stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                readGroup.leave()
-            }
+                // Read pipe on GCD to avoid blocking the cooperative thread pool
+                var stderrData = Data()
+                let readGroup = DispatchGroup()
+                readGroup.enter()
+                DispatchQueue.global(qos: .utility).async {
+                    stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    readGroup.leave()
+                }
 
-            process.terminationHandler = { proc in
-                readGroup.wait()
-                let exitCode = proc.terminationStatus
-                let msg = String(data: stderrData, encoding: .utf8) ?? ""
-                if exitCode != 0 {
-                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                } else {
-                    continuation.resume(returning: msg)
+                process.terminationHandler = { proc in
+                    readGroup.wait()
+                    if proc.terminationReason == .uncaughtSignal {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    let exitCode = proc.terminationStatus
+                    let msg = String(data: stderrData, encoding: .utf8) ?? ""
+                    if exitCode == 0 {
+                        continuation.resume(returning: msg)
+                    } else {
+                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
+                    }
+                }
+
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
                 }
             }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
-            }
+        } onCancel: {
+            process.terminate()
         }
     }
 
     private nonisolated func parseLoudnormStats(_ output: String) throws -> LoudnormStats {
-        guard let jsonStart = output.range(of: "{", options: .backwards),
-              let jsonEnd = output.range(of: "}", options: .backwards) else {
+        // Find the last '{' (start of the JSON block), then scan forward to its matching '}'
+        guard let braceRange = output.range(of: "{", options: .backwards) else {
             throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
         }
 
-        let jsonStr = String(output[jsonStart.lowerBound...jsonEnd.upperBound])
+        var depth = 0
+        var jsonEnd: String.Index?
+        outer: for idx in output[braceRange.lowerBound...].indices {
+            switch output[idx] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 { jsonEnd = idx; break outer }
+            default: break
+            }
+        }
+
+        guard let jsonEnd else {
+            throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
+        }
+
+        let jsonStr = String(output[braceRange.lowerBound...jsonEnd])
         guard let data = jsonStr.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data),
               let dict = json as? [String: String] else {

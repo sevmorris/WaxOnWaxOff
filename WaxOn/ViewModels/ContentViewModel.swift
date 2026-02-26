@@ -154,10 +154,9 @@ final class ContentViewModel {
                 let waveform = try await WaveformGenerator.generate(url: url)
                 if let currentIndex = files.firstIndex(where: { $0.id == id }) {
                     files[currentIndex].outputWaveform = waveform
-                    print("[WaxOn] Output waveform generated for \(url.lastPathComponent): \(waveform.peaks.count) peaks, \(waveform.channelCount) ch")
                 }
             } catch {
-                print("[WaxOn] Output waveform FAILED for \(url.lastPathComponent): \(error)")
+                // Output waveform generation failed — non-critical, processed file is unaffected
             }
         }
     }
