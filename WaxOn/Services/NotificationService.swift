@@ -6,8 +6,16 @@ enum NotificationService {
         let center = UNUserNotificationCenter.current()
 
         do {
-            let granted = try await center.requestAuthorization(options: [.alert, .sound])
-            guard granted else { return }
+            let settings = await center.notificationSettings()
+            switch settings.authorizationStatus {
+            case .notDetermined:
+                let granted = try await center.requestAuthorization(options: [.alert, .sound])
+                guard granted else { return }
+            case .authorized, .provisional:
+                break
+            default:
+                return
+            }
 
             let content = UNMutableNotificationContent()
             content.title = "WaxOn Processing Complete"

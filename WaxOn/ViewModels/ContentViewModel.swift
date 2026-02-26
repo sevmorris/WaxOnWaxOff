@@ -62,6 +62,14 @@ final class ContentViewModel {
 
     func process() {
         guard !files.isEmpty else { return }
+
+        // Validate custom output directory upfront before any processing starts
+        if let customPath = settings.outputDirectoryPath,
+           !FileManager.default.isWritableFile(atPath: customPath) {
+            alertMessage = "Output directory is not writable: \(customPath)"
+            return
+        }
+
         isProcessing = true
 
         let currentSettings = settings
@@ -77,8 +85,8 @@ final class ContentViewModel {
         processingTask = Task {
             do {
                 let processor = AudioProcessor(settings: currentSettings) { [weak self] id in
-                    Task { @MainActor in
-                        guard let self else { return }
+                    guard let self else { return }
+                    Task { @MainActor [self] in
                         if let index = self.files.firstIndex(where: { $0.id == id }) {
                             self.files[index].status = .processing
                         }
