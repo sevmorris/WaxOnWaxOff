@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/header.png" alt="WaxOn">
+  <img src="assets/waxon_banner.png" alt="WaxOn">
 </p>
 
 **Podcast Audio Prep for macOS**
