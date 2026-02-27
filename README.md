@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/header.png" alt="WaxOn">
+</p>
+
 **Podcast Audio Prep for macOS**
 
 WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting in a single drag-and-drop workflow, outputting 24-bit WAV files.
