@@ -14,7 +14,7 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 
 ## Download
 
-**[WaxOn v2.2 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.2.dmg)**
+**[WaxOn v2.3 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.3.dmg)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
