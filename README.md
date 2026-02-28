@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/waxon_banner.png" alt="WaxOn">
-</p>
-
 **Podcast Audio Prep for macOS**
 
 WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting in a single drag-and-drop workflow, outputting 24-bit WAV files.
@@ -100,6 +96,6 @@ This program is free software: you can redistribute it and/or modify it under th
 
 I'm a freelance audio engineer, not a software developer. These tools exist because AI made it possible for me to build things I couldn't build alone. It's exciting, but complicated.
 
-The app icon is my own — hand-drawn. AI can build the software, but I can still make the art myself, and I think that's worth doing, even if poorly.
+The app icon is my own design. AI can build the software, but I can still make the art myself, and I think that's worth doing.
 
 AI-assisted development raises real questions about labor displacement, resource consumption, and the concentration of power in a handful of tech companies. I don't have clean answers. I do think it matters that the people using these tools are honest about the trade-offs rather than pretending they don't exist.
