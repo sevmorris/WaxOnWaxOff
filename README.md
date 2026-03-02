@@ -9,7 +9,7 @@ WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw rec
 > macOS will block the app because it is not notarized with Apple. After dragging WaxOn to Applications, **run this command in Terminal:**
 >
 > ```
-> xattr -cr /Applications/WaxOn.app
+> xattr -cr /Applications/WaxOnWaxOff.app
 > ```
 >
 > Without this step, macOS will refuse to open the app.

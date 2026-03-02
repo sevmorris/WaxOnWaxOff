@@ -5,7 +5,7 @@ macOS will block this app because it is not notarized with Apple.
 
 After dragging WaxOn/WaxOff to Applications, open Terminal and run:
 
-    xattr -cr /Applications/WaxOn.app
+    xattr -cr /Applications/WaxOnWaxOff.app
 
 Without this step, macOS will refuse to open the app.
 
