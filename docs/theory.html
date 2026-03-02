@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WaxOn/WaxOff — Theory of Operation</title>
+  <style>
+    :root {
+      --bg:           #ffffff;
+      --bg-subtle:    #f5f5f7;
+      --bg-code:      #f0f0f2;
+      --border:       #d2d2d7;
+      --text:         #1d1d1f;
+      --text-muted:   #6e6e73;
+      --accent:       #0066cc;
+      --accent-hover: #0055b3;
+      --nav-bg:       #fafafa;
+      --tag-bg:       #e8f0fe;
+      --tag-text:     #1a56b0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:           #111113;
+        --bg-subtle:    #1c1c1e;
+        --bg-code:      #2a2a2d;
+        --border:       #3a3a3c;
+        --text:         #f2f2f7;
+        --text-muted:   #8e8e93;
+        --accent:       #4da3ff;
+        --accent-hover: #79bcff;
+        --nav-bg:       #1c1c1e;
+        --tag-bg:       #1a2d4a;
+        --tag-text:     #6eb0ff;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    nav {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      width: 230px;
+      min-width: 230px;
+      background: var(--nav-bg);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 28px 0 40px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nav-brand {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .nav-brand span {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: block;
+    }
+    .nav-brand small {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    nav a {
+      display: block;
+      padding: 5px 20px;
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      border-left: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      line-height: 1.5;
+    }
+    nav a:hover { color: var(--accent); }
+    nav a.section-head {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      padding-top: 16px;
+      padding-bottom: 4px;
+      pointer-events: none;
+    }
+    nav a.sub { padding-left: 32px; }
+    nav a.back-link {
+      font-size: 0.78rem;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    /* ── Main content ── */
+    main {
+      flex: 1;
+      max-width: 820px;
+      padding: 56px 48px 100px;
+    }
+
+    section { margin-bottom: 64px; }
+
+    h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 10px; }
+    h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    h3 { font-size: 1.05rem; font-weight: 600; margin: 28px 0 10px; }
+    h4 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 20px 0 8px; }
+
+    p { margin-bottom: 14px; }
+    p:last-child { margin-bottom: 0; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; color: var(--accent-hover); }
+
+    ul, ol { padding-left: 20px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; line-height: 1.5; }
+    li:last-child { margin-bottom: 0; }
+
+    code {
+      font-family: "SF Mono", "Fira Mono", "Menlo", monospace;
+      font-size: 0.84em;
+      background: var(--bg-code);
+      color: var(--text);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    pre {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      overflow-x: auto;
+      margin-bottom: 14px;
+    }
+    pre code { background: none; padding: 0; font-size: 0.85rem; }
+
+    .callout {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      font-size: 0.9rem;
+    }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    /* ── Hero ── */
+    .hero { margin-bottom: 56px; }
+    .hero h1 { margin-bottom: 12px; }
+    .hero p { font-size: 1.05rem; color: var(--text-muted); max-width: 600px; }
+
+    /* ── Mode badge ── */
+    .mode-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 100px;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+      margin-left: 8px;
+      text-transform: uppercase;
+    }
+    .mode-waxon  { background: #e8f0fe; color: #1a56b0; }
+    .mode-waxoff { background: #e6f4ea; color: #137333; }
+    @media (prefers-color-scheme: dark) {
+      .mode-waxon  { background: #1a2d4a; color: #6eb0ff; }
+      .mode-waxoff { background: #1a3a25; color: #6fcf97; }
+    }
+
+    /* ── Signal chain diagram ── */
+    .chain {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 18px;
+    }
+    .chain-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+    }
+    .chain-node {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .chain-node.optional {
+      border-style: dashed;
+      color: var(--text-muted);
+    }
+    .chain-arrow {
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .chain-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      padding: 2px 0 0 0;
+      font-style: italic;
+    }
+
+    /* ── Comparison table ── */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .compare-table th {
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-subtle);
+    }
+    .compare-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table td:first-child { font-weight: 600; white-space: nowrap; width: 180px; }
+
+    /* ── Formula block ── */
+    .formula {
+      font-family: "SF Mono", "Fira Mono", "Menlo", monospace;
+      font-size: 0.9rem;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 20px;
+      margin-bottom: 14px;
+      line-height: 2;
+    }
+
+    /* ── Tag ── */
+    .tag {
+      display: inline-block;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 100px;
+      letter-spacing: 0.03em;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 800px) {
+      body { flex-direction: column; }
+      nav {
+        position: static;
+        height: auto;
+        width: 100%;
+        min-width: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 16px 0;
+        flex-direction: row;
+        flex-wrap: wrap;
+        overflow-x: auto;
+      }
+      .nav-brand { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+      nav a.section-head { display: none; }
+      nav a { padding: 4px 12px; white-space: nowrap; }
+      nav a.sub { padding-left: 12px; }
+      main { padding: 32px 24px 60px; }
+      h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <span>WaxOn/WaxOff</span>
+    <small>Theory of Operation</small>
+  </div>
+  <a class="back-link" href="index.html">← User Manual</a>
+  <a class="section-head" href="#">Overview</a>
+  <a href="#intro">Introduction</a>
+  <a href="#signal-chain">Signal Chains</a>
+  <a class="section-head" href="#">Fundamentals</a>
+  <a href="#ebu-r128">EBU R128 Loudness</a>
+  <a href="#two-pass">Two-Pass Normalization</a>
+  <a href="#true-peak">True Peak &amp; Oversampling</a>
+  <a href="#phase-rotation">Phase Rotation</a>
+  <a href="#mix-summing">Mix Summing</a>
+  <a class="section-head" href="#">Design Decisions</a>
+  <a href="#waxon-design">WaxOn Design</a>
+  <a href="#waxoff-design">WaxOff Design</a>
+  <a href="#formats">Output Formats</a>
+  <a href="#summary">Summary</a>
+</nav>
+
+<main>
+
+  <!-- Hero -->
+  <div class="hero" id="intro">
+    <h1>Theory of Operation</h1>
+    <p>A technical deep-dive into the audio processing logic of WaxOn/WaxOff — the signal chain, the engineering rationale, and the decisions behind each stage.</p>
+    <p style="margin-top: 12px;">This document assumes familiarity with basic audio concepts (dBFS, sample rate, dynamic range). It's written for audio engineers, curious users, and anyone who wants to understand <em>why</em> the app does what it does.</p>
+  </div>
+
+  <!-- Signal Chains -->
+  <section id="signal-chain">
+    <h2>Signal Chains at a Glance</h2>
+
+    <h3>WaxOn <span class="mode-badge mode-waxon">WaxOn</span></h3>
+    <div class="chain">
+      <div class="chain-row">
+        <div class="chain-node">High-Pass Filter</div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node">Channel Select<br><span style="font-size:0.75rem;font-weight:400;">+ Resample</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node optional">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Resample</span></div>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--text-muted);">Dashed border = optional stage. Output: 24-bit WAV.</p>
+
+    <h3>WaxOff <span class="mode-badge mode-waxoff">WaxOff</span></h3>
+    <div class="chain">
+      <div class="chain-row">
+        <div class="chain-node optional">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">150 Hz allpass</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node optional">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Encode MP3</span></div>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--text-muted);">Phase rotation and MP3 encode are optional. Output: 24-bit WAV and/or MP3.</p>
+
+    <h3>WaxOn Mix</h3>
+    <p>An additional zeroth stage runs before the standard WaxOn chain:</p>
+    <div class="chain">
+      <div class="chain-row">
+        <div class="chain-node">amix<br><span style="font-size:0.75rem;font-weight:400;">normalize=1</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node" style="color:var(--text-muted);border-style:dashed;font-style:italic;">WaxOn chain above</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EBU R128 -->
+  <section id="ebu-r128">
+    <h2>EBU R128 Loudness</h2>
+
+    <p>EBU R128 (and the underlying ITU-R BS.1770-4 algorithm) is the measurement standard used by virtually all broadcast and streaming platforms — Spotify, Apple Podcasts, YouTube, and broadcast television worldwide all normalize to a loudness target derived from this standard. Understanding it explains most of what WaxOff does.</p>
+
+    <h3>Integrated Loudness (LUFS)</h3>
+    <p>Integrated loudness (denoted <strong>I</strong>) is the time-averaged loudness of a complete program, measured in <strong>LUFS</strong> (Loudness Units relative to Full Scale). LUFS is numerically identical to LKFS — both refer to the same algorithm.</p>
+    <p>Unlike peak metering or RMS, integrated loudness is:</p>
+    <ul>
+      <li><strong>Perceptually weighted</strong> — a K-weighting filter is applied before measurement, approximating human hearing (boosts 3–5 kHz presence range, rolls off sub-bass)</li>
+      <li><strong>Gated</strong> — silence and very quiet passages are excluded from the average so they don't misrepresent the loudness of the actual content</li>
+      <li><strong>Integrated over the full duration</strong> — requires the complete file to compute</li>
+    </ul>
+
+    <h3>K-Weighting</h3>
+    <p>K-weighting is a two-stage filter chain applied to each channel before energy summation:</p>
+    <ol>
+      <li><strong>Pre-filter (high-shelf)</strong>: boosts above ~1 kHz, mimicking the acoustic effect of the head increasing high-frequency energy at the ears</li>
+      <li><strong>RLB weighting (high-pass)</strong>: 100 Hz second-order high-pass that reduces the contribution of sub-bass energy</li>
+    </ol>
+    <p>The result is a loudness measurement that correlates well with perceived loudness for speech and music.</p>
+
+    <h3>Gating</h3>
+    <p>Loudness is computed over overlapping 400 ms blocks (75% overlap, so one new block every 100 ms). Two gating stages prevent silence from pulling the integrated value down:</p>
+    <ol>
+      <li><strong>Absolute gate</strong>: exclude any block below −70 LUFS</li>
+      <li><strong>Relative gate</strong>: from the remaining blocks, compute an ungated mean; exclude any block more than 10 LU below that mean</li>
+    </ol>
+    <p>The final integrated loudness is the mean of the remaining blocks. This means gaps between sentences, breath pauses, and room tone don't meaningfully affect the measurement.</p>
+
+    <h3>True Peak (TP)</h3>
+    <p>True peak is the maximum reconstructed level when the digital signal is converted to analog. It differs from sample peak because the analog waveform between samples can exceed any individual sample value — these are <em>inter-sample peaks</em>. See the <a href="#true-peak">True Peak & Oversampling</a> section for detail.</p>
+    <p>EBU R128 specifies a maximum true peak of <strong>−1.0 dBTP</strong> for most distribution. WaxOff defaults to this value.</p>
+
+    <h3>Loudness Range (LRA)</h3>
+    <p>LRA measures the spread between loud and quiet sections of a program — its macro-dynamics — in Loudness Units. It is computed as the difference between the 95th and 10th percentiles of the short-term loudness distribution (after gating). EBU R128 does not mandate a specific LRA target but recommends keeping it below 18 LU for broadcast.</p>
+    <p>WaxOff exposes LRA as a configurable parameter (default 11). The <code>loudnorm</code> filter can apply gentle dynamic compression to constrain LRA to the target value. At LRA=11, some limiting of macro-dynamics is applied; lower values compress more aggressively. WaxOn hardcodes LRA=20 (effectively unconstrained), which is correct for ingest where you want zero dynamic processing.</p>
+  </section>
+
+  <!-- Two-Pass -->
+  <section id="two-pass">
+    <h2>Two-Pass Normalization</h2>
+
+    <p>EBU R128 integrated loudness requires the complete file to compute — it is a time-integrated measurement. You cannot know the correct gain adjustment until after you have read every sample. This makes single-pass normalization impossible for linear (non-dynamic) mode. Both WaxOn and WaxOff solve this with a two-pass approach.</p>
+
+    <h3>Pass 1 — Analysis</h3>
+    <p>FFmpeg's <code>loudnorm</code> filter reads the entire file and prints a JSON block to stderr containing:</p>
+    <ul>
+      <li><code>input_i</code> — integrated loudness of the source</li>
+      <li><code>input_tp</code> — measured true peak</li>
+      <li><code>input_lra</code> — measured loudness range</li>
+      <li><code>input_thresh</code> — gating threshold used</li>
+      <li><code>target_offset</code> — computed gain offset to reach the target</li>
+    </ul>
+    <p>The output is discarded (<code>-f null</code>); only the measurements matter. The app parses the JSON from stderr and stores the values.</p>
+
+    <h3>Pass 2 — Linear Normalization</h3>
+    <p>The same filter runs again, this time with the measured values injected back in and <code>linear=true</code> set:</p>
+    <pre><code>loudnorm=I={target}:TP={tp}:LRA={lra}
+  :measured_I={inputI}:measured_TP={inputTP}
+  :measured_LRA={inputLRA}:measured_thresh={inputThresh}
+  :offset={targetOffset}:linear=true</code></pre>
+
+    <h3>Why <code>linear=true</code> Matters</h3>
+    <p>The <code>loudnorm</code> filter has two modes:</p>
+    <ul>
+      <li><strong>Dynamic mode</strong> (default, <code>linear=false</code>): applies time-varying gain. This is a form of dynamic range processing — quieter passages are boosted more, louder passages less. Introduces subtle distortion and changes the character of the audio. Intended for live streaming where only one pass is possible.</li>
+      <li><strong>Linear mode</strong> (<code>linear=true</code>): applies a single, constant gain offset across the entire file. No dynamic processing, no change to transients or stereo image. The measured <code>target_offset</code> tells the filter exactly what gain to apply.</li>
+    </ul>
+    <p>Both WaxOn and WaxOff use linear mode for pass 2. For mastering and delivery, this is the only correct approach — the goal is level adjustment, not dynamics processing.</p>
+  </section>
+
+  <!-- True Peak -->
+  <section id="true-peak">
+    <h2>True Peak and Oversampled Limiting</h2>
+
+    <h3>The Inter-Sample Peak Problem</h3>
+    <p>Digital audio stores the waveform as discrete samples — amplitude values at regular time intervals (44,100 or 48,000 per second). A sample peak meter reads the highest sample value, which is straightforward. But the <em>analog</em> waveform reconstructed by a DAC continuously interpolates between those samples, and the reconstructed waveform can peak significantly higher than any individual sample value.</p>
+    <p>These are <strong>inter-sample peaks</strong>, and they become real, audible clipping when:</p>
+    <ul>
+      <li>The file is played back through a DAC (analog reconstruction fills in between samples)</li>
+      <li>The file is encoded with a lossy codec — MP3, AAC, and OGG encoding and decoding can <em>increase</em> peak levels by 0.1–1.5 dB or more above the source PCM values</li>
+    </ul>
+    <p>A file that samples-peek at −1 dBFS can easily have a true peak above 0 dBFS, causing clipping that no sample-level meter would detect.</p>
+
+    <h3>How Oversampled Limiting Solves This</h3>
+    <p>True peak limiting works by upsampling the signal before the limiter so that inter-sample peaks become visible as actual samples, then limiting those samples, then downsampling back.</p>
+    <div class="formula">
+      Input (44.1 kHz) → Upsample 2× (88.2 kHz) → alimiter → Downsample (44.1 kHz) → Output
+    </div>
+    <p>At 2× the sample rate, the interpolated samples that approximate the inter-sample waveform are now captured. The limiter can see and clip them. When downsampled back, the true peaks of the resulting file are controlled.</p>
+    <p>2× oversampling catches the vast majority of inter-sample peaks in practice. 4× oversampling is used in some mastering workflows to catch pathological cases, but the returns diminish quickly for typical voice material.</p>
+
+    <h3>WaxOn Limiter Settings</h3>
+    <p>WaxOn's alimiter is configured for transparent peak control:</p>
+    <ul>
+      <li><strong>limit</strong>: linear amplitude equivalent of the configured ceiling (e.g., −1.0 dB → 0.891251)</li>
+      <li><strong>attack=5 ms</strong>: the limiter begins attenuating 5 ms before the peak. Fast enough to prevent transient overshoot, slow enough to avoid pre-ringing artifacts on voice.</li>
+      <li><strong>release=50 ms</strong>: gain recovers in 50 ms after the peak passes. On typical voice material, this is fast enough to be inaudible as pumping while still recovering promptly between words.</li>
+      <li><strong>level=disabled</strong>: prevents the limiter from applying makeup gain. Without this, <code>alimiter</code> compensates for gain reduction, undoing the ceiling control. With it disabled, the limiter only attenuates — never amplifies.</li>
+    </ul>
+
+    <h3>WaxOff Pre-Encode Limiter</h3>
+    <p>WaxOff's loudnorm filter targets true peak via its <code>TP</code> parameter, but this is a soft target — the filter's internal gain calculation accounts for it, but it does not guarantee a hard ceiling. In practice, the loudnorm output can exceed the TP target by up to ~0.5–1.0 dB in edge cases.</p>
+    <p>For WAV-only output this is acceptable — the file plays back through a DAC and any overshoot is minor. For MP3 output it is a real problem: the encoding process adds its own inter-sample peaks (typically +0.1–1.5 dB), so a file already approaching the ceiling will clip after decode.</p>
+    <p>WaxOff solves this with a dedicated pre-encode limiter applied only when producing MP3:</p>
+    <ul>
+      <li><strong>Ceiling: −2.0 dBTP</strong> — 1 dB of headroom below the intended −1.0 dBTP loudnorm target. This comfortably absorbs both loudnorm overshoot and typical MP3 codec-induced peaks, resulting in decoded MP3 files that land at or below −1.0 dBTP.</li>
+      <li><strong>attack=1 ms, release=20 ms</strong> — faster than WaxOn's limiter because this stage has no creative role. It is pure safety. At these speeds on voice material, the limiting is completely transparent.</li>
+      <li>Same 2× oversampling approach as WaxOn for true peak accuracy.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>Why −2 dBTP and not −1 dBTP?</strong>
+      The loudnorm filter targets −1.0 dBTP but can overshoot by up to ~1 dB. The MP3 codec can then add another 0.1–1.5 dB of inter-sample peaks. A hard limiter at −2.0 dBTP provides 1 dB of margin that reliably keeps the decoded MP3 below −1.0 dBTP under virtually all real-world conditions.
+    </div>
+  </section>
+
+  <!-- Phase Rotation -->
+  <section id="phase-rotation">
+    <h2>Phase Rotation and Crest Factor</h2>
+
+    <h3>Crest Factor</h3>
+    <p>Crest factor is the ratio of a signal's peak level to its RMS level, expressed in dB:</p>
+    <div class="formula">
+      Crest Factor (dB) = Peak (dBFS) − RMS (dBFS)
+    </div>
+    <p>Typical speech has a crest factor of 15–25 dB. High crest factor has a practical consequence for loudness normalization: to reach a loudness target without exceeding the ceiling, the limiter must apply more gain reduction (limiting). More limiting means more audible artifacts — transient softening, pumping, coloration.</p>
+    <p>Reducing crest factor before normalization means the same LUFS target can be reached with less limiting and more transparency.</p>
+
+    <h3>How Allpass Filtering Reduces Crest Factor</h3>
+    <p>A first-order allpass filter passes all frequencies at equal amplitude but shifts the phase of different frequencies by different amounts. Critically, it doesn't alter the frequency response — it only changes <em>when</em> different frequency components arrive relative to each other.</p>
+    <p>Much of the peak asymmetry in voice audio comes from low-frequency content: proximity effect from cardioid microphones, low-frequency resonances in recording spaces, and bass-heavy content in finished mixes. This energy tends to create asymmetric waveforms — where one polarity of the waveform consistently peaks higher than the other.</p>
+    <p>An allpass filter in the low-frequency range redistributes the phase relationships between bass components and midrange components, making peaks more symmetric. The result is a lower crest factor — peaks are shorter relative to average level — without any change to the frequency response or audible character of the audio.</p>
+    <p>The effect is genuinely inaudible. Allpass filters are phase-transparent in the same way polarity inversion is — they don't change what you hear, only the mathematical representation of the waveform.</p>
+
+    <h3>WaxOn vs. WaxOff Frequencies</h3>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>WaxOn</th>
+          <th>WaxOff</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Frequency</td>
+          <td>200 Hz</td>
+          <td>150 Hz</td>
+        </tr>
+        <tr>
+          <td>Q</td>
+          <td>0.707 (Butterworth)</td>
+          <td>default</td>
+        </tr>
+        <tr>
+          <td>Rationale</td>
+          <td>Raw recordings often have proximity effect and mic combination issues in the 150–250 Hz range. 200 Hz targets the low-mid region where these artifacts cause most of the crest factor problem.</td>
+          <td>Finished mixes are already edited and processed. The remaining crest factor issue is typically pure bass energy. 150 Hz targets this lower.</td>
+        </tr>
+        <tr>
+          <td>Default</td>
+          <td>Always on (not user-configurable)</td>
+          <td>On (user can disable)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Mix Summing -->
+  <section id="mix-summing">
+    <h2>Mix Summing</h2>
+
+    <p>When two or more audio signals are summed, the combined level increases. By how much depends on the correlation between the signals:</p>
+    <ul>
+      <li><strong>Perfectly correlated</strong> (identical content, e.g. duplicate tracks): +20·log₁₀(N) dB</li>
+      <li><strong>Uncorrelated</strong> (independent noise sources): +10·log₁₀(N) dB</li>
+      <li><strong>Typical podcast speakers</strong> (largely uncorrelated, some shared room): approximately +10·log₁₀(N) dB</li>
+    </ul>
+    <div class="formula">
+      2 tracks → ~+3 dB &nbsp;&nbsp; 4 tracks → ~+6 dB &nbsp;&nbsp; 8 tracks → ~+9 dB
+    </div>
+    <p>Without compensation, summing two podcast speakers could push the mix 3 dB louder than either individual track — potentially clipping the input to the limiter and producing inconsistent results regardless of how many files are combined.</p>
+
+    <p>WaxOn's Mix stage uses FFmpeg's <code>amix</code> filter with <code>normalize=1</code>, which scales the output by 1/N before summing. This keeps the mix at a level consistent with the individual inputs regardless of how many files are combined — the subsequent filter and limiter chain receives appropriately leveled material and behaves predictably.</p>
+
+    <div class="callout">
+      <strong>normalize=1 vs normalize=0</strong>
+      With <code>normalize=0</code>, amix passes raw summed samples — the mix gets louder with each additional file. With <code>normalize=1</code>, each input is scaled by 1/N before summing. The result is that N equal-level sources produce an output at the same level as a single source. For podcast use, this is the correct behavior.
+    </div>
+  </section>
+
+  <!-- WaxOn Design -->
+  <section id="waxon-design">
+    <h2>WaxOn Design Rationale <span class="mode-badge mode-waxon">WaxOn</span></h2>
+
+    <h3>Stage Order</h3>
+    <p>The WaxOn pipeline stage order is deliberate:</p>
+    <ol>
+      <li><strong>High-pass first</strong> — subsonic content below 80 Hz is removed before any gain stage processes it. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't musically useful.</li>
+      <li><strong>Phase rotation before normalization</strong> — reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
+      <li><strong>Channel selection before normalization</strong> — if extracting mono from a stereo source, do it before measurement so the loudnorm analysis is performed on the actual output signal, not a wider stereo version of it.</li>
+      <li><strong>Limiter last</strong> — after any loudness normalization, with oversampling to catch true peaks.</li>
+    </ol>
+
+    <h3>LRA=20 in WaxOn Loudnorm</h3>
+    <p>WaxOn's loudnorm hardcodes <code>LRA=20</code>. The LRA parameter tells the loudnorm filter how aggressively to constrain the dynamic range — lower values apply more dynamic compression. At LRA=20, the filter applies essentially no dynamic processing; it acts as a pure linear gain offset.</p>
+    <p>This is intentional for ingest. WaxOn is a pre-editing tool. You want your recordings to arrive at your DAW at consistent levels, but with their original dynamic character intact. Any dynamic processing at this stage would fight against the compression and automation you'll apply during editing. LRA=20 ensures loudnorm does exactly one thing in WaxOn: level adjustment.</p>
+
+    <h3>Default Loudnorm Target: −30 LUFS</h3>
+    <p>−30 LUFS is conservative by design. At this level, even a recording with significant dynamic range and a crest factor of 20 dB will have peaks well below −10 dBFS, giving the limiter ample headroom. The goal is to bring different recordings to a <em>consistent</em> level for editing, not to hit a delivery target. −30 LUFS leaves plenty of room for the final mix to breathe and for WaxOff to handle delivery normalization correctly.</p>
+
+    <h3>Loudnorm TP = limitDb</h3>
+    <p>Both the loudnorm <code>TP</code> parameter and the alimiter <code>limit</code> are set to the same value (the configured ceiling, default −1.0 dB). These are not redundant:</p>
+    <ul>
+      <li>Loudnorm's <code>TP</code> influences its internal gain calculation — it tries to avoid exceeding the ceiling, but this is a soft target.</li>
+      <li>The alimiter is the hard ceiling — it guarantees no output sample (at 2× sample rate) exceeds the limit.</li>
+    </ul>
+    <p>Setting both to the same value means loudnorm and the limiter are working toward the same goal: if loudnorm succeeds, the limiter barely engages. If loudnorm slightly overshoots, the limiter catches it. The two stages are complementary, not redundant.</p>
+  </section>
+
+  <!-- WaxOff Design -->
+  <section id="waxoff-design">
+    <h2>WaxOff Design Rationale <span class="mode-badge mode-waxoff">WaxOff</span></h2>
+
+    <h3>No High-Pass Filter</h3>
+    <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW — high-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
+
+    <h3>User-Configurable LRA</h3>
+    <p>Unlike WaxOn's hardcoded LRA=20, WaxOff exposes LRA as a user setting. For delivery, some macro-dynamic constraint is appropriate — a podcast episode should have a consistent loudness profile throughout. The default of 11 LU is a reasonable target: it constrains macro-dynamics enough to ensure consistent perceived loudness across the episode without audibly squashing the mix's dynamics.</p>
+    <p>The loudnorm filter with LRA=11 applies gentle, program-level gain changes (not sample-by-sample compression). The effect is less aggressive than any compressor you would have used during editing.</p>
+
+    <h3>Delivery Targets</h3>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Platform</th>
+          <th>Target LUFS</th>
+          <th>Max True Peak</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Apple Podcasts</td>
+          <td>−16 LUFS (normalized)</td>
+          <td>−1.0 dBTP</td>
+        </tr>
+        <tr>
+          <td>Spotify</td>
+          <td>−14 LUFS (normalized)</td>
+          <td>−1.0 dBTP</td>
+        </tr>
+        <tr>
+          <td>Buzzsprout</td>
+          <td>−19 LUFS recommended</td>
+          <td>−1.0 dBTP</td>
+        </tr>
+        <tr>
+          <td>YouTube</td>
+          <td>−14 LUFS (normalized)</td>
+          <td>−1.0 dBTP</td>
+        </tr>
+        <tr>
+          <td>EBU R128 (broadcast)</td>
+          <td>−23 LUFS</td>
+          <td>−1.0 dBTP</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Most streaming platforms normalize incoming audio to their own target on playback — so delivering at −18 LUFS versus −16 LUFS won't make your episode sound quieter or louder to listeners (the platform adjusts). What matters most is staying below the true peak ceiling to avoid clipping during that normalization step.</p>
+    <p>WaxOff's default of −18 LUFS with −1.0 dBTP is a safe, widely accepted podcast delivery target.</p>
+  </section>
+
+  <!-- Output Formats -->
+  <section id="formats">
+    <h2>Output Format Rationale</h2>
+
+    <h3>24-bit WAV</h3>
+    <p>Both WaxOn and WaxOff output 24-bit WAV as the primary format.</p>
+    <ul>
+      <li><strong>24-bit vs 16-bit</strong>: 24-bit provides 144 dB of theoretical dynamic range vs 96 dB for 16-bit. For WaxOn (pre-editing ingest), the additional headroom is essential — you'll apply further processing in a DAW, and each gain stage consumes headroom. For WaxOff delivery, 16-bit would technically suffice, but 24-bit is the standard for intermediate and archive files and costs nothing on modern storage.</li>
+      <li><strong>WAV vs FLAC</strong>: WAV is uncompressed and universally compatible. FLAC offers lossless compression but adds decoding overhead and has narrower compatibility in broadcast/video tools. WAV is the correct choice for intermediate and delivery files in a podcast production workflow.</li>
+    </ul>
+
+    <h3>MP3 CBR</h3>
+    <p>WaxOff's MP3 output uses CBR (constant bit rate) rather than VBR (variable bit rate). For podcast delivery:</p>
+    <ul>
+      <li><strong>CBR vs VBR</strong>: VBR can achieve better quality-per-byte for music, but some podcast hosting platforms, embedded systems, and players have historically had issues with VBR MP3 seeking and duration calculation. CBR is universally compatible.</li>
+      <li><strong>160 kbps as default</strong>: 128 kbps can produce audible artifacts on sibilants and high-frequency consonants in speech. 192 kbps is essentially transparent for voice and is worth using if file size is not a constraint. 160 kbps is the practical midpoint — transparent for the vast majority of voice material and widely used as a podcast delivery standard.</li>
+      <li><strong>MP3 from WAV, not from source</strong>: WaxOff always generates the WAV first and derives the MP3 from it. This means the normalization and filtering happens exactly once; the MP3 is a faithful transcode of the normalized WAV, not a separate re-processing of the original file.</li>
+    </ul>
+  </section>
+
+  <!-- Summary -->
+  <section id="summary">
+    <h2>Summary</h2>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Design Decision</th>
+          <th>Rationale</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>HPF before all gain stages (WaxOn)</td>
+          <td>Subsonic energy inflates loudness measurements and activates the limiter on content that isn't perceptually meaningful</td>
+        </tr>
+        <tr>
+          <td>Phase rotation before normalization</td>
+          <td>Lower crest factor → loudnorm applies gain more accurately → limiter works less hard → more transparent output</td>
+        </tr>
+        <tr>
+          <td>Two-pass loudnorm with linear=true</td>
+          <td>Single-pass normalization is inaccurate; linear mode applies a clean gain offset with no dynamic processing</td>
+        </tr>
+        <tr>
+          <td>LRA=20 in WaxOn</td>
+          <td>Ingest preprocessing should not touch dynamics; loudnorm acts as pure level adjustment</td>
+        </tr>
+        <tr>
+          <td>2× oversampled alimiter (WaxOn)</td>
+          <td>Inter-sample peaks are invisible to a standard sample-rate limiter; oversampling makes them visible and catchable</td>
+        </tr>
+        <tr>
+          <td>Pre-encode −2 dBTP limiter (WaxOff MP3)</td>
+          <td>Loudnorm TP is a soft target; MP3 encoding adds further inter-sample peaks; −2 dBTP provides 1 dB headroom for decoded files to land at or below −1.0 dBTP</td>
+        </tr>
+        <tr>
+          <td>amix normalize=1 (WaxOn Mix)</td>
+          <td>Prevents level from increasing with file count; downstream chain receives consistent levels regardless of how many files are mixed</td>
+        </tr>
+        <tr>
+          <td>MP3 derived from WAV output</td>
+          <td>Normalization happens once; MP3 is a transcode of the normalized file, not a separate re-processing of the original</td>
+        </tr>
+        <tr>
+          <td>24-bit WAV output</td>
+          <td>Headroom for further processing (WaxOn) and lossless archive quality (WaxOff); universally compatible</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr style="border:none; border-top: 1px solid var(--border); margin: 48px 0 32px;">
+    <p style="font-size:0.85rem; color: var(--text-muted);">
+      WaxOn/WaxOff is free software licensed under the <a href="https://github.com/sevmorris/WaxOnWaxOff/blob/main/LICENSE">GPL-3.0</a>.
+      Built by <a href="https://github.com/sevmorris">Seven Morris</a> with AI collaboration.
+    </p>
+  </section>
+
+</main>
+</body>
+</html>
