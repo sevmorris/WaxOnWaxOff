@@ -1,9 +1,19 @@
 import Foundation
 
+struct FileInfo: Sendable, Equatable {
+    let format: String
+    let sampleRate: Double
+    let channelCount: Int
+    let bitDepth: Int?
+    let duration: TimeInterval
+    let bitRate: Double?
+}
+
 struct AudioStats: Equatable, Sendable {
     let rms: Double
     let peak: Double
     let crest: Double
+    let lufs: Double
 }
 
 enum FileStatus: Equatable, Sendable {
@@ -22,6 +32,7 @@ struct FileItem: Identifiable, Equatable {
     var waveform: WaveformData?
     var outputWaveform: WaveformData?
     var analysisStats: AudioStats?
+    var fileInfo: FileInfo?
 
     init(url: URL) {
         self.id = UUID()
@@ -29,6 +40,7 @@ struct FileItem: Identifiable, Equatable {
         self.status = .pending
         self.waveform = nil
         self.analysisStats = nil
+        self.fileInfo = nil
     }
 
     var stats: AudioStats? {
@@ -47,6 +59,6 @@ struct FileItem: Identifiable, Equatable {
     }
 
     static func == (lhs: FileItem, rhs: FileItem) -> Bool {
-        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform == rhs.waveform && lhs.outputWaveform == rhs.outputWaveform
+        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform == rhs.waveform && lhs.outputWaveform == rhs.outputWaveform && lhs.fileInfo == rhs.fileInfo
     }
 }

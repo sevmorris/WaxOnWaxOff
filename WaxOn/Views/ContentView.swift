@@ -124,8 +124,18 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.black.opacity(0.05))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                FileInfoStatsView(file: file)
             }
             .padding()
+        } else if let phase = viewModel.mixPhase {
+            VStack(spacing: 10) {
+                ProgressView().scaleEffect(1.2)
+                Text(phase)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack {
                 Image(systemName: "waveform")

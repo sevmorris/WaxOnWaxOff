@@ -10,7 +10,7 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 
 ## Download
 
-**[WaxOn v2.4 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.4.dmg)**
+**[WaxOn v2.5 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.5.dmg)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
@@ -38,6 +38,8 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 - **Custom Output Directory**: Optionally set a dedicated output folder
 - **Reveal in Finder**: Click to reveal processed output files
 - **Waveform Preview**: Select a file to view its waveform with dB scale
+- **File Stats**: After selecting a file, a stats strip below the waveform shows format, sample rate, channels, bit depth, duration, bit rate, RMS, peak, crest factor, and integrated LUFS (ITU-R BS.1770)
+- **Mix Progress**: The waveform panel shows a live phase indicator (Mixing → Filtering → Analyzing loudness → Normalizing → Limiting) while a mix is rendering
 
 ## System Requirements
 

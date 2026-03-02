@@ -11,6 +11,7 @@ final class ContentViewModel {
         didSet { settings.save() }
     }
     var isProcessing = false
+    var mixPhase: String? = nil
     var alertMessage: String?
     private var processingTask: Task<Void, Never>?
 
@@ -37,6 +38,7 @@ final class ContentViewModel {
         for file in newFiles {
             analyzeFile(file)
             generateWaveform(file)
+            analyzeFileInfo(file)
         }
     }
 
@@ -132,7 +134,11 @@ final class ContentViewModel {
         processingTask = Task {
             do {
                 let processor = AudioProcessor(settings: settings)
-                let result = try await processor.mixAndProcess(inputs: selectedURLs)
+                let result = try await processor.mixAndProcess(inputs: selectedURLs) { [weak self] phase in
+                    Task { @MainActor [weak self] in
+                        self?.mixPhase = phase
+                    }
+                }
                 let newItem = FileItem(url: result.output)
                 files.append(newItem)
                 if let idx = files.firstIndex(where: { $0.id == newItem.id }) {
@@ -145,7 +151,17 @@ final class ContentViewModel {
                 alertMessage = error.localizedDescription
             }
             isProcessing = false
+            mixPhase = nil
             processingTask = nil
+        }
+    }
+
+    private func analyzeFileInfo(_ file: FileItem) {
+        Task {
+            if let info = try? await AudioAnalyzer.info(url: file.url),
+               let idx = files.firstIndex(where: { $0.id == file.id }) {
+                files[idx].fileInfo = info
+            }
         }
     }
 

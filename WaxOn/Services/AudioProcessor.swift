@@ -58,7 +58,7 @@ actor AudioProcessor {
         }
     }
 
-    func mixAndProcess(inputs: [URL]) async throws -> JobResult {
+    func mixAndProcess(inputs: [URL], onPhase: (@Sendable (String) -> Void)? = nil) async throws -> JobResult {
         guard !inputs.isEmpty else { throw ProcessingError.invalidInput }
         let fm = FileManager.default
         for url in inputs {
@@ -80,6 +80,7 @@ actor AudioProcessor {
         defer { try? fm.removeItem(at: work) }
 
         // Step 0: amix N inputs → rawMix.wav
+        onPhase?("Mixing \(n) files…")
         let rawMixURL = work.appendingPathComponent("rawMix.wav")
         var amixArgs = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
         for url in inputs {
@@ -93,6 +94,7 @@ actor AudioProcessor {
         try Task.checkCancellation()
 
         // Step 1: Highpass + phase rotation + channel selection + resample
+        onPhase?("Filtering…")
         let isStereo = settings.outputChannels == .stereo
         let outputChannelCount = isStereo ? "2" : "1"
         let phaseFilter = "allpass=f=200:t=q:w=0.707,"
@@ -118,6 +120,7 @@ actor AudioProcessor {
         if settings.loudnormEnabled {
             let target = settings.loudnormTarget
             let tp = settings.limitDb
+            onPhase?("Analyzing loudness…")
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
             let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
@@ -127,6 +130,7 @@ actor AudioProcessor {
 
             let stats = try parseLoudnormStats(analysisOutput)
 
+            onPhase?("Normalizing…")
             let normURL = work.appendingPathComponent("mix_norm.wav")
             let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
 
@@ -143,6 +147,7 @@ actor AudioProcessor {
         try Task.checkCancellation()
 
         // Step 3: 2× oversample → brick-wall limiter → resample → final output
+        onPhase?("Limiting…")
         let oversampleSr = sr * 2
         let step3Af = [
             "aresample=\(oversampleSr)",
