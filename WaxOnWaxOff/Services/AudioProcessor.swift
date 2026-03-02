@@ -466,7 +466,7 @@ actor AudioProcessor {
         let here = input.deletingLastPathComponent()
         if fm.isWritableFile(atPath: here.path) { return here }
 
-        let music = fm.homeDirectoryForCurrentUser.appendingPathComponent("Music/WaxOn", isDirectory: true)
+        let music = fm.homeDirectoryForCurrentUser.appendingPathComponent("Music/WaxOnWaxOff", isDirectory: true)
         if (try? fm.createDirectory(at: music, withIntermediateDirectories: true)) != nil {
             return music
         }
