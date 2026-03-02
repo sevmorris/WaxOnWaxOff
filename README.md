@@ -1,20 +1,12 @@
 **Podcast Audio Prep for macOS**
 
-WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting in a single drag-and-drop workflow, outputting 24-bit WAV files.
+WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing — high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution — EBU R128 loudness normalization, true peak control, and MP3 encoding.
 
-WaxOn does not perform noise reduction, de-essing, or any other restoration — it's a first-step ingest processor that gets your raw recordings into a consistent, workable format before further prep or editing.
-
-## Design Philosophy
-
-WaxOn is focused on podcast audio prep. It exposes the controls that matter for that job and keeps sensible defaults for everything else. The goal is a low-friction workflow: drop your files in, configure what you care about, and get to editing.
-
-## Download
-
-**[WaxOn v2.6 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.6.dmg)** · **[Manual](https://sevmorris.github.io/WaxOn/)**
+**[Download v1.0 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.0.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
-> macOS will block the app with a malware warning because it is not notarized with Apple. After mounting the DMG and dragging WaxOn to Applications, **you must run this command in Terminal:**
+> macOS will block the app because it is not notarized with Apple. After dragging WaxOn to Applications, **run this command in Terminal:**
 >
 > ```
 > xattr -cr /Applications/WaxOn.app
@@ -22,80 +14,67 @@ WaxOn is focused on podcast audio prep. It exposes the controls that matter for 
 >
 > Without this step, macOS will refuse to open the app.
 
-## Features
+## WaxOn — Raw Recording Prep
 
-- **High-Pass Filter**: Configurable cutoff (40–90 Hz, default 80 Hz) removes low-frequency rumble and handling noise
-- **Loudness Normalization**: Optional two-pass EBU R128 normalization with configurable target (-35 to -16 LUFS, default -30). Uses linear gain for transparent level matching across files. True peak target respects your ceiling setting.
-- **Brick-Wall Limiting**: Configurable ceiling (-3 to -1 dB) with 2x oversampled true peak limiting
-- **Phase Rotation**: Automatic 200 Hz allpass to reduce peak asymmetry and improve headroom
-- **Mono or Stereo Output**: Mono with left/right channel selection, or stereo passthrough
-- **Sample Rate Conversion**: 44.1 kHz or 48 kHz output
-- **Drag & Drop**: Drop audio files onto the window to process
-- **Batch Processing**: Process multiple files in parallel (up to 3 concurrent jobs) with per-file progress
-- **Mix**: Select 2 or more files and mix them down to a single processed output — mixed with normalized amix, then run through the full WaxOn pipeline
-- **Input Validation**: Unsupported file formats are rejected automatically
-- **File Reordering**: Drag to reorder files in the processing queue
-- **Custom Output Directory**: Optionally set a dedicated output folder
-- **Reveal in Finder**: Click to reveal processed output files
-- **Waveform Preview**: Select a file to view its waveform with dB scale
-- **File Stats**: After selecting a file, a stats strip below the waveform shows format, sample rate, channels, bit depth, duration, bit rate, RMS, peak, crest factor, and integrated LUFS (ITU-R BS.1770)
-- **Mix Progress**: The waveform panel shows a live phase indicator (Mixing → Filtering → Analyzing loudness → Normalizing → Limiting) while a mix is rendering
+Use WaxOn on raw recordings before editing. Drop your files in, configure what you care about, and get to editing.
+
+- **High-Pass Filter** — configurable cutoff (40–90 Hz, default 80 Hz) removes rumble, HVAC hum, and handling noise
+- **Loudness Normalization** — optional two-pass EBU R128 with configurable target (−35 to −16 LUFS). Linear gain only — dynamics fully preserved
+- **Brick-Wall Limiting** — 2× oversampled true peak control at the chosen ceiling (−1 to −3 dB)
+- **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
+- **Mono or Stereo Output** — mono with left/right channel extraction, or stereo passthrough
+- **Sample Rate Conversion** — 44.1 kHz or 48 kHz output
+- **Mix** — select 2+ files and combine them into a single processed output (host + guest, stems, etc.)
+- **Batch Processing** — up to 3 concurrent jobs with per-file progress
+
+**Output:** `{name}-{rate}waxon-{limit}.wav` (24-bit WAV)
+
+## WaxOff — Delivery & Mastering
+
+Use WaxOff on your finished, edited mix. Apply broadcast-standard loudness normalization and deliver as WAV, MP3, or both.
+
+- **EBU R128 Loudness Normalization** — two-pass analysis + linear gain. No dynamic processing; stereo image and transients are unchanged
+- **True Peak Control** — configurable ceiling (−3.0 to −0.1 dBTP, default −1.0)
+- **WAV + MP3 Output** — 24-bit WAV, CBR MP3 (128/160/192 kbps), or both
+- **Phase Rotation** — optional 150 Hz allpass to reduce crest factor on bass-heavy material
+- **Presets** — three built-in presets (Podcast Standard, Podcast Loud, WAV Only Mastering) plus custom presets
+- **Sample Rate Conversion** — 44.1 kHz or 48 kHz
+
+**Output:** `{name}-lev-{target}LUFS.wav` / `.mp3`
+
+### Built-In Presets
+
+| Preset | Target | True Peak | Output | MP3 | Sample Rate |
+|--------|--------|-----------|--------|-----|-------------|
+| Podcast Standard | −18 LUFS | −1.0 dBTP | WAV + MP3 | 160 kbps | 44.1 kHz |
+| Podcast Loud | −16 LUFS | −1.0 dBTP | WAV + MP3 | 160 kbps | 44.1 kHz |
+| WAV Only (Mastering) | −18 LUFS | −1.0 dBTP | WAV only | — | 48 kHz |
+
+## Shared Features
+
+- **Waveform Preview** — select a file to view its waveform with dB scale
+- **File Stats** — format, sample rate, channels, bit depth, duration, bit rate, RMS, peak, crest factor, and integrated LUFS
+- **Drag & Drop** — drop files anywhere on the window
+- **Resizable Layout** — drag the divider between file list and waveform panel
+- **Custom Output Directory** — optionally set a dedicated output folder
+- **Reveal in Finder** — click to reveal processed files
+- **Delete Key** — press Delete to remove selected files from the queue
+- **Independent File Lists** — each mode keeps its own queue; switching modes doesn't disturb your work
+
+## Workflow
+
+```
+Raw recordings → WaxOn → Edit in DAW → WaxOff → Distribute
+```
+
+## Supported Formats
+
+WAV, AIFF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC. FFmpeg is bundled — no separate installation required.
 
 ## System Requirements
 
 - macOS 14.0 (Sonoma) or later
-- FFmpeg (bundled or installed via Homebrew)
-
-## Usage
-
-1. Launch WaxOn
-2. Configure your settings:
-   - **Sample Rate**: 44.1 kHz or 48 kHz
-   - **Output**: Mono or Stereo
-   - **Channel** (mono only): Left or Right from stereo source
-   - **Limiter**: Ceiling level (e.g., -1.0 dB)
-3. Drag and drop audio files onto the window
-4. Click "Process" — or select 2+ files and click "Mix" to combine them into a single processed output
-5. Output files are saved alongside the originals with a `-waxon` suffix (or to your configured output directory)
-
-## Output Naming
-
-```
-{original-name}-{samplerate}waxon-{limit}dB.wav
-```
-
-Example: `episode-01-44kwaxon-1dB.wav`
-
-Mix output:
-
-```
-mix-{N}-files-{samplerate}waxon-{limit}dB.wav
-```
-
-Example: `mix-2-files-44kwaxon-1dB.wav`
-
-## Additional Settings
-
-- **High Pass**: High-pass filter cutoff frequency (default 80 Hz, range 40–90 Hz)
-- **Loudness Norm**: Enable EBU R128 loudness normalization
-- **Target**: Integrated loudness target (default -30 LUFS, range -35 to -16 LUFS)
-- **Output Directory**: Set a custom output folder (default: saves alongside source files)
-
-## Processing Pipeline
-
-WaxOn uses FFmpeg with a multi-pass pipeline:
-
-1. **High-pass filtering**, channel selection (if mono), phase rotation, and resampling to target sample rate
-2. **Loudness normalization** (if enabled) — two-pass EBU R128 analysis followed by linear gain application
-3. **Brick-wall limiting** with 2x oversampled true peak control
-
-Output format: 24-bit WAV
-
-## Companion App
-
-[WaxOff](https://github.com/sevmorris/WaxOff) finalizes your podcast mix for distribution — EBU R128 loudness normalization, optional phase rotation, and MP3 encoding.
-
-**Workflow**: Raw recordings → **WaxOn** → Edit in DAW → **WaxOff** → Distribute
+- Apple Silicon or Intel Mac
 
 ## License
 
