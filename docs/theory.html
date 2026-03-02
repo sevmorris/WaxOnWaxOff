@@ -416,7 +416,7 @@
 
     <h3>Loudness Range (LRA)</h3>
     <p>LRA measures the spread between loud and quiet sections of a program — its macro-dynamics — in Loudness Units. It is computed as the difference between the 95th and 10th percentiles of the short-term loudness distribution (after gating). EBU R128 does not mandate a specific LRA target but recommends keeping it below 18 LU for broadcast.</p>
-    <p>WaxOff exposes LRA as a configurable parameter (default 11). The <code>loudnorm</code> filter can apply gentle dynamic compression to constrain LRA to the target value. At LRA=11, some limiting of macro-dynamics is applied; lower values compress more aggressively. WaxOn hardcodes LRA=20 (effectively unconstrained), which is correct for ingest where you want zero dynamic processing.</p>
+    <p>Both modes pass an LRA value to the <code>loudnorm</code> filter. WaxOn hardcodes LRA=20 (effectively unconstrained — no dynamic processing). WaxOff hardcodes LRA=11, which allows the filter to apply gentle dynamic compression to constrain the macro-dynamic spread of a finished mix. Lower values compress more aggressively; higher values relax the constraint.</p>
   </section>
 
   <!-- Two-Pass -->
@@ -609,8 +609,8 @@
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW — high-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
 
-    <h3>User-Configurable LRA</h3>
-    <p>Unlike WaxOn's hardcoded LRA=20, WaxOff exposes LRA as a user setting. For delivery, some macro-dynamic constraint is appropriate — a podcast episode should have a consistent loudness profile throughout. The default of 11 LU is a reasonable target: it constrains macro-dynamics enough to ensure consistent perceived loudness across the episode without audibly squashing the mix's dynamics.</p>
+    <h3>Hardcoded LRA=11</h3>
+    <p>WaxOff hardcodes <code>LRA=11</code> rather than exposing it as a setting. For delivery, some macro-dynamic constraint is appropriate — a podcast episode should have a consistent loudness profile throughout. 11 LU is a reasonable fixed value: it constrains macro-dynamics enough to ensure consistent perceived loudness across the episode without audibly squashing the mix's dynamics.</p>
     <p>The loudnorm filter with LRA=11 applies gentle, program-level gain changes (not sample-by-sample compression). The effect is less aggressive than any compressor you would have used during editing.</p>
 
     <h3>Delivery Targets</h3>
