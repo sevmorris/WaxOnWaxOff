@@ -12,6 +12,15 @@ struct WaxOnWaxOffApp: App {
     @State private var appState = AppState()
     @Environment(\.openWindow) private var openWindow
 
+    init() {
+        Task {
+            let result = await UpdateChecker().check()
+            if case .available = result {
+                await checkForUpdates()
+            }
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             if appState.mode == nil {
