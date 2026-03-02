@@ -125,6 +125,30 @@ final class ContentViewModel {
         processingTask = nil
     }
 
+    func mixSelected() {
+        guard selectedFileIDs.count >= 2 else { return }
+        let selectedURLs = files.filter { selectedFileIDs.contains($0.id) }.map { $0.url }
+        isProcessing = true
+        processingTask = Task {
+            do {
+                let processor = AudioProcessor(settings: settings)
+                let result = try await processor.mixAndProcess(inputs: selectedURLs)
+                let newItem = FileItem(url: result.output)
+                files.append(newItem)
+                if let idx = files.firstIndex(where: { $0.id == newItem.id }) {
+                    files[idx].status = .processed(outputURL: result.output)
+                }
+                generateOutputWaveform(id: newItem.id, url: result.output)
+                await NotificationService.showCompletionNotification(fileCount: 1)
+            } catch is CancellationError {
+            } catch {
+                alertMessage = error.localizedDescription
+            }
+            isProcessing = false
+            processingTask = nil
+        }
+    }
+
     private func analyzeFile(_ file: FileItem) {
         guard let index = files.firstIndex(where: { $0.id == file.id }) else { return }
         files[index].status = .analyzing

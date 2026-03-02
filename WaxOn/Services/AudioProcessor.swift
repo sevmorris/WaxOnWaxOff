@@ -58,6 +58,122 @@ actor AudioProcessor {
         }
     }
 
+    func mixAndProcess(inputs: [URL]) async throws -> JobResult {
+        guard !inputs.isEmpty else { throw ProcessingError.invalidInput }
+        let fm = FileManager.default
+        for url in inputs {
+            guard fm.fileExists(atPath: url.path) else { throw ProcessingError.invalidInput }
+        }
+
+        let tools = try await FFmpegManager.shared.ensureTools()
+        let sr = settings.sampleRate.rawValue
+        let rateTag = sr == 44100 ? "44k" : "48k"
+        let limitAmp = pow(10.0, settings.limitDb / 20.0)
+        let limitTag = formatDbTag(settings.limitDb)
+        let outDir = bestOutputDir(for: inputs[0])
+        let n = inputs.count
+        let outName = "mix-\(n)-files-\(rateTag)waxon-\(limitTag).wav"
+        let finalURL = outDir.appendingPathComponent(outName)
+        let tmpURL = outDir.appendingPathComponent(".\(outName).tmp")
+
+        let work = try makeTemp(prefix: "waxon_mix_\(rateTag)_")
+        defer { try? fm.removeItem(at: work) }
+
+        // Step 0: amix N inputs → rawMix.wav
+        let rawMixURL = work.appendingPathComponent("rawMix.wav")
+        var amixArgs = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
+        for url in inputs {
+            amixArgs += ["-i", url.path]
+        }
+        amixArgs += [
+            "-filter_complex", "amix=inputs=\(n):duration=longest:normalize=1",
+            "-c:a", "pcm_s24le", "-ar", "\(sr)", rawMixURL.path
+        ]
+        try await runFFmpeg(exe: tools.ffmpeg, args: amixArgs)
+        try Task.checkCancellation()
+
+        // Step 1: Highpass + phase rotation + channel selection + resample
+        let isStereo = settings.outputChannels == .stereo
+        let outputChannelCount = isStereo ? "2" : "1"
+        let phaseFilter = "allpass=f=200:t=q:w=0.707,"
+        let midURL = work.appendingPathComponent("mix_mid.wav")
+
+        let step1Af: String
+        if isStereo {
+            step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+        } else {
+            let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
+            step1Af = "highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
+        }
+
+        try await runFFmpeg(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", rawMixURL.path, "-af", step1Af,
+            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
+        ])
+        try Task.checkCancellation()
+
+        // Step 2: Optional EBU R128 two-pass loudnorm
+        let limiterInput: URL
+        if settings.loudnormEnabled {
+            let target = settings.loudnormTarget
+            let tp = settings.limitDb
+            let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
+            let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner",
+                "-i", midURL.path, "-af", analyzeAf,
+                "-f", "null", "/dev/null"
+            ])
+
+            let stats = try parseLoudnormStats(analysisOutput)
+
+            let normURL = work.appendingPathComponent("mix_norm.wav")
+            let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
+
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", midURL.path, "-af", normAf,
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
+            ])
+
+            limiterInput = normURL
+        } else {
+            limiterInput = midURL
+        }
+        try Task.checkCancellation()
+
+        // Step 3: 2× oversample → brick-wall limiter → resample → final output
+        let oversampleSr = sr * 2
+        let step3Af = [
+            "aresample=\(oversampleSr)",
+            "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
+            "aresample=\(sr)"
+        ].joined(separator: ",")
+
+        if fm.fileExists(atPath: tmpURL.path) {
+            try? fm.removeItem(at: tmpURL)
+        }
+
+        try await runFFmpeg(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", limiterInput.path, "-af", step3Af,
+            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
+        ])
+
+        guard let attrs = try? fm.attributesOfItem(atPath: tmpURL.path),
+              let size = attrs[.size] as? NSNumber,
+              size.intValue > 0 else {
+            throw ProcessingError.outputMissing
+        }
+
+        if fm.fileExists(atPath: finalURL.path) {
+            try? fm.removeItem(at: finalURL)
+        }
+        try fm.moveItem(at: tmpURL, to: finalURL)
+
+        return JobResult(id: nil, input: inputs[0], output: finalURL)
+    }
+
     private func processOne(_ input: URL, id: UUID, tools: FFmpegManager.Paths) async throws -> JobResult? {
         let fm = FileManager.default
         guard fm.fileExists(atPath: input.path) else {

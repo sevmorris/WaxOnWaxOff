@@ -10,7 +10,7 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 
 ## Download
 
-**[WaxOn v2.3 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.3.dmg)**
+**[WaxOn v2.4 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.4.dmg)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
@@ -32,6 +32,7 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 - **Sample Rate Conversion**: 44.1 kHz or 48 kHz output
 - **Drag & Drop**: Drop audio files onto the window to process
 - **Batch Processing**: Process multiple files in parallel (up to 3 concurrent jobs) with per-file progress
+- **Mix**: Select 2 or more files and mix them down to a single processed output — mixed with normalized amix, then run through the full WaxOn pipeline
 - **Input Validation**: Unsupported file formats are rejected automatically
 - **File Reordering**: Drag to reorder files in the processing queue
 - **Custom Output Directory**: Optionally set a dedicated output folder
@@ -52,7 +53,7 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
    - **Channel** (mono only): Left or Right from stereo source
    - **Limiter**: Ceiling level (e.g., -1.0 dB)
 3. Drag and drop audio files onto the window
-4. Click "Process"
+4. Click "Process" — or select 2+ files and click "Mix" to combine them into a single processed output
 5. Output files are saved alongside the originals with a `-waxon` suffix (or to your configured output directory)
 
 ## Output Naming
@@ -62,6 +63,14 @@ WaxOn is intentionally minimal. It does one thing — prepares raw podcast recor
 ```
 
 Example: `episode-01-44kwaxon-1dB.wav`
+
+Mix output:
+
+```
+mix-{N}-files-{samplerate}waxon-{limit}dB.wav
+```
+
+Example: `mix-2-files-44kwaxon-1dB.wav`
 
 ## Additional Settings
 

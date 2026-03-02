@@ -78,6 +78,13 @@ struct ContentView: View {
             }
 
             Button {
+                viewModel.mixSelected()
+            } label: {
+                Label("Mix", systemImage: "waveform.badge.plus")
+            }
+            .disabled(viewModel.selectedFileIDs.count < 2 || viewModel.isProcessing)
+
+            Button {
                 viewModel.removeSelected()
             } label: {
                 Label("Remove", systemImage: "minus.circle")
