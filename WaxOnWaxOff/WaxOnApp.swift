@@ -29,6 +29,14 @@ struct WaxOnWaxOffApp: App {
                     openWindow(id: "help")
                 }
                 .keyboardShortcut("?", modifiers: .command)
+
+                Divider()
+
+                Button("Send Feedback…") {
+                    if let url = URL(string: "mailto:7morris@gmail.com?subject=WaxOnWaxOff%20Feedback") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
             }
         }
 
