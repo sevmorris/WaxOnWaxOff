@@ -37,6 +37,12 @@ struct WaxOnWaxOffApp: App {
                         NSWorkspace.shared.open(url)
                     }
                 }
+
+                Button("Report an Issue…") {
+                    if let url = URL(string: "https://github.com/sevmorris/WaxOnWaxOff/issues/new") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
             }
         }
 
