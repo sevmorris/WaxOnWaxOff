@@ -55,6 +55,10 @@ struct FileInfoStatsView: View {
                 .font(.system(size: 12.5, weight: .medium).monospaced())
                 .foregroundStyle(.primary)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.primary.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func formatSR(_ hz: Double) -> String {

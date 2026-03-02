@@ -35,26 +35,37 @@ struct WaveformView: View {
     private var dbScale: some View {
         GeometryReader { geometry in
             let midY = geometry.size.height / 2
+            let visible = visibleLabels(midY: midY)
 
             ZStack {
-                ForEach(dbLevels, id: \.self) { db in
-                    let amplitude = pow(10, db / 20)
-                    let yOffset = (1 - amplitude) * midY
-
-                    Text(formatDb(db))
+                ForEach(visible, id: \.db) { item in
+                    Text(formatDb(item.db))
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .position(x: 16, y: yOffset)
+                        .position(x: 16, y: item.y)
 
-                    if db == 0 {
-                        Text(formatDb(db))
+                    if item.db == 0 {
+                        Text(formatDb(item.db))
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.secondary)
-                            .position(x: 16, y: geometry.size.height - yOffset)
+                            .position(x: 16, y: geometry.size.height - item.y)
                     }
                 }
             }
         }
+    }
+
+    private func visibleLabels(midY: CGFloat) -> [(db: Double, y: CGFloat)] {
+        let edge: CGFloat = 6    // keep label center this far from the view edge
+        let minGap: CGFloat = 12 // minimum pixel gap between consecutive labels
+        var result: [(db: Double, y: CGFloat)] = []
+        for db in dbLevels {
+            let amplitude = pow(10.0, db / 20.0)
+            let y = max(edge, min((1 - amplitude) * midY, midY - edge))
+            if let prev = result.last, y - prev.y < minGap { continue }
+            result.append((db, y))
+        }
+        return result
     }
 
     private var dbGridLines: some View {
