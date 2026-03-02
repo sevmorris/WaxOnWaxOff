@@ -30,6 +30,10 @@ struct WaxOnWaxOffApp: App {
                 }
                 .keyboardShortcut("?", modifiers: .command)
 
+                Button("Check for Updates…") {
+                    Task { await checkForUpdates() }
+                }
+
                 Divider()
 
                 Button("Send Feedback…") {
