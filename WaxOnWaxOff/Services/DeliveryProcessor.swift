@@ -188,9 +188,20 @@ actor DeliveryProcessor {
         output: URL,
         settings: WaxOffSettings
     ) async throws {
+        // 2× oversample → -2 dBTP brick-wall limit → resample back
+        // Lossy codecs can introduce +0.1–1.5 dB inter-sample peaks; this prevents decode clipping.
+        let limitAmp = pow(10.0, -2.0 / 20.0)
+        let oversampleSr = settings.sampleRate * 2
+        let preEncodeFilter = [
+            "aresample=\(oversampleSr)",
+            "alimiter=limit=\(String(format: "%.6f", limitAmp)):attack=1:release=20:level=disabled",
+            "aresample=\(settings.sampleRate)"
+        ].joined(separator: ",")
+
         let args = [
             "-hide_banner", "-nostats", "-y",
             "-i", input.path,
+            "-af", preEncodeFilter,
             "-c:a", "libmp3lame",
             "-b:a", "\(settings.mp3Bitrate)k",
             "-ar", String(settings.sampleRate),
