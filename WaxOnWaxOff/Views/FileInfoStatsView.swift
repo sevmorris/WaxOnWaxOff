@@ -8,12 +8,8 @@ struct FileInfoStatsView: View {
             if let info = file.fileInfo {
                 infoRow(info)
             }
-            if file.fileInfo != nil && file.stats != nil {
-                Divider().padding(.vertical, 8)
-            }
-            if let stats = file.stats {
-                statsRow(stats)
-            }
+            Divider().padding(.vertical, 8)
+            statsRow(file.stats)
         }
         .padding(.top, 6)
     }
@@ -34,13 +30,12 @@ struct FileInfoStatsView: View {
         }
     }
 
-    @ViewBuilder
-    private func statsRow(_ stats: AudioStats) -> some View {
+    private func statsRow(_ stats: AudioStats?) -> some View {
         HStack(alignment: .top, spacing: 20) {
-            statBlock("RMS", String(format: "%.1f dBFS", stats.rms))
-            statBlock("PEAK", String(format: "%.1f dBFS", stats.peak))
-            statBlock("CREST", String(format: "%.1f dB", stats.crest))
-            statBlock("LUFS", String(format: "%.1f", stats.lufs))
+            statBlock("RMS",   stats.map { String(format: "%.1f dBFS", $0.rms)   } ?? "---")
+            statBlock("PEAK",  stats.map { String(format: "%.1f dBFS", $0.peak)  } ?? "---")
+            statBlock("CREST", stats.map { String(format: "%.1f dB",   $0.crest) } ?? "---")
+            statBlock("LUFS",  stats.map { String(format: "%.1f",      $0.lufs)  } ?? "---")
         }
     }
 

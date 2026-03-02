@@ -152,8 +152,8 @@ struct WaxOffMainView: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: nsImage.size.width * 0.25,
-                           height: nsImage.size.height * 0.25)
+                    .frame(width: nsImage.size.width * 0.1875,
+                           height: nsImage.size.height * 0.1875)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: .bottomTrailing)
                     .padding(.bottom, 12)
