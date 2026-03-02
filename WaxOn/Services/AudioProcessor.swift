@@ -72,7 +72,7 @@ actor AudioProcessor {
         let limitTag = formatDbTag(settings.limitDb)
         let outDir = bestOutputDir(for: inputs[0])
         let n = inputs.count
-        let outName = "mix-\(n)-files-\(rateTag)waxon-\(limitTag).wav"
+        let outName = "mix-\(rateTag)waxon-\(limitTag).wav"
         let finalURL = outDir.appendingPathComponent(outName)
         let tmpURL = outDir.appendingPathComponent(".\(outName).tmp")
 

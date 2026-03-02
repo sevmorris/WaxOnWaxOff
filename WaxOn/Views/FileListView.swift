@@ -17,6 +17,11 @@ struct FileListView: View {
                 viewModel.moveFiles(from: source, to: destination)
             }
         }
+        .onKeyPress(.delete) {
+            guard !viewModel.selectedFileIDs.isEmpty else { return .ignored }
+            viewModel.removeSelected()
+            return .handled
+        }
     }
 }
 

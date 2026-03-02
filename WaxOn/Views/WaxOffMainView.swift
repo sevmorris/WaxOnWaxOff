@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct ContentView: View {
+struct WaxOffMainView: View {
     @Environment(AppState.self) var appState
-    var viewModel: ContentViewModel
+    var viewModel: DeliveryViewModel
     @State private var fileListWidth: CGFloat = 250
 
     private var selectedFile: FileItem? {
@@ -25,11 +25,8 @@ struct ContentView: View {
                     .frame(width: 4)
                     .contentShape(Rectangle())
                     .onHover { hovering in
-                        if hovering {
-                            NSCursor.resizeLeftRight.push()
-                        } else {
-                            NSCursor.pop()
-                        }
+                        if hovering { NSCursor.resizeLeftRight.push() }
+                        else { NSCursor.pop() }
                     }
                     .gesture(
                         DragGesture(minimumDistance: 1)
@@ -42,7 +39,7 @@ struct ContentView: View {
                 waveformSection
                     .frame(minWidth: 300)
             }
-            SettingsView(viewModel: viewModel)
+            WaxOffSettingsView(viewModel: viewModel)
         }
         .frame(minWidth: 900, minHeight: 620)
         .padding(.bottom)
@@ -61,6 +58,11 @@ struct ContentView: View {
         HStack {
             ModeSwitcher()
 
+            Divider()
+                .frame(height: 20)
+
+            WaxOffPresetPicker(viewModel: viewModel)
+
             Spacer()
 
             if viewModel.isProcessing {
@@ -78,13 +80,6 @@ struct ContentView: View {
                 }
                 .disabled(viewModel.files.isEmpty)
             }
-
-            Button {
-                viewModel.mixSelected()
-            } label: {
-                Label("Mix", systemImage: "waveform.badge.plus")
-            }
-            .disabled(viewModel.selectedFileIDs.count < 2 || viewModel.isProcessing)
 
             Button {
                 viewModel.removeSelected()
@@ -109,7 +104,7 @@ struct ContentView: View {
         if viewModel.files.isEmpty {
             EmptyStateView()
         } else {
-            FileListView(viewModel: viewModel)
+            DeliveryFileListView(viewModel: viewModel)
         }
     }
 
@@ -131,7 +126,7 @@ struct ContentView: View {
                     FileInfoStatsView(file: file)
                 }
                 .padding()
-            } else if let phase = viewModel.mixPhase {
+            } else if let phase = viewModel.deliveryPhase {
                 VStack(spacing: 10) {
                     ProgressView().scaleEffect(1.2)
                     Text(phase)
@@ -152,7 +147,7 @@ struct ContentView: View {
             }
         }
         .background {
-            if let url = Bundle.main.url(forResource: "WaxOn_bg", withExtension: "png"),
+            if let url = Bundle.main.url(forResource: "WaxOff_bg", withExtension: "png"),
                let nsImage = NSImage(contentsOf: url) {
                 Image(nsImage: nsImage)
                     .resizable()
@@ -176,7 +171,28 @@ struct ContentView: View {
     }
 }
 
-#Preview {
-    ContentView(viewModel: ContentViewModel())
-        .environment(AppState())
+// MARK: - DeliveryFileListView
+
+private struct DeliveryFileListView: View {
+    @Bindable var viewModel: DeliveryViewModel
+
+    var body: some View {
+        List(selection: $viewModel.selectedFileIDs) {
+            ForEach(viewModel.files) { file in
+                FileRowView(file: file)
+                    .tag(file.id)
+            }
+            .onDelete { offsets in
+                viewModel.removeFiles(at: offsets)
+            }
+            .onMove { source, destination in
+                viewModel.moveFiles(from: source, to: destination)
+            }
+        }
+        .onKeyPress(.delete) {
+            guard !viewModel.selectedFileIDs.isEmpty else { return .ignored }
+            viewModel.removeSelected()
+            return .handled
+        }
+    }
 }

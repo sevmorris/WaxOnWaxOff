@@ -27,16 +27,16 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                if viewModel.settings.outputChannels == .mono {
-                    GridRow {
-                        Text("Channel")
-                        Picker("", selection: $viewModel.settings.channel) {
-                            Text("Left").tag(WaxOnSettings.MonoChannel.left)
-                            Text("Right").tag(WaxOnSettings.MonoChannel.right)
-                        }
-                        .pickerStyle(.segmented)
+                GridRow {
+                    Text("Channel")
+                    Picker("", selection: $viewModel.settings.channel) {
+                        Text("Left").tag(WaxOnSettings.MonoChannel.left)
+                        Text("Right").tag(WaxOnSettings.MonoChannel.right)
                     }
+                    .pickerStyle(.segmented)
                 }
+                .disabled(viewModel.settings.outputChannels == .stereo)
+                .opacity(viewModel.settings.outputChannels == .stereo ? 0.4 : 1)
 
                 GridRow {
                     Text("Ceiling")
@@ -116,5 +116,6 @@ struct SettingsView: View {
         }
         .padding()
         .background(.thinMaterial)
+        .frame(minHeight: 280, alignment: .top)
     }
 }
