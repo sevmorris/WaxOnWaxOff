@@ -10,7 +10,7 @@ WaxOn is focused on podcast audio prep. It exposes the controls that matter for 
 
 ## Download
 
-**[WaxOn v2.5 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.5.dmg)** · **[Manual](https://sevmorris.github.io/WaxOn/)**
+**[WaxOn v2.6 (DMG)](https://github.com/sevmorris/WaxOn/releases/latest/download/WaxOn-v2.6.dmg)** · **[Manual](https://sevmorris.github.io/WaxOn/)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
