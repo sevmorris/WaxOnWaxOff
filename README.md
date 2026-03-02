@@ -6,7 +6,7 @@ WaxOn does not perform noise reduction, de-essing, or any other restoration — 
 
 ## Design Philosophy
 
-WaxOn is intentionally minimal. It does one thing — prepares raw podcast recordings for editing — and exposes only the controls that matter for that job. Sensible defaults handle the rest. Drop your files in, hit Process, and get to editing.
+WaxOn is focused on podcast audio prep. It exposes the controls that matter for that job and keeps sensible defaults for everything else. The goal is a low-friction workflow: drop your files in, configure what you care about, and get to editing.
 
 ## Download
 
