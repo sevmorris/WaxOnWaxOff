@@ -173,6 +173,24 @@ else
     done <<< "$OLD_TAGS"
 fi
 
+# ── Remove old Pages deployments ─────────────────────────────────────────────
+step "Removing old Pages deployments"
+ALL_DEPLOY_IDS=$(gh api "repos/$REPO/deployments?environment=github-pages&per_page=100" \
+    --jq '.[].id')
+OLD_DEPLOY_IDS=$(echo "$ALL_DEPLOY_IDS" | tail -n +2)
+if [[ -z "$OLD_DEPLOY_IDS" ]]; then
+    ok "No old deployments to remove"
+else
+    COUNT=0
+    while IFS= read -r deploy_id; do
+        gh api -X POST "repos/$REPO/deployments/${deploy_id}/statuses" \
+            -f state=inactive --silent 2>/dev/null || true
+        gh api -X DELETE "repos/$REPO/deployments/${deploy_id}" --silent 2>/dev/null || true
+        COUNT=$((COUNT + 1))
+    done <<< "$OLD_DEPLOY_IDS"
+    ok "Removed $COUNT old deployment(s)"
+fi
+
 # ── Clean up temp files ───────────────────────────────────────────────────────
 step "Cleaning up"
 rm -rf "$STAGING" "$MOUNT" "$DERIVED_DATA"
