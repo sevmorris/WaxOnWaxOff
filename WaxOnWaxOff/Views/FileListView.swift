@@ -17,11 +17,14 @@ struct FileListView: View {
                 viewModel.moveFiles(from: source, to: destination)
             }
         }
-        .onKeyPress(.delete) {
-            guard !viewModel.selectedFileIDs.isEmpty else { return .ignored }
-            viewModel.removeSelected()
-            return .handled
-        }
+        .background(
+            Button("") {
+                guard !viewModel.selectedFileIDs.isEmpty else { return }
+                viewModel.removeSelected()
+            }
+            .keyboardShortcut(.delete, modifiers: [])
+            .hidden()
+        )
     }
 }
 
