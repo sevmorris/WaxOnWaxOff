@@ -568,7 +568,11 @@
 
   <section id="waxon-mix">
     <h2>Mix Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>Mix combines two or more audio files into a single processed output — useful for blending host and guest recordings, or merging any set of stems before editing.</p>
+    <p>Mix combines two or more audio files into a single processed output. The full WaxOn pipeline — high-pass filter, phase rotation, optional loudness normalization, and true-peak limiting — runs on the combined signal.</p>
+
+    <h3>Two Common Workflows</h3>
+    <p><strong>Mix raw recordings in one step.</strong> Drag two unprocessed tracks (e.g. host and guest recorded separately) into WaxOn, select both, and click Mix. The high-pass filter cleans up low-frequency buildup from the individual recordings before they are blended. Use the default High Pass setting (80 Hz) or adjust to taste.</p>
+    <p><strong>Mix pre-cleaned files.</strong> If you have already processed your individual tracks through WaxOn (or cleaned them in a DAW), you can mix the outputs directly. In this case the high-pass filter has already done its work. Set High Pass to <strong>DC Block</strong> (20 Hz) in Settings — it will remove only DC offset and infrasonic content without touching the voice range.</p>
 
     <h3>How to Mix</h3>
     <ol>
