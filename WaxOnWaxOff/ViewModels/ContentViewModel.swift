@@ -126,6 +126,17 @@ final class ContentViewModel {
     func cancelProcessing() {
         processingTask?.cancel()
         processingTask = nil
+        isProcessing = false
+        mixPhase = nil
+        for i in files.indices {
+            if case .processing = files[i].status {
+                if let stats = files[i].analysisStats {
+                    files[i].status = .ready(stats)
+                } else {
+                    files[i].status = .pending
+                }
+            }
+        }
     }
 
     func mixSelected() {

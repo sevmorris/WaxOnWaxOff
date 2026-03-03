@@ -296,6 +296,7 @@ actor AudioProcessor {
         process.arguments = args
         process.standardInput = FileHandle.nullDevice
 
+        nonisolated(unsafe) var cancelled = false
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 let stderrPipe = Pipe()
@@ -313,7 +314,7 @@ actor AudioProcessor {
 
                 process.terminationHandler = { proc in
                     readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal {
+                    if proc.terminationReason == .uncaughtSignal || cancelled {
                         continuation.resume(throwing: CancellationError())
                         return
                     }
@@ -333,6 +334,7 @@ actor AudioProcessor {
                 }
             }
         } onCancel: {
+            cancelled = true
             process.terminate()
         }
     }
@@ -348,6 +350,7 @@ actor AudioProcessor {
         process.arguments = args
         process.standardInput = FileHandle.nullDevice
 
+        nonisolated(unsafe) var cancelled = false
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                 let stderrPipe = Pipe()
@@ -365,7 +368,7 @@ actor AudioProcessor {
 
                 process.terminationHandler = { proc in
                     readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal {
+                    if proc.terminationReason == .uncaughtSignal || cancelled {
                         continuation.resume(throwing: CancellationError())
                         return
                     }
@@ -385,6 +388,7 @@ actor AudioProcessor {
                 }
             }
         } onCancel: {
+            cancelled = true
             process.terminate()
         }
     }
