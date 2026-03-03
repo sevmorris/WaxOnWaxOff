@@ -55,12 +55,14 @@ struct SettingsView: View {
                                 get: { Double(viewModel.settings.dcBlockHz) },
                                 set: { viewModel.settings.dcBlockHz = Int($0) }
                             ),
-                            in: 40...90,
+                            in: 20...90,
                             step: 5
                         )
-                        Text(viewModel.settings.dcBlockHz == 80
-                             ? "\(viewModel.settings.dcBlockHz) Hz · default"
-                             : "\(viewModel.settings.dcBlockHz) Hz")
+                        Text(viewModel.settings.dcBlockHz == 20
+                             ? "DC Block"
+                             : viewModel.settings.dcBlockHz == 80
+                               ? "\(viewModel.settings.dcBlockHz) Hz · default"
+                               : "\(viewModel.settings.dcBlockHz) Hz")
                             .frame(width: 110, alignment: .trailing)
                     }
                 }
