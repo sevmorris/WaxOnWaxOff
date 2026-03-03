@@ -8,6 +8,8 @@
 
 set -euo pipefail
 
+REPO="sevmorris/WaxOnWaxOff"
+
 # ── Args ──────────────────────────────────────────────────────────────────────
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <version>"
@@ -26,11 +28,17 @@ APP_PATH="$DERIVED_DATA/Build/Products/Release/WaxOnWaxOff.app"
 STAGING="/tmp/waxon_dmg_${VERSION}"
 DMG="/tmp/WaxOnWaxOff-${TAG}.dmg"
 MOUNT="/tmp/waxon_verify_${VERSION}"
+MANUAL="$PROJECT_DIR/docs/index.html"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step()  { echo "\n▶ $*"; }
 ok()    { echo "  ✓ $*"; }
 fail()  { echo "\n  ✗ $*" >&2; exit 1; }
+
+cleanup() {
+    rm -rf "$STAGING" "$MOUNT" "$DERIVED_DATA"
+    rm -f "$DMG"
+}
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 step "Preflight checks"
@@ -45,6 +53,11 @@ if [[ -n "$(git status --porcelain)" ]]; then
     fail "Working tree is dirty — commit or stash changes before releasing"
 fi
 ok "Working tree clean"
+
+if git tag | grep -q "^${TAG}$"; then
+    fail "Tag $TAG already exists — has this version been released?"
+fi
+ok "Tag $TAG is available"
 
 # ── Version bump ──────────────────────────────────────────────────────────────
 step "Bumping version to $VERSION"
@@ -112,7 +125,6 @@ ok "DMG contains $DMG_VERSION"
 
 # ── Update manual download link ───────────────────────────────────────────────
 step "Updating manual download link"
-MANUAL="$PROJECT_DIR/docs/index.html"
 sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\">Download v[0-9][0-9.]*|WaxOnWaxOff-${TAG}.dmg\">Download ${TAG}|g" "$MANUAL"
 git add "$MANUAL"
 git commit -m "docs: update download link to ${TAG}"
@@ -129,11 +141,33 @@ ok "Pushed $TAG"
 step "Creating GitHub release"
 RELEASE_NOTES="**[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**"
 gh release create "$TAG" "$DMG" \
-    --repo sevmorris/WaxOnWaxOff \
+    --repo "$REPO" \
     --title "WaxOn/WaxOff $TAG" \
     --notes "$RELEASE_NOTES"
 ok "Release published"
 
-# ── Done ──────────────────────────────────────────────────────────────────────
+# ── Remove old releases ───────────────────────────────────────────────────────
+step "Removing old releases"
+OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
+    --jq '.[].tagName' | grep -v "^${TAG}$" || true)
+if [[ -z "$OLD_TAGS" ]]; then
+    ok "No old releases to remove"
+else
+    while IFS= read -r old_tag; do
+        gh release delete "$old_tag" --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
+        git tag -d "$old_tag" 2>/dev/null || true
+        ok "Removed $old_tag"
+    done <<< "$OLD_TAGS"
+fi
+
+# ── Clean up temp files ───────────────────────────────────────────────────────
+step "Cleaning up"
+rm -rf "$STAGING" "$MOUNT" "$DERIVED_DATA"
+rm -f "$DMG"
+ok "Temp files removed"
+
+# ── Open release page ─────────────────────────────────────────────────────────
+RELEASE_URL="https://github.com/${REPO}/releases/tag/${TAG}"
 echo "\n✓ WaxOn/WaxOff $TAG released successfully."
-echo "  https://github.com/sevmorris/WaxOnWaxOff/releases/tag/$TAG"
+echo "  $RELEASE_URL"
+open "$RELEASE_URL"
