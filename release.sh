@@ -139,7 +139,20 @@ ok "Pushed $TAG"
 
 # ── GitHub release ────────────────────────────────────────────────────────────
 step "Creating GitHub release"
-RELEASE_NOTES="**[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**"
+PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1)
+if [[ -n "$PREV_TAG" ]]; then
+    CHANGES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" \
+        | grep -v "^- Bump version" \
+        | grep -v "^- docs: update download link")
+else
+    CHANGES=$(git log --pretty=format:"- %s" \
+        | grep -v "^- Bump version" \
+        | grep -v "^- docs: update download link")
+fi
+RELEASE_NOTES="**[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**
+
+### Changes
+${CHANGES}"
 gh release create "$TAG" "$DMG" \
     --repo "$REPO" \
     --title "WaxOn/WaxOff $TAG" \
