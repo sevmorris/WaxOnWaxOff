@@ -33,14 +33,21 @@ struct FileInfoStatsView: View {
     private func statsRow(_ stats: AudioStats?) -> some View {
         HStack(alignment: .top, spacing: 20) {
             statBlock("RMS",   stats.map { String(format: "%.1f dBFS", $0.rms)   } ?? "---")
-            statBlock("PEAK",  stats.map { String(format: "%.1f dBFS", $0.peak)  } ?? "---")
+            statBlock("PEAK",  stats.map { String(format: "%.1f dBFS", $0.peak)  } ?? "---",
+                      valueColor: stats.map { peakColor($0.peak) } ?? .primary)
             statBlock("CREST", stats.map { String(format: "%.1f dB",   $0.crest) } ?? "---")
             statBlock("LUFS",  stats.map { String(format: "%.1f",      $0.lufs)  } ?? "---")
         }
     }
 
+    private func peakColor(_ peak: Double) -> Color {
+        if peak >= 0   { return .red }
+        if peak >= -3  { return .orange }
+        return .primary
+    }
+
     @ViewBuilder
-    private func statBlock(_ label: String, _ value: String) -> some View {
+    private func statBlock(_ label: String, _ value: String, valueColor: Color = .primary) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
                 .font(.system(size: 9, weight: .semibold))
@@ -48,7 +55,7 @@ struct FileInfoStatsView: View {
                 .kerning(0.4)
             Text(value)
                 .font(.system(size: 12.5, weight: .medium).monospaced())
-                .foregroundStyle(.primary)
+                .foregroundStyle(valueColor)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
