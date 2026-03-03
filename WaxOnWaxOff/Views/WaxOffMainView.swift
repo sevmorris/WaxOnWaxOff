@@ -39,6 +39,7 @@ struct WaxOffMainView: View {
                 waveformSection
                     .frame(minWidth: 300)
             }
+            Divider()
             WaxOffSettingsView(viewModel: viewModel)
         }
         .frame(minWidth: 900, minHeight: 620)
@@ -156,7 +157,7 @@ struct WaxOffMainView: View {
                            height: nsImage.size.height * 0.1875)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: .bottomTrailing)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 10)
                     .padding(.trailing, 24)
                     .padding([.top, .leading], 12)
             }
