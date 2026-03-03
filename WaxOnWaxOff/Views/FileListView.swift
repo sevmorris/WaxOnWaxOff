@@ -37,11 +37,6 @@ struct FileRowView: View {
                 Text(file.url.lastPathComponent)
                     .font(.body)
 
-                if case .processing = file.status {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
                 if file.isProcessed {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
@@ -66,6 +61,12 @@ struct FileRowView: View {
             }
 
             statusText
+
+            if case .processing = file.status {
+                ProgressView(value: nil as Double?)
+                    .progressViewStyle(.linear)
+                    .tint(.accentColor)
+            }
         }
     }
 

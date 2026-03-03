@@ -90,9 +90,9 @@ final class ContentViewModel {
                 let processor = AudioProcessor(settings: currentSettings) { [weak self] id in
                     guard let self else { return }
                     Task { @MainActor [self] in
-                        if let index = self.files.firstIndex(where: { $0.id == id }) {
-                            self.files[index].status = .processing
-                        }
+                        guard let index = self.files.firstIndex(where: { $0.id == id }),
+                              !self.files[index].isProcessed else { return }
+                        self.files[index].status = .processing
                     }
                 }
                 let results = try await processor.run(inputs: inputs)
