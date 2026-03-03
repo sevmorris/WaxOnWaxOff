@@ -42,6 +42,7 @@ struct ContentView: View {
                 waveformSection
                     .frame(minWidth: 300)
             }
+            Divider()
             SettingsView(viewModel: viewModel)
         }
         .frame(minWidth: 900, minHeight: 620)
@@ -157,11 +158,11 @@ struct ContentView: View {
                 Image(nsImage: nsImage)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: nsImage.size.width * 0.25,
-                           height: nsImage.size.height * 0.25)
+                    .frame(width: nsImage.size.width * 0.1875,
+                           height: nsImage.size.height * 0.1875)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: .bottomTrailing)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 10)
                     .padding(.trailing, 24)
                     .padding([.top, .leading], 12)
             }
