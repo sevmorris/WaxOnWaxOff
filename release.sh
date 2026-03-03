@@ -76,6 +76,9 @@ fi
 # ── Build ─────────────────────────────────────────────────────────────────────
 step "Building (clean, Release)"
 rm -rf "$DERIVED_DATA"
+rm -rf ~/Library/Caches/com.apple.dt.Xcode* 2>/dev/null || true
+rm -rf ~/Library/Developer/Xcode/DerivedData/ModuleCache* 2>/dev/null || true
+ok "Xcode caches cleared"
 xcodebuild \
     -project "$PROJECT" \
     -scheme "$SCHEME" \
