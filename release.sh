@@ -110,6 +110,14 @@ hdiutil detach "$MOUNT" -quiet
     fail "DMG version mismatch: expected $VERSION, got $DMG_VERSION"
 ok "DMG contains $DMG_VERSION"
 
+# ── Update manual download link ───────────────────────────────────────────────
+step "Updating manual download link"
+MANUAL="$PROJECT_DIR/docs/index.html"
+sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\">Download v[0-9][0-9.]*|WaxOnWaxOff-${TAG}.dmg\">Download ${TAG}|g" "$MANUAL"
+git add "$MANUAL"
+git commit -m "docs: update download link to ${TAG}"
+ok "Manual points to ${TAG}"
+
 # ── Tag and push ──────────────────────────────────────────────────────────────
 step "Tagging and pushing"
 git tag "$TAG"
