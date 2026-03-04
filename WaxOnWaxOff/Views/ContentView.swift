@@ -62,6 +62,11 @@ struct ContentView: View {
         HStack {
             ModeSwitcher()
 
+            Divider()
+                .frame(height: 20)
+
+            WaxOnPresetPicker(viewModel: viewModel)
+
             Spacer()
 
             if viewModel.isProcessing {
