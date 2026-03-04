@@ -361,7 +361,7 @@
 <nav>
   <div class="nav-brand">
     <span>WaxOn/WaxOff</span>
-    <small>Manual — v1.1.5</small>
+    <small>Manual — v1.1.8</small>
   </div>
   <a class="section-head" href="#">Overview</a>
   <a href="#overview">Introduction</a>
@@ -369,6 +369,7 @@
   <a href="#interface">The Interface</a>
   <a class="section-head" href="#">WaxOn Mode</a>
   <a class="sub" href="#waxon-overview">Overview</a>
+  <a class="sub" href="#waxon-presets">Presets</a>
   <a class="sub" href="#waxon-settings">Settings</a>
   <a class="sub" href="#waxon-pipeline">Pipeline</a>
   <a class="sub" href="#waxon-mix">Mix Mode</a>
@@ -435,7 +436,7 @@
     <p>Both modes share the same window layout. The window is divided into three areas.</p>
 
     <h3>Toolbar</h3>
-    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by the action buttons. In WaxOff mode, a Preset picker also appears in the toolbar. Clicking the active mode button returns to the mode picker.</p>
+    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by a Preset picker, and then the action buttons. Clicking the active mode button returns to the mode picker.</p>
 
     <h3>File List</h3>
     <p>The left panel shows all loaded files. Each row displays the filename and a status label. Drag rows to reorder; drag the vertical divider to resize the panel.</p>
@@ -469,10 +470,71 @@
     <h3>Quick Start</h3>
     <ol>
       <li>Click <strong>WaxOn</strong> in the toolbar (or choose it from the mode picker)</li>
-      <li>Configure sample rate, output channels, and ceiling in the Settings strip</li>
+      <li>Select a preset from the Preset menu in the toolbar, or configure settings manually in the Settings strip</li>
       <li>Drag your audio files onto the window</li>
       <li>Click <strong>Process</strong> — or select 2+ files and click <strong>Mix</strong> to combine them</li>
     </ol>
+  </section>
+
+  <section id="waxon-presets">
+    <h2>WaxOn Presets <span class="mode-badge mode-waxon">WaxOn</span></h2>
+    <p>Presets save and restore a complete group of WaxOn settings in one click. The Preset menu is in the toolbar, to the right of the mode switcher.</p>
+
+    <h3>Built-In Presets</h3>
+    <table class="presets-table">
+      <thead>
+        <tr>
+          <th>Preset</th>
+          <th>HPF</th>
+          <th>Loudness Norm</th>
+          <th>Target</th>
+          <th>Output</th>
+          <th>Sample Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Defaults</td>
+          <td>80 Hz</td>
+          <td>Off</td>
+          <td>—</td>
+          <td>Mono L</td>
+          <td>44.1 kHz</td>
+        </tr>
+        <tr>
+          <td>Edit Prep</td>
+          <td>80 Hz</td>
+          <td>On</td>
+          <td>−30 LUFS</td>
+          <td>Mono L</td>
+          <td>44.1 kHz</td>
+        </tr>
+        <tr>
+          <td>Edit Prep EBU</td>
+          <td>80 Hz</td>
+          <td>On</td>
+          <td>−23 LUFS</td>
+          <td>Mono L</td>
+          <td>44.1 kHz</td>
+        </tr>
+        <tr>
+          <td>Mix</td>
+          <td>20 Hz (DC Block)</td>
+          <td>On</td>
+          <td>−24 LUFS</td>
+          <td>Stereo</td>
+          <td>44.1 kHz</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Defaults</strong> resets all WaxOn settings to factory values — a quick way to start fresh.</p>
+    <p><strong>Edit Prep</strong> is optimized for single-mic podcast recordings destined for DAW editing. −30 LUFS leaves generous headroom for editing and processing.</p>
+    <p><strong>Edit Prep EBU</strong> targets the EBU R128 dialogue reference level of −23 LUFS. Tracks feel natural at calibrated monitor levels and still leave headroom before typical delivery targets.</p>
+    <p><strong>Mix</strong> is configured for multi-track blending: DC Block removes only infrasonic content and DC offset (not voice frequencies), loudness normalization ensures all files arrive at the mix at equal perceived loudness, and stereo output preserves spatial information in the blend.</p>
+
+    <h3>Custom Presets</h3>
+    <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets from the same menu.</p>
   </section>
 
   <section id="waxon-settings">
