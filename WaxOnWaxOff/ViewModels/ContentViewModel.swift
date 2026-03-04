@@ -13,6 +13,7 @@ final class ContentViewModel {
     var isProcessing = false
     var mixPhase: String? = nil
     var alertMessage: String?
+    var presetStore = WaxOnPresetStore()
     private var processingTask: Task<Void, Never>?
 
     private static let validExtensions: Set<String> = [
@@ -61,6 +62,17 @@ final class ContentViewModel {
 
     func moveFiles(from source: IndexSet, to destination: Int) {
         files.move(fromOffsets: source, toOffset: destination)
+    }
+
+    // MARK: - Presets
+
+    func applyPreset(_ preset: WaxOnPreset) {
+        settings = preset.settings
+        presetStore.selectedPresetID = preset.id
+    }
+
+    func saveCurrentAsPreset(name: String) {
+        presetStore.savePreset(name: name, settings: settings)
     }
 
     func process() {
