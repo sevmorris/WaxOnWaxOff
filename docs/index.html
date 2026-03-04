@@ -361,7 +361,7 @@
 <nav>
   <div class="nav-brand">
     <span>WaxOn/WaxOff</span>
-    <small>Manual — v1.1.8</small>
+    <small>Manual — v1.1.10</small>
   </div>
   <a class="section-head" href="#">Overview</a>
   <a href="#overview">Introduction</a>
@@ -443,10 +443,11 @@
     <ul>
       <li><strong>Waiting</strong> — file queued, analysis pending</li>
       <li><strong>Calculating stats</strong> — audio stats are being computed</li>
-      <li><strong>Processing</strong> — pipeline is running</li>
+      <li><strong>Processing</strong> — pipeline is running; a progress bar appears under the row</li>
       <li><strong>Output: …</strong> — processed; click the folder icon to reveal in Finder</li>
       <li><strong>Error</strong> — something went wrong; the message is shown inline</li>
     </ul>
+    <p>WaxOn processes up to 3 files concurrently. Files waiting their turn show a muted static progress bar so it's clear they are queued and not stalled.</p>
     <p>Select files and press <kbd>Delete</kbd> to remove them, or use <kbd>⌘⌥Delete</kbd> to clear the entire list.</p>
 
     <h3>Waveform Panel</h3>
