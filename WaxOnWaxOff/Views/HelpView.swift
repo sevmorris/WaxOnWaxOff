@@ -109,8 +109,21 @@ struct HelpView: View {
                 dividerRow
 
                 section("Supported Formats") {
-                    text("WAV, AIFF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC.")
+                    text("WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV.")
                     text("All processing uses FFmpeg, bundled inside the app — no separate installation required.")
+                }
+
+                dividerRow
+
+                section("Support") {
+                    text("WaxOn/WaxOff is free. If it saves you time, a coffee is always appreciated.")
+                    Button("Support on Ko-fi →") {
+                        if let url = URL(string: "https://ko-fi.com/sevmo") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(Color.accentColor)
                 }
 
                 Spacer()
