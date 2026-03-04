@@ -361,7 +361,7 @@
 <nav>
   <div class="nav-brand">
     <span>WaxOn/WaxOff</span>
-    <small>Manual — v1.1.1</small>
+    <small>Manual — v1.1.5</small>
   </div>
   <a class="section-head" href="#">Overview</a>
   <a href="#overview">Introduction</a>
@@ -556,11 +556,12 @@
     </ol>
 
     <h3>Mix Pipeline</h3>
-    <p>Mix adds a zeroth stage before the chain above:</p>
+    <p>When Loudness Norm is on, Mix adds two stages before the chain above. When off, only the amix stage is added.</p>
     <ul>
-      <li><strong>amix</strong> — FFmpeg's <code>amix</code> with <code>normalize=1</code> blends all inputs to a balanced common level. The mixed signal then runs through all three stages identically to a single-file job.</li>
+      <li><strong>Per-file leveling <span class="tag">Loudnorm only</span></strong> — each input is individually normalized to the target LUFS using a two-pass EBU R128 analysis and linear gain. All files arrive at the mix at equal perceived loudness, regardless of how they were recorded.</li>
+      <li><strong>amix</strong> — FFmpeg's <code>amix</code> blends the files. When Loudness Norm is on, <code>normalize=0</code> is used (files are already level-matched and the final loudnorm pass corrects the summing gain increase). When off, <code>normalize=1</code> scales by 1/N to prevent level buildup. The combined signal then runs through all three stages identically to a single-file job.</li>
     </ul>
-    <p>The waveform panel shows a live phase indicator while a mix is rendering: <em>Mixing files… → Filtering… → Analyzing loudness… → Normalizing… → Limiting…</em></p>
+    <p>The waveform panel shows a live phase indicator during a mix: <em>Leveling file 1 of N… → … → Mixing N files… → Filtering… → Analyzing loudness… → Normalizing… → Limiting…</em></p>
 
     <h3>Output Format</h3>
     <p>All WaxOn outputs are <strong>24-bit WAV</strong>, regardless of input format. Lossless, uncompressed, and compatible with every DAW.</p>
@@ -568,7 +569,7 @@
 
   <section id="waxon-mix">
     <h2>Mix Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>Mix combines two or more audio files into a single processed output. The full WaxOn pipeline — high-pass filter, phase rotation, optional loudness normalization, and true-peak limiting — runs on the combined signal.</p>
+    <p>Mix combines two or more audio files into a single processed output. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing — ensuring a balanced blend regardless of source levels. The full WaxOn pipeline then runs on the combined signal.</p>
 
     <h3>Two Common Workflows</h3>
     <p><strong>Mix raw recordings in one step.</strong> Drag two unprocessed tracks (e.g. host and guest recorded separately) into WaxOn, select both, and click Mix. The high-pass filter cleans up low-frequency buildup from the individual recordings before they are blended. Use the default High Pass setting (80 Hz) or adjust to taste.</p>
