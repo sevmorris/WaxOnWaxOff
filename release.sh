@@ -129,7 +129,7 @@ ok "DMG contains $DMG_VERSION"
 # ── Update manual download link and version badge ─────────────────────────────
 step "Updating manual download link"
 sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\">Download v[0-9][0-9.]*|WaxOnWaxOff-${TAG}.dmg\">Download ${TAG}|g" "$MANUAL"
-sed -i '' "s|Manual — v[0-9][0-9.]*|Manual — ${VERSION}|g" "$MANUAL"
+sed -i '' "s|Manual — v[0-9][0-9.]*|Manual — ${TAG}|g" "$MANUAL"
 sed -i '' "s|\[Download v[0-9][0-9.]* (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v[0-9][0-9.]*.dmg)|\[Download ${TAG} (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-${TAG}.dmg)|g" README.md
 git add "$MANUAL" README.md
 git commit -m "docs: update download link to ${TAG}"
