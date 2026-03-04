@@ -24,7 +24,7 @@ Use WaxOn on raw recordings before editing. Drop your files in, configure what y
 - **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
 - **Mono or Stereo Output** — mono with left/right channel extraction, or stereo passthrough
 - **Sample Rate Conversion** — 44.1 kHz or 48 kHz output
-- **Mix** — select 2+ files and combine them into a single processed output (host + guest, stems, etc.)
+- **Mix** — select 2+ files and combine them. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing, then the combined output is normalized to the same target — ensuring a balanced blend regardless of source levels
 - **Batch Processing** — up to 3 concurrent jobs with per-file progress
 
 **Output:** `{name}-{rate}waxon-{limit}.wav` (24-bit WAV)

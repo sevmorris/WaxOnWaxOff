@@ -79,21 +79,54 @@ actor AudioProcessor {
         let work = try makeTemp(prefix: "waxon_mix_\(rateTag)_")
         defer { try? fm.removeItem(at: work) }
 
-        // Step 0: amix N inputs → rawMix.wav
+        // Step 0: Pre-normalize each input to target LUFS so files are level-matched before mixing
+        let mixInputs: [URL]
+        if settings.loudnormEnabled {
+            let target = settings.loudnormTarget
+            let tp = settings.limitDb
+            var prenormed: [URL] = []
+            for (i, url) in inputs.enumerated() {
+                onPhase?("Leveling file \(i + 1) of \(n)…")
+                let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
+                let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
+                    "-nostdin", "-hide_banner",
+                    "-i", url.path, "-af", analyzeAf,
+                    "-f", "null", "/dev/null"
+                ])
+                try Task.checkCancellation()
+                let stats = try parseLoudnormStats(analysisOutput)
+                let prenormURL = work.appendingPathComponent("prenorm_\(i).wav")
+                let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
+                try await runFFmpeg(exe: tools.ffmpeg, args: [
+                    "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                    "-i", url.path, "-af", normAf,
+                    "-c:a", "pcm_s24le", "-ar", "\(sr)", prenormURL.path
+                ])
+                try Task.checkCancellation()
+                prenormed.append(prenormURL)
+            }
+            mixInputs = prenormed
+        } else {
+            mixInputs = inputs
+        }
+
+        // Step 1: amix N inputs → rawMix.wav
         onPhase?("Mixing \(n) files…")
         let rawMixURL = work.appendingPathComponent("rawMix.wav")
         var amixArgs = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
-        for url in inputs {
+        for url in mixInputs {
             amixArgs += ["-i", url.path]
         }
+        // Files are pre-normalized — sum without gain adjustment so the mix reflects true level
+        let amixNormalize = settings.loudnormEnabled ? "normalize=0" : "normalize=1"
         amixArgs += [
-            "-filter_complex", "amix=inputs=\(n):duration=longest:normalize=1",
+            "-filter_complex", "amix=inputs=\(n):duration=longest:\(amixNormalize)",
             "-c:a", "pcm_s24le", "-ar", "\(sr)", rawMixURL.path
         ]
         try await runFFmpeg(exe: tools.ffmpeg, args: amixArgs)
         try Task.checkCancellation()
 
-        // Step 1: Highpass + phase rotation + channel selection + resample
+        // Step 2: Highpass + phase rotation + channel selection + resample
         onPhase?("Filtering…")
         let isStereo = settings.outputChannels == .stereo
         let outputChannelCount = isStereo ? "2" : "1"
@@ -115,7 +148,7 @@ actor AudioProcessor {
         ])
         try Task.checkCancellation()
 
-        // Step 2: Optional EBU R128 two-pass loudnorm
+        // Step 3: Optional EBU R128 two-pass loudnorm on the mix
         let limiterInput: URL
         if settings.loudnormEnabled {
             let target = settings.loudnormTarget
@@ -146,7 +179,7 @@ actor AudioProcessor {
         }
         try Task.checkCancellation()
 
-        // Step 3: 2× oversample → brick-wall limiter → resample → final output
+        // Step 4: 2× oversample → brick-wall limiter → resample → final output
         onPhase?("Limiting…")
         let oversampleSr = sr * 2
         let step3Af = [
