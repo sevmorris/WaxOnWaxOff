@@ -7,7 +7,7 @@ struct FileListView: View {
     var body: some View {
         List(selection: $viewModel.selectedFileIDs) {
             ForEach(viewModel.files) { file in
-                FileRowView(file: file)
+                FileRowView(file: file, isProcessing: viewModel.isProcessing)
                     .tag(file.id)
             }
             .onDelete { offsets in
@@ -30,6 +30,7 @@ struct FileListView: View {
 
 struct FileRowView: View {
     let file: FileItem
+    var isProcessing: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -66,6 +67,11 @@ struct FileRowView: View {
                 ProgressView(value: nil as Double?)
                     .progressViewStyle(.linear)
                     .tint(.accentColor)
+            } else if isProcessing, case .ready = file.status {
+                ProgressView(value: 0.0, total: 1.0)
+                    .progressViewStyle(.linear)
+                    .tint(.secondary)
+                    .opacity(0.35)
             }
         }
     }
