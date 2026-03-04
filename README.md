@@ -2,7 +2,7 @@
 
 WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing — high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution — EBU R128 loudness normalization, true peak control, and MP3 encoding.
 
-**[Download v1.1.11 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.1.11.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/)** · [![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/sevmo)
+**[Download v1.1.11 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.1.11.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
@@ -90,3 +90,7 @@ I'm a freelance audio engineer, not a software developer. These tools exist beca
 The current app icon is my own (very minimal) design. AI can build the software, but I can still make the art myself, and I think that's worth doing.
 
 AI-assisted development raises real questions about labor displacement, resource consumption, and the concentration of power in a handful of tech companies. I don't have clean answers. I do think it matters that the people using these tools are honest about the trade-offs rather than pretending they don't exist.
+
+WaxOn/WaxOff has been built carefully and iteratively — tested in real podcast workflows, refined based on actual use, and updated continuously as improvements reveal themselves. That process takes real time and attention, even when AI is writing the code. The app is free and will stay that way, but if it saves you time in your own work, a small contribution is always appreciated.
+
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/sevmo)
