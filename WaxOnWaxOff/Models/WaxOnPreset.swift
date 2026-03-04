@@ -20,6 +20,32 @@ struct WaxOnPreset: Identifiable, Codable, Equatable {
         ),
         WaxOnPreset(
             id: UUID(uuidString: "A0000000-0000-0000-0000-000000000002")!,
+            name: "Edit Prep",
+            settings: WaxOnSettings(
+                sampleRate: .s44100,
+                outputChannels: .mono,
+                channel: .left,
+                limitDb: -1.0,
+                loudnormEnabled: true,
+                loudnormTarget: -30.0,
+                dcBlockHz: 80
+            )
+        ),
+        WaxOnPreset(
+            id: UUID(uuidString: "A0000000-0000-0000-0000-000000000003")!,
+            name: "Edit Prep EBU",
+            settings: WaxOnSettings(
+                sampleRate: .s44100,
+                outputChannels: .mono,
+                channel: .left,
+                limitDb: -1.0,
+                loudnormEnabled: true,
+                loudnormTarget: -23.0,
+                dcBlockHz: 80
+            )
+        ),
+        WaxOnPreset(
+            id: UUID(uuidString: "A0000000-0000-0000-0000-000000000004")!,
             name: "Mix",
             settings: WaxOnSettings(
                 sampleRate: .s44100,
