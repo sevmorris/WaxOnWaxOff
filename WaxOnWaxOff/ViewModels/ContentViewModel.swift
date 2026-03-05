@@ -14,6 +14,7 @@ final class ContentViewModel {
     var mixPhase: String? = nil
     var alertMessage: String?
     var presetStore = WaxOnPresetStore()
+    var log = ProcessingLog()
     private var processingTask: Task<Void, Never>?
 
     private static let validExtensions: Set<String> = [
@@ -86,6 +87,7 @@ final class ContentViewModel {
         }
 
         isProcessing = true
+        log.clear()
 
         let currentSettings = settings
         let inputs = files.map { JobInput(id: $0.id, url: $0.url) }
@@ -99,14 +101,20 @@ final class ContentViewModel {
 
         processingTask = Task {
             do {
-                let processor = AudioProcessor(settings: currentSettings) { [weak self] id in
-                    guard let self else { return }
-                    Task { @MainActor [self] in
-                        guard let index = self.files.firstIndex(where: { $0.id == id }),
-                              !self.files[index].isProcessed else { return }
-                        self.files[index].status = .processing
-                    }
-                }
+                let processor = AudioProcessor(settings: currentSettings,
+                    onFileStarted: { [weak self] id in
+                        guard let self else { return }
+                        Task { @MainActor [self] in
+                            guard let index = self.files.firstIndex(where: { $0.id == id }),
+                                  !self.files[index].isProcessed else { return }
+                            self.files[index].status = .processing
+                        }
+                    },
+                    onLog: { [weak self] message, level in
+                        Task { @MainActor [weak self] in
+                            self?.log.append(message, level: level)
+                        }
+                    })
                 let results = try await processor.run(inputs: inputs)
 
                 for result in results {
@@ -155,9 +163,15 @@ final class ContentViewModel {
         guard selectedFileIDs.count >= 2 else { return }
         let selectedURLs = files.filter { selectedFileIDs.contains($0.id) }.map { $0.url }
         isProcessing = true
+        log.clear()
         processingTask = Task {
             do {
-                let processor = AudioProcessor(settings: settings)
+                let processor = AudioProcessor(settings: settings,
+                    onLog: { [weak self] message, level in
+                        Task { @MainActor [weak self] in
+                            self?.log.append(message, level: level)
+                        }
+                    })
                 let result = try await processor.mixAndProcess(inputs: selectedURLs) { [weak self] phase in
                     Task { @MainActor [weak self] in
                         self?.mixPhase = phase
