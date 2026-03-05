@@ -345,9 +345,9 @@
       <div class="chain-row">
         <div class="chain-node">High-Pass Filter</div>
         <div class="chain-arrow">→</div>
-        <div class="chain-node">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass</span></div>
+        <div class="chain-node">Channel Select<br><span style="font-size:0.75rem;font-weight:400;">mono only</span></div>
         <div class="chain-arrow">→</div>
-        <div class="chain-node">Channel Select<br><span style="font-size:0.75rem;font-weight:400;">+ Resample</span></div>
+        <div class="chain-node">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass + Resample</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
@@ -471,7 +471,7 @@
       <li>The file is played back through a DAC (analog reconstruction fills in between samples)</li>
       <li>The file is encoded with a lossy codec — MP3, AAC, and OGG encoding and decoding can <em>increase</em> peak levels by 0.1–1.5 dB or more above the source PCM values</li>
     </ul>
-    <p>A file that samples-peek at −1 dBFS can easily have a true peak above 0 dBFS, causing clipping that no sample-level meter would detect.</p>
+    <p>A file with a sample peak of −1 dBFS can easily have a true peak above 0 dBFS, causing clipping that no sample-level meter would detect.</p>
 
     <div class="callout">
       <strong>The Streaming Ingest Trap</strong>
@@ -600,8 +600,8 @@
     <p>The WaxOn pipeline stage order is deliberate:</p>
     <ol>
       <li><strong>High-pass first</strong> — subsonic content below 80 Hz is removed before any gain stage processes it. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't musically useful.</li>
+      <li><strong>Channel selection before phase rotation</strong> — if extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. The loudnorm analysis then also measures the real output signal.</li>
       <li><strong>Phase rotation before normalization</strong> — reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
-      <li><strong>Channel selection before normalization</strong> — if extracting mono from a stereo source, do it before measurement so the loudnorm analysis is performed on the actual output signal, not a wider stereo version of it.</li>
       <li><strong>Limiter last</strong> — after any loudness normalization, with oversampling to catch true peaks.</li>
     </ol>
 
@@ -613,7 +613,7 @@
     <p>This is intentional for ingest. WaxOn is a pre-editing tool. You want your recordings to arrive at your DAW at consistent levels, but with their original dynamic character intact. Any dynamic processing at this stage would fight against the compression and automation you'll apply during editing. LRA=20 ensures loudnorm does exactly one thing in WaxOn: level adjustment.</p>
 
     <h3>Default Loudnorm Target: −30 LUFS</h3>
-    <p>−30 LUFS is conservative by design. At this level, even a recording with significant dynamic range and a crest factor of 20 dB will have peaks well below −10 dBFS, giving the limiter ample headroom. The goal is to bring different recordings to a <em>consistent</em> level for editing, not to hit a delivery target. −30 LUFS leaves plenty of room for the final mix to breathe and for WaxOff to handle delivery normalization correctly.</p>
+    <p>−30 LUFS is conservative by design. At this level, even a recording with significant dynamic range and a crest factor of 20 dB will have peaks well below −10 dBFS, giving the limiter ample headroom. The goal is to bring different recordings to a <em>consistent</em> level for editing, not to hit a delivery target. −30 LUFS leaves plenty of room for the final mix to breathe.</p>
 
     <h3>Loudnorm TP = limitDb</h3>
     <p>Both the loudnorm <code>TP</code> parameter and the alimiter <code>limit</code> are set to the same value (the configured ceiling, default −1.0 dB). These are not redundant:</p>
