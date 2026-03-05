@@ -4,6 +4,7 @@ struct ContentView: View {
     @Environment(AppState.self) var appState
     var viewModel: ContentViewModel
     @State private var fileListWidth: CGFloat = 250
+    @State private var showConsole = false
 
     private var selectedFile: FileItem? {
         guard viewModel.selectedFileIDs.count == 1,
@@ -121,8 +122,12 @@ struct ContentView: View {
 
     @ViewBuilder
     private var waveformSection: some View {
-        Group {
-            if let file = selectedFile {
+        ZStack(alignment: .topTrailing) {
+            Group {
+            if showConsole {
+                ConsoleView(log: viewModel.log)
+                    .padding()
+            } else if let file = selectedFile {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(file.url.lastPathComponent)
                         .font(.headline)
@@ -157,20 +162,34 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background {
-            if let url = Bundle.main.url(forResource: "WaxOn_bg", withExtension: "png"),
-               let nsImage = NSImage(contentsOf: url) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: nsImage.size.width * 0.1875,
-                           height: nsImage.size.height * 0.1875)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: .bottomTrailing)
-                    .padding(.bottom, 10)
-                    .padding(.trailing, 24)
-                    .padding([.top, .leading], 12)
+            .background {
+                if let url = Bundle.main.url(forResource: "WaxOn_bg", withExtension: "png"),
+                   let nsImage = NSImage(contentsOf: url) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: nsImage.size.width * 0.1875,
+                               height: nsImage.size.height * 0.1875)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .bottomTrailing)
+                        .padding(.bottom, 10)
+                        .padding(.trailing, 24)
+                        .padding([.top, .leading], 12)
+                }
             }
+
+            Button {
+                showConsole.toggle()
+            } label: {
+                Image(systemName: showConsole ? "waveform" : "terminal")
+                    .font(.caption)
+                    .padding(6)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .help(showConsole ? "Show Waveform" : "Show Console")
         }
     }
 

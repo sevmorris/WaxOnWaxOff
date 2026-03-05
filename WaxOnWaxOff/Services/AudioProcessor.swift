@@ -16,10 +16,14 @@ private struct LoudnormStats {
 actor AudioProcessor {
     let settings: WaxOnSettings
     let onFileStarted: (@Sendable (UUID) -> Void)?
+    let onLog: (@Sendable (String, LogLevel) -> Void)?
 
-    init(settings: WaxOnSettings, onFileStarted: (@Sendable (UUID) -> Void)? = nil) {
+    init(settings: WaxOnSettings,
+         onFileStarted: (@Sendable (UUID) -> Void)? = nil,
+         onLog: (@Sendable (String, LogLevel) -> Void)? = nil) {
         self.settings = settings
         self.onFileStarted = onFileStarted
+        self.onLog = onLog
     }
 
     func run(inputs: [JobInput]) async throws -> [JobResult] {
@@ -79,6 +83,8 @@ actor AudioProcessor {
         let work = try makeTemp(prefix: "waxon_mix_\(rateTag)_")
         defer { try? fm.removeItem(at: work) }
 
+        onLog?("▶ Mix (\(n) files)", .info)
+
         // Step 0: Pre-normalize each input to target LUFS so files are level-matched before mixing
         let mixInputs: [URL]
         if settings.loudnormEnabled {
@@ -86,7 +92,9 @@ actor AudioProcessor {
             let tp = settings.limitDb
             var prenormed: [URL] = []
             for (i, url) in inputs.enumerated() {
+                let fname = url.lastPathComponent
                 onPhase?("Leveling file \(i + 1) of \(n)…")
+                onLog?("  [\(i + 1)/\(n)] \(fname) — analyzing…", .verbose)
                 let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
                 let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                     "-nostdin", "-hide_banner",
@@ -95,6 +103,7 @@ actor AudioProcessor {
                 ])
                 try Task.checkCancellation()
                 let stats = try parseLoudnormStats(analysisOutput)
+                onLog?("  [\(i + 1)/\(n)] \(fname) — \(stats.inputI) LUFS  |  TP \(stats.inputTP) dBTP  |  offset \(stats.targetOffset) dB", .info)
                 let prenormURL = work.appendingPathComponent("prenorm_\(i).wav")
                 let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
                 try await runFFmpeg(exe: tools.ffmpeg, args: [
@@ -112,6 +121,8 @@ actor AudioProcessor {
 
         // Step 1: amix N inputs → rawMix.wav
         onPhase?("Mixing \(n) files…")
+        let amixNormalizeDesc = settings.loudnormEnabled ? "normalize=0 (pre-leveled)" : "normalize=1"
+        onLog?("  amix: \(n) inputs  |  \(amixNormalizeDesc)", .verbose)
         let rawMixURL = work.appendingPathComponent("rawMix.wav")
         var amixArgs = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
         for url in mixInputs {
@@ -141,6 +152,9 @@ actor AudioProcessor {
             step1Af = "highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
         }
 
+        let mixChannelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
+        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz  |  \(mixChannelDesc)  |  \(rateTag) kHz", .verbose)
+
         try await runFFmpeg(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", rawMixURL.path, "-af", step1Af,
@@ -154,6 +168,7 @@ actor AudioProcessor {
             let target = settings.loudnormTarget
             let tp = settings.limitDb
             onPhase?("Analyzing loudness…")
+            onLog?("  loudnorm: analyzing mix…", .verbose)
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
             let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
@@ -162,6 +177,8 @@ actor AudioProcessor {
             ])
 
             let stats = try parseLoudnormStats(analysisOutput)
+            onLog?("  mix measured: \(stats.inputI) LUFS  |  TP \(stats.inputTP) dBTP  |  LRA \(stats.inputLRA) LU", .info)
+            onLog?("  target: \(target) LUFS  |  offset \(stats.targetOffset) dB", .verbose)
 
             onPhase?("Normalizing…")
             let normURL = work.appendingPathComponent("mix_norm.wav")
@@ -187,6 +204,7 @@ actor AudioProcessor {
             "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
             "aresample=\(sr)"
         ].joined(separator: ",")
+        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling \(settings.limitDb) dBTP", .verbose)
 
         if fm.fileExists(atPath: tmpURL.path) {
             try? fm.removeItem(at: tmpURL)
@@ -209,6 +227,7 @@ actor AudioProcessor {
         }
         try fm.moveItem(at: tmpURL, to: finalURL)
 
+        onLog?("✓ \(outName)", .info)
         return JobResult(id: nil, input: inputs[0], output: finalURL)
     }
 
@@ -221,6 +240,7 @@ actor AudioProcessor {
         let sr = settings.sampleRate.rawValue
         let rateTag = sr == 44100 ? "44k" : "48k"
         let stem = input.deletingPathExtension().lastPathComponent
+        let filename = input.lastPathComponent
         let limitAmp = pow(10.0, settings.limitDb / 20.0)
         let limitTag = formatDbTag(settings.limitDb)
         let outDir = bestOutputDir(for: input)
@@ -248,6 +268,10 @@ actor AudioProcessor {
             outputChannelCount = "1"
         }
 
+        onLog?("▶ \(filename)", .info)
+        let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
+        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
+
         try await runFFmpeg(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", input.path, "-af", step1Af,
@@ -262,6 +286,7 @@ actor AudioProcessor {
             let target = settings.loudnormTarget
             let tp = settings.limitDb
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
+            onLog?("  loudnorm: analyzing…", .verbose)
             let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
                 "-i", midURL.path, "-af", analyzeAf,
@@ -269,6 +294,8 @@ actor AudioProcessor {
             ])
 
             let stats = try parseLoudnormStats(analysisOutput)
+            onLog?("  measured: \(stats.inputI) LUFS  |  TP \(stats.inputTP) dBTP  |  LRA \(stats.inputLRA) LU", .info)
+            onLog?("  target: \(target) LUFS  |  offset \(stats.targetOffset) dB", .verbose)
 
             let normURL = work.appendingPathComponent("\(stem)_norm.wav")
             let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
@@ -294,6 +321,8 @@ actor AudioProcessor {
             "aresample=\(sr)"
         ].joined(separator: ",")
 
+        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling \(settings.limitDb) dBTP", .verbose)
+
         if fm.fileExists(atPath: tmpURL.path) {
             try? fm.removeItem(at: tmpURL)
         }
@@ -315,6 +344,7 @@ actor AudioProcessor {
         }
         try fm.moveItem(at: tmpURL, to: finalURL)
 
+        onLog?("✓ \(outName)", .info)
         return JobResult(id: id, input: input, output: finalURL)
     }
 
