@@ -451,12 +451,13 @@
     <p>Select files and press <kbd>Delete</kbd> to remove them, or use <kbd>⌘⌥Delete</kbd> to clear the entire list.</p>
 
     <h3>Waveform Panel</h3>
-    <p>The right panel shows three things depending on context:</p>
+    <p>The right panel shows different content depending on context:</p>
     <ul>
       <li><strong>File selected</strong> — waveform with a stats strip below it</li>
-      <li><strong>Processing in progress</strong> — a spinner with a live phase label</li>
+      <li><strong>Mix in progress</strong> — a spinner with a live phase label showing the current stage</li>
       <li><strong>Nothing selected</strong> — a prompt to select a file</li>
     </ul>
+    <p>A toggle button in the top-right corner switches between the waveform view and the <strong>Console</strong> — a scrollable log showing what WaxOn is doing during processing. A Verbose checkbox reveals additional detail such as filter parameters and per-file loudnorm measurements.</p>
 
     <h3>Settings Bar</h3>
     <p>The bottom strip contains all processing settings for the current mode. Settings persist between sessions.</p>
@@ -861,7 +862,7 @@
       <div class="label">RMS</div>
       <div class="desc">Root Mean Square level in dBFS — represents average loudness over the entire file</div>
       <div class="label">PEAK</div>
-      <div class="desc">True peak level in dBFS — the highest sample value across all channels</div>
+      <div class="desc">Sample peak level in dBFS — the highest sample value across all channels</div>
       <div class="label">CREST</div>
       <div class="desc">Crest factor (PEAK − RMS) in dB — indicates dynamic range. Higher values mean more headroom between peaks and average level</div>
       <div class="label">LUFS</div>
