@@ -126,7 +126,8 @@ struct ContentView: View {
             Group {
             if showConsole {
                 ConsoleView(log: viewModel.log)
-                    .padding()
+                    .padding([.top, .leading, .trailing])
+                    .padding(.bottom, 72)
             } else if let file = selectedFile {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(file.url.lastPathComponent)
@@ -182,10 +183,10 @@ struct ContentView: View {
                 showConsole.toggle()
             } label: {
                 Image(systemName: showConsole ? "waveform" : "terminal")
-                    .font(.caption)
-                    .padding(6)
+                    .font(.callout)
+                    .padding(9)
                     .background(.regularMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .buttonStyle(.plain)
             .padding(8)
