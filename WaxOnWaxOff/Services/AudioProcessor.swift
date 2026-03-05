@@ -104,6 +104,7 @@ actor AudioProcessor {
                 try Task.checkCancellation()
                 let stats = try parseLoudnormStats(analysisOutput)
                 onLog?("  [\(i + 1)/\(n)] \(fname) — \(stats.inputI) LUFS  |  TP \(stats.inputTP) dBTP  |  offset \(stats.targetOffset) dB", .info)
+                onLog?("  [\(i + 1)/\(n)] \(fname) — LRA \(stats.inputLRA) LU  |  thresh \(stats.inputThresh) LUFS", .verbose)
                 let prenormURL = work.appendingPathComponent("prenorm_\(i).wav")
                 let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
                 try await runFFmpeg(exe: tools.ffmpeg, args: [
@@ -178,9 +179,10 @@ actor AudioProcessor {
 
             let stats = try parseLoudnormStats(analysisOutput)
             onLog?("  mix measured: \(stats.inputI) LUFS  |  TP \(stats.inputTP) dBTP  |  LRA \(stats.inputLRA) LU", .info)
-            onLog?("  target: \(target) LUFS  |  offset \(stats.targetOffset) dB", .verbose)
+            onLog?("  target: \(target) LUFS  |  offset \(stats.targetOffset) dB  |  thresh \(stats.inputThresh) LUFS", .verbose)
 
             onPhase?("Normalizing…")
+            onLog?("  loudnorm: normalizing…", .verbose)
             let normURL = work.appendingPathComponent("mix_norm.wav")
             let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
 
@@ -204,7 +206,7 @@ actor AudioProcessor {
             "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
             "aresample=\(sr)"
         ].joined(separator: ",")
-        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling \(settings.limitDb) dBTP", .verbose)
+        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling \(settings.limitDb) dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
 
         if fm.fileExists(atPath: tmpURL.path) {
             try? fm.removeItem(at: tmpURL)
@@ -228,6 +230,7 @@ actor AudioProcessor {
         try fm.moveItem(at: tmpURL, to: finalURL)
 
         onLog?("✓ \(outName)", .info)
+        onLog?("  → \(finalURL.path)", .verbose)
         return JobResult(id: nil, input: inputs[0], output: finalURL)
     }
 
@@ -295,7 +298,8 @@ actor AudioProcessor {
 
             let stats = try parseLoudnormStats(analysisOutput)
             onLog?("  measured: \(stats.inputI) LUFS  |  TP \(stats.inputTP) dBTP  |  LRA \(stats.inputLRA) LU", .info)
-            onLog?("  target: \(target) LUFS  |  offset \(stats.targetOffset) dB", .verbose)
+            onLog?("  target: \(target) LUFS  |  offset \(stats.targetOffset) dB  |  thresh \(stats.inputThresh) LUFS", .verbose)
+            onLog?("  loudnorm: normalizing…", .verbose)
 
             let normURL = work.appendingPathComponent("\(stem)_norm.wav")
             let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
@@ -321,7 +325,7 @@ actor AudioProcessor {
             "aresample=\(sr)"
         ].joined(separator: ",")
 
-        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling \(settings.limitDb) dBTP", .verbose)
+        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling \(settings.limitDb) dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
 
         if fm.fileExists(atPath: tmpURL.path) {
             try? fm.removeItem(at: tmpURL)
@@ -345,6 +349,7 @@ actor AudioProcessor {
         try fm.moveItem(at: tmpURL, to: finalURL)
 
         onLog?("✓ \(outName)", .info)
+        onLog?("  → \(finalURL.path)", .verbose)
         return JobResult(id: id, input: input, output: finalURL)
     }
 
