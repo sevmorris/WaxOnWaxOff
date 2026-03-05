@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 enum AppMode: String, CaseIterable {
@@ -7,5 +8,18 @@ enum AppMode: String, CaseIterable {
 
 @Observable
 final class AppState {
-    var mode: AppMode? = nil   // nil = show picker
+    var mode: AppMode? = nil {
+        didSet {
+            if let mode {
+                UserDefaults.standard.set(mode.rawValue, forKey: "lastMode")
+            }
+        }
+    }
+
+    init() {
+        if let saved = UserDefaults.standard.string(forKey: "lastMode"),
+           let restored = AppMode(rawValue: saved) {
+            mode = restored
+        }
+    }
 }
