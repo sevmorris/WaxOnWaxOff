@@ -11,15 +11,12 @@ struct ConsoleView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Console")
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-                Spacer()
                 Toggle("Verbose", isOn: $verbose)
                     .toggleStyle(.checkbox)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .controlSize(.small)
+                Spacer()
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
