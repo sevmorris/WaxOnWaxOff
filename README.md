@@ -79,7 +79,7 @@ WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bu
 
 ## License
 
-Copyright © 2026. This app was designed and directed by Seven Morris, with code primarily generated through AI collaboration using [OpenClaw](https://openclaw.ai) and Claude (Anthropic).
+Copyright © 2026. This app was designed and directed by [Seven Morris](https://sevmorris.github.io), with code primarily generated through AI collaboration using [OpenClaw](https://openclaw.ai) and Claude (Anthropic).
 
 This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License v3.0](LICENSE).
 
