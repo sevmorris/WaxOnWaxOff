@@ -5,11 +5,11 @@ struct FileInfoStatsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let info = file.fileInfo {
+            if let info = file.outputFileInfo ?? file.fileInfo {
                 infoRow(info)
             }
             Divider().padding(.vertical, 8)
-            statsRow(file.stats)
+            statsRow(file.outputStats ?? file.stats)
         }
         .padding(.top, 6)
     }
