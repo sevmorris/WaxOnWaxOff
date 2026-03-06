@@ -124,6 +124,13 @@ struct HelpView: View {
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(Color.accentColor)
+                    Button("sevmorris.github.io →") {
+                        if let url = URL(string: "https://sevmorris.github.io") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(Color.accentColor)
                 }
 
                 Spacer()
