@@ -433,7 +433,7 @@
   <!-- Interface -->
   <section id="interface">
     <h2>The Interface</h2>
-    <p>Both modes share the same window layout. The window is divided into three areas.</p>
+    <p>Both modes share the same window layout. The window is divided into four areas.</p>
 
     <h3>Toolbar</h3>
     <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by a Preset picker, and then the action buttons. Clicking the active mode button returns to the mode picker.</p>
@@ -459,8 +459,8 @@
     </ul>
     <p>A toggle button in the top-right corner switches between the waveform view and the <strong>Console</strong> — a scrollable log showing what WaxOn is doing during processing. A Verbose checkbox reveals additional detail such as filter parameters and per-file loudnorm measurements.</p>
 
-    <h3>Settings Bar</h3>
-    <p>The bottom strip contains all processing settings for the current mode. Settings persist between sessions.</p>
+    <h3>Settings Sidebar</h3>
+    <p>A collapsible panel on the right edge of the window contains all processing settings for the current mode. Toggle it open or closed with the <strong>⊟</strong> button at the far right of the toolbar. Settings persist between sessions.</p>
   </section>
 
   <!-- WaxOn Mode -->
@@ -472,7 +472,7 @@
     <h3>Quick Start</h3>
     <ol>
       <li>Click <strong>WaxOn</strong> in the toolbar (or choose it from the mode picker)</li>
-      <li>Select a preset from the Preset menu in the toolbar, or configure settings manually in the Settings strip</li>
+      <li>Select a preset from the Preset menu in the toolbar, or configure settings manually in the Settings sidebar</li>
       <li>Drag your audio files onto the window</li>
       <li>Click <strong>Process</strong> — or select 2+ files and click <strong>Mix</strong> to combine them</li>
     </ol>
@@ -580,7 +580,7 @@
         </tr>
         <tr>
           <td>High Pass</td>
-          <td>40–90 Hz · default 80 Hz</td>
+          <td>20–90 Hz · default 80 Hz</td>
           <td>High-pass filter cutoff. 80 Hz removes most rumble and handling noise without thinning the voice. Lower for sources with significant bass content.</td>
         </tr>
         <tr>
