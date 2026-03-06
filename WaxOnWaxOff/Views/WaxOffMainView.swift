@@ -4,6 +4,7 @@ struct WaxOffMainView: View {
     @Environment(AppState.self) var appState
     var viewModel: DeliveryViewModel
     @State private var fileListWidth: CGFloat = 250
+    @State private var showSettings = true
 
     private var selectedFile: FileItem? {
         guard viewModel.selectedFileIDs.count == 1,
@@ -38,11 +39,21 @@ struct WaxOffMainView: View {
 
                 waveformSection
                     .frame(minWidth: 300)
+
+                if showSettings {
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.15))
+                            .frame(width: 1)
+                        WaxOffSettingsView(viewModel: viewModel)
+                            .frame(width: 260)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .transition(.move(edge: .trailing))
+                }
             }
-            Divider()
-            WaxOffSettingsView(viewModel: viewModel)
         }
-        .frame(minWidth: 900, minHeight: 620)
+        .frame(minWidth: 900, minHeight: 540)
         .padding(.bottom)
         .dropDestination(for: URL.self) { urls, _ in
             viewModel.addFiles(urls)
@@ -95,6 +106,18 @@ struct WaxOffMainView: View {
                 Label("Clear", systemImage: "trash")
             }
             .keyboardShortcut(.delete, modifiers: [.command, .option])
+
+            Divider()
+                .frame(height: 20)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    showSettings.toggle()
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .help(showSettings ? "Hide Settings" : "Show Settings")
         }
         .padding()
         .background(.regularMaterial)
@@ -111,55 +134,57 @@ struct WaxOffMainView: View {
 
     @ViewBuilder
     private var waveformSection: some View {
-        Group {
-            if let file = selectedFile {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(file.url.lastPathComponent)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+        ZStack {
+            Group {
+                if let file = selectedFile {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(file.url.lastPathComponent)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
 
-                    WaveformView(waveformData: file.waveform)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(.black.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        WaveformView(waveformData: file.waveform)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(.black.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    FileInfoStatsView(file: file)
+                        FileInfoStatsView(file: file)
+                    }
+                    .padding()
+                } else if let phase = viewModel.deliveryPhase {
+                    VStack(spacing: 10) {
+                        ProgressView().scaleEffect(1.2)
+                        Text(phase)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.tertiary)
+                        Text("Select a file to view waveform")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .padding()
-            } else if let phase = viewModel.deliveryPhase {
-                VStack(spacing: 10) {
-                    ProgressView().scaleEffect(1.2)
-                    Text(phase)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack {
-                    Image(systemName: "waveform")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.tertiary)
-                    Text("Select a file to view waveform")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .background {
-            if let url = Bundle.main.url(forResource: "WaxOff_bg", withExtension: "png"),
-               let nsImage = NSImage(contentsOf: url) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: nsImage.size.width * 0.1875,
-                           height: nsImage.size.height * 0.1875)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: .bottomTrailing)
-                    .padding(.bottom, 10)
-                    .padding(.trailing, 24)
-                    .padding([.top, .leading], 12)
+            .background {
+                if let url = Bundle.main.url(forResource: "WaxOff_bg", withExtension: "png"),
+                   let nsImage = NSImage(contentsOf: url) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: nsImage.size.width * 0.1875,
+                               height: nsImage.size.height * 0.1875)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .bottomTrailing)
+                        .padding(.bottom, 10)
+                        .padding(.trailing, 24)
+                        .padding([.top, .leading], 12)
+                }
             }
         }
     }

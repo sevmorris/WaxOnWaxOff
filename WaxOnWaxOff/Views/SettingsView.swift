@@ -5,12 +5,9 @@ struct SettingsView: View {
     @Bindable var viewModel: ContentViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Settings").font(.headline)
-
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-                GridRow {
-                    Text("Sample Rate")
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                row("Sample Rate") {
                     Picker("", selection: $viewModel.settings.sampleRate) {
                         Text("44.1 kHz").tag(WaxOnSettings.SampleRate.s44100)
                         Text("48 kHz").tag(WaxOnSettings.SampleRate.s48000)
@@ -18,8 +15,7 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                GridRow {
-                    Text("Output")
+                row("Output") {
                     Picker("", selection: $viewModel.settings.outputChannels) {
                         Text("Mono").tag(WaxOnSettings.OutputChannels.mono)
                         Text("Stereo").tag(WaxOnSettings.OutputChannels.stereo)
@@ -27,8 +23,7 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                GridRow {
-                    Text("Channel")
+                row("Channel") {
                     Picker("", selection: $viewModel.settings.channel) {
                         Text("Left").tag(WaxOnSettings.MonoChannel.left)
                         Text("Right").tag(WaxOnSettings.MonoChannel.right)
@@ -38,18 +33,19 @@ struct SettingsView: View {
                 .disabled(viewModel.settings.outputChannels == .stereo)
                 .opacity(viewModel.settings.outputChannels == .stereo ? 0.4 : 1)
 
-                GridRow {
-                    Text("Ceiling")
-                    HStack {
+                Divider().padding(.vertical, 6)
+
+                row("Ceiling") {
+                    HStack(spacing: 6) {
                         Slider(value: $viewModel.settings.limitDb, in: -3 ... -1, step: 1)
                         Text(String(format: "%.0f dB", viewModel.settings.limitDb))
-                            .frame(width: 80, alignment: .trailing)
+                            .font(.system(size: 11).monospaced())
+                            .frame(width: 34, alignment: .trailing)
                     }
                 }
 
-                GridRow {
-                    Text("High Pass")
-                    HStack {
+                row("High Pass") {
+                    HStack(spacing: 6) {
                         Slider(
                             value: Binding(
                                 get: { Double(viewModel.settings.dcBlockHz) },
@@ -58,50 +54,50 @@ struct SettingsView: View {
                             in: 20...90,
                             step: 5
                         )
-                        Text(viewModel.settings.dcBlockHz == 20
-                             ? "DC Block"
-                             : viewModel.settings.dcBlockHz == 80
-                               ? "\(viewModel.settings.dcBlockHz) Hz · default"
-                               : "\(viewModel.settings.dcBlockHz) Hz")
-                            .frame(width: 110, alignment: .trailing)
+                        Text(viewModel.settings.dcBlockHz == 20 ? "DC Block" : "\(viewModel.settings.dcBlockHz) Hz")
+                            .font(.system(size: 11).monospaced())
+                            .frame(width: 55, alignment: .trailing)
                     }
                 }
 
-                GridRow {
-                    Text("Loudness Norm")
-                    Toggle("Enable", isOn: $viewModel.settings.loudnormEnabled)
+                Divider().padding(.vertical, 6)
+
+                row("Loudness Norm") {
+                    Toggle("", isOn: $viewModel.settings.loudnormEnabled)
                         .toggleStyle(.switch)
+                        .labelsHidden()
                 }
 
-                GridRow {
-                    Text("Target")
-                    HStack {
+                row("Target") {
+                    HStack(spacing: 6) {
                         Slider(value: $viewModel.settings.loudnormTarget, in: -35 ... -16, step: 1)
-                        Text(viewModel.settings.loudnormTarget == -30
-                             ? String(format: "%.0f LUFS · default", viewModel.settings.loudnormTarget)
-                             : String(format: "%.0f LUFS", viewModel.settings.loudnormTarget))
-                            .frame(width: 130, alignment: .trailing)
+                        Text(String(format: "%.0f LUFS", viewModel.settings.loudnormTarget))
+                            .font(.system(size: 11).monospaced())
+                            .frame(width: 52, alignment: .trailing)
                     }
-                    .disabled(!viewModel.settings.loudnormEnabled)
                 }
+                .disabled(!viewModel.settings.loudnormEnabled)
+                .opacity(!viewModel.settings.loudnormEnabled ? 0.4 : 1)
 
-                GridRow {
-                    Text("Output Dir")
-                    HStack {
-                        if let path = viewModel.settings.outputDirectoryPath {
-                            Text(path)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .font(.caption)
-                            Button("Reset") {
-                                viewModel.settings.outputDirectoryPath = nil
-                            }
-                            .controlSize(.small)
-                        } else {
-                            Text("Same as source")
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
+                Divider().padding(.vertical, 6)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("OUTPUT DIR")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .kerning(0.4)
+                    if let path = viewModel.settings.outputDirectoryPath {
+                        Text(URL(fileURLWithPath: path).lastPathComponent)
+                            .font(.system(size: 11))
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Same as source")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 6) {
                         Button("Choose…") {
                             let panel = NSOpenPanel()
                             panel.canChooseDirectories = true
@@ -112,12 +108,32 @@ struct SettingsView: View {
                             }
                         }
                         .controlSize(.small)
+                        if viewModel.settings.outputDirectoryPath != nil {
+                            Button("Reset") {
+                                viewModel.settings.outputDirectoryPath = nil
+                            }
+                            .controlSize(.small)
+                        }
                     }
                 }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 2)
             }
+            .padding(12)
         }
-        .padding()
         .background(.thinMaterial)
-        .frame(minHeight: 280, alignment: .top)
+    }
+
+    @ViewBuilder
+    private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .kerning(0.4)
+            content()
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 2)
     }
 }

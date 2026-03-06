@@ -5,6 +5,7 @@ struct ContentView: View {
     var viewModel: ContentViewModel
     @State private var fileListWidth: CGFloat = 250
     @State private var showConsole = false
+    @State private var showSettings = true
 
     private var selectedFile: FileItem? {
         guard viewModel.selectedFileIDs.count == 1,
@@ -42,11 +43,21 @@ struct ContentView: View {
 
                 waveformSection
                     .frame(minWidth: 300)
+
+                if showSettings {
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.15))
+                            .frame(width: 1)
+                        SettingsView(viewModel: viewModel)
+                            .frame(width: 240)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .transition(.move(edge: .trailing))
+                }
             }
-            Divider()
-            SettingsView(viewModel: viewModel)
         }
-        .frame(minWidth: 900, minHeight: 620)
+        .frame(minWidth: 900, minHeight: 540)
         .padding(.bottom)
         .dropDestination(for: URL.self) { urls, _ in
             viewModel.addFiles(urls)
@@ -106,6 +117,18 @@ struct ContentView: View {
                 Label("Clear", systemImage: "trash")
             }
             .keyboardShortcut(.delete, modifiers: [.command, .option])
+
+            Divider()
+                .frame(height: 20)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    showSettings.toggle()
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .help(showSettings ? "Hide Settings" : "Show Settings")
         }
         .padding()
         .background(.regularMaterial)
