@@ -2,7 +2,7 @@
 
 WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing — high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution — EBU R128 loudness normalization, true peak control, and MP3 encoding.
 
-**[Download v1.1.20 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.1.20.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**
+**[Download v1.1.21 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.1.21.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**
 
 > ⚠️ **Important — Read Before First Launch**
 >
