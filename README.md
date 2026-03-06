@@ -91,7 +91,7 @@ AI-assisted development raises real questions about labor displacement, resource
 
 The current app icon is my own (very minimal) design. AI can build the software, but I can still make the art myself.
 
-WaxOn/WaxOff has been built carefully and iteratively — tested in real podcast workflows, refined based on actual use, and updated continuously as improvements reveal themselves. That process takes real time and attention, even when AI is writing the code. The app is free and will stay that way, but if it saves you time in your own work, a small contribution for my caffeine requirement is always appreciated.
+WaxOn/WaxOff has been built carefully and iteratively — tested in real podcast workflows, refined based on actual use, and updated continuously as improvements reveal themselves. That process takes real time and attention, even when AI is writing the code. The app is free and will stay that way. If you find it useful, a coffee is appreciated.
 
 
 <p align="center"><a href="https://www.caffeineinformer.com/"><img src="assets/Caffeine_structure_sm.png" width="50%"></a></p>
