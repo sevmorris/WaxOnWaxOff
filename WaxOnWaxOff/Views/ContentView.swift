@@ -135,7 +135,7 @@ struct ContentView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
 
-                    WaveformView(waveformData: file.waveform)
+                    WaveformView(waveformData: file.outputWaveform ?? file.waveform)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(.black.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
