@@ -50,7 +50,7 @@ struct ContentView: View {
                             .fill(Color.primary.opacity(0.15))
                             .frame(width: 1)
                         SettingsView(viewModel: viewModel)
-                            .frame(width: 240)
+                            .frame(width: 260)
                     }
                     .frame(maxHeight: .infinity)
                     .transition(.move(edge: .trailing))
