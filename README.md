@@ -18,7 +18,7 @@ WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw rec
 
 Use WaxOn on raw recordings before editing. Drop your files in, configure what you care about, and get to editing.
 
-- **High-Pass Filter** — configurable cutoff (40–90 Hz, default 80 Hz) removes rumble, HVAC hum, and handling noise
+- **High-Pass Filter** — configurable cutoff (20–90 Hz, default 80 Hz) removes rumble, HVAC hum, and handling noise; set to 20 Hz for DC Block only
 - **Loudness Normalization** — optional two-pass EBU R128 with configurable target (−35 to −16 LUFS). Linear gain only — dynamics fully preserved
 - **Brick-Wall Limiting** — 2× oversampled true peak control at the chosen ceiling (−1 to −3 dB)
 - **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
@@ -61,6 +61,7 @@ Use WaxOff on your finished, edited mix. Apply broadcast-standard loudness norma
 - **Reveal in Finder** — click to reveal processed files
 - **Delete Key** — press Delete to remove selected files from the queue
 - **Independent File Lists** — each mode keeps its own queue; switching modes doesn't disturb your work
+- **Collapsible Settings Sidebar** — toggle the settings panel with the toolbar button; slides in/out from the right edge
 
 ## Workflow
 
