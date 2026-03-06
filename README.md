@@ -94,6 +94,6 @@ The current app icon is my own (very minimal) design. AI can build the software,
 WaxOn/WaxOff has been built carefully and iteratively — tested in real podcast workflows, refined based on actual use, and updated continuously as improvements reveal themselves. That process takes real time and attention, even when AI is writing the code. The app is free and will stay that way, but if it saves you time in your own work, a small contribution for my caffeine requirement is always appreciated.
 
 
-<p align="center"><img src="assets/Caffeine_structure_sm.png" width="50%"></p>
+<p align="center"><a href="https://en.wikipedia.org/wiki/Caffeine"><img src="assets/Caffeine_structure_sm.png" width="50%"></a></p>
 
 [![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/sevmo)
