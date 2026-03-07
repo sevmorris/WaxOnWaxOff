@@ -756,7 +756,7 @@
         <tr>
           <td>Sample Rate</td>
           <td>44.1 kHz · 48 kHz</td>
-          <td>Output sample rate for the WAV (and source for MP3 encoding). 44.1 kHz for podcast delivery; 48 kHz for video or mastering handoff.</td>
+          <td>Output sample rate for the WAV. 44.1 kHz for podcast delivery; 48 kHz for video or mastering handoff. MP3 output is always encoded at 44.1 kHz regardless of this setting.</td>
         </tr>
         <tr>
           <td>Output</td>
@@ -812,7 +812,7 @@
       <li>
         <div>
           <strong>MP3 Encoding <span class="tag">Optional</span></strong>
-          <span>If Output is MP3 or Both, the normalized WAV is encoded using <code>libmp3lame</code> at the chosen CBR bitrate. The WAV is always written first; MP3 is derived from it.</span>
+          <span>If Output is MP3 or Both, the normalized WAV is encoded using <code>libmp3lame</code> at the chosen CBR bitrate. MP3 is always encoded at 44.1 kHz — the standard for podcast audio — regardless of the sample rate setting. The WAV is always written first; MP3 is derived from it.</span>
         </div>
       </li>
     </ol>

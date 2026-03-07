@@ -36,7 +36,7 @@ Use WaxOff on your finished, edited mix. Apply broadcast-standard loudness norma
 
 - **EBU R128 Loudness Normalization** — two-pass analysis + linear gain. No dynamic processing; stereo image and transients are unchanged
 - **True Peak Control** — configurable ceiling (−3.0 to −0.1 dBTP, default −1.0)
-- **WAV + MP3 Output** — 24-bit WAV, CBR MP3 (128/160/192 kbps), or both
+- **WAV + MP3 Output** — 24-bit WAV, CBR MP3 (128/160/192 kbps), or both; MP3 always outputs at 44.1 kHz
 - **Phase Rotation** — optional 150 Hz allpass to reduce crest factor on bass-heavy material
 - **Presets** — three built-in presets (Podcast Standard, Podcast Loud, WAV Only Mastering) plus custom presets
 - **Sample Rate Conversion** — 44.1 kHz or 48 kHz
