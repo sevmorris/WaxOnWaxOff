@@ -146,16 +146,28 @@
       max-width: 1080px;
       margin: 0 auto;
       padding: 0 2rem;
-      height: 64px;
+      height: 72px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .wordmark {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+    }
+    .wordmark-name {
       font-family: var(--font-display);
       font-size: 2rem;
       letter-spacing: 0.06em;
       color: var(--light);
+    }
+    .wordmark-sub {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--tan);
     }
     nav { display: flex; align-items: center; gap: 1.5rem; }
     nav a {
@@ -387,7 +399,10 @@
   <!-- HEADER -->
   <header>
     <div class="header-inner">
-      <span class="wordmark">WaxOn/WaxOff</span>
+      <div class="wordmark">
+        <span class="wordmark-name">WaxOn/WaxOff</span>
+        <span class="wordmark-sub">Free &middot; macOS &middot; Podcast Audio Prep</span>
+      </div>
       <nav>
         <a href="manual/">Manual</a>
         <a href="https://github.com/sevmorris/WaxOnWaxOff" target="_blank" rel="noopener noreferrer">GitHub</a>
