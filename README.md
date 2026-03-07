@@ -86,7 +86,7 @@ This program is free software: you can redistribute it and/or modify it under th
 
 ## A Note on AI
 
-I'm a freelance audio engineer, not a software developer. These tools exist because AI made it possible for me to build things I couldn't build alone — and I think that's genuinely valuable.
+I'm a freelance audio engineer, not a software developer. These tools exist because AI made it possible for me to build things I couldn't build alone, and I think that's genuinely valuable.
 
 But I hold that alongside some serious concerns. AI raises deep questions about labor displacement, resource consumption, surveillance, the concentration of power in a small number of corporations, and the increasingly close relationship between those corporations and governments. These aren't hypothetical risks — they're unfolding now, and the implications for ordinary people are significant. I don't have clean answers. I don't think anyone does.
 
