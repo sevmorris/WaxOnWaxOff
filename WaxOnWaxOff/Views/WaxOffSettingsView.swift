@@ -8,11 +8,18 @@ struct WaxOffSettingsView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 row("Sample Rate") {
-                    Picker("", selection: $viewModel.settings.sampleRate) {
-                        Text("44.1 kHz").tag(44100)
-                        Text("48 kHz").tag(48000)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker("", selection: $viewModel.settings.sampleRate) {
+                            Text("44.1 kHz").tag(44100)
+                            Text("48 kHz").tag(48000)
+                        }
+                        .pickerStyle(.segmented)
+                        if viewModel.settings.outputMode != .wav {
+                            Text("MP3 always outputs at 44.1 kHz")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    .pickerStyle(.segmented)
                 }
 
                 row("Output") {
