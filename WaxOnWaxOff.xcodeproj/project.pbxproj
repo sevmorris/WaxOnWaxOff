@@ -262,7 +262,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.22;
+				MARKETING_VERSION = 1.1.23;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sevmorris.WaxOnWaxOff;
 				PRODUCT_NAME = WaxOnWaxOff;
 				REGISTER_APP_GROUPS = YES;
@@ -294,7 +294,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.22;
+				MARKETING_VERSION = 1.1.23;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.sevmorris.WaxOnWaxOff;
 				PRODUCT_NAME = WaxOnWaxOff;
 				REGISTER_APP_GROUPS = YES;
