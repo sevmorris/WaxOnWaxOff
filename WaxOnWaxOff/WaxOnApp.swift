@@ -46,7 +46,7 @@ struct WaxOnWaxOffApp: App {
                 Divider()
 
                 Button("Send Feedback…") {
-                    if let url = URL(string: "mailto:7morris@gmail.com?subject=WaxOnWaxOff%20Feedback") {
+                    if let url = URL(string: "https://sevmorris.github.io/#contact") {
                         NSWorkspace.shared.open(url)
                     }
                 }
