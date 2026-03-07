@@ -3,922 +3,606 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WaxOn/WaxOff Manual</title>
+  <title>WaxOn/WaxOff — Podcast Audio Prep for macOS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:           #ffffff;
-      --bg-subtle:    #f5f5f7;
-      --bg-code:      #f0f0f2;
-      --border:       #d2d2d7;
-      --text:         #1d1d1f;
-      --text-muted:   #6e6e73;
-      --accent:       #0066cc;
-      --accent-hover: #0055b3;
-      --nav-bg:       #fafafa;
-      --tag-bg:       #e8f0fe;
-      --tag-text:     #1a56b0;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg:           #111113;
-        --bg-subtle:    #1c1c1e;
-        --bg-code:      #2a2a2d;
-        --border:       #3a3a3c;
-        --text:         #f2f2f7;
-        --text-muted:   #8e8e93;
-        --accent:       #4da3ff;
-        --accent-hover: #79bcff;
-        --nav-bg:       #1c1c1e;
-        --tag-bg:       #1a2d4a;
-        --tag-text:     #6eb0ff;
-      }
+      --black:      #0e0e0e;
+      --dark:       #1a1816;
+      --mid:        #242018;
+      --light:      #f2ead8;
+      --cream:      #e8dfc8;
+      --orange:     #d4520a;
+      --orange-lt:  #e8641c;
+      --tan:        #9c8a6a;
+      --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+      --font-ui:      'Barlow Condensed', 'Arial Narrow', sans-serif;
+      --font-body:    'Barlow', Arial, sans-serif;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     html { scroll-behavior: smooth; font-size: 16px; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      display: flex;
-      min-height: 100vh;
+      font-family: var(--font-body);
+      background: var(--dark);
+      color: var(--light);
+      line-height: 1.65;
     }
 
-    /* ── Sidebar ── */
-    nav {
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      width: 230px;
-      min-width: 230px;
-      background: var(--nav-bg);
-      border-right: 1px solid var(--border);
-      overflow-y: auto;
-      padding: 28px 0 40px;
-      display: flex;
-      flex-direction: column;
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      background-size: 180px 180px;
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 999;
     }
 
-    .nav-brand {
-      padding: 0 20px 20px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 16px;
+    h1, h2, h3 {
+      font-family: var(--font-display);
+      letter-spacing: 0.02em;
+      line-height: 1;
     }
-    .nav-brand span {
-      font-size: 1.1rem;
+    h1 { font-size: clamp(4rem, 12vw, 9rem); color: var(--light); }
+    h2 { font-size: clamp(2rem, 3.5vw, 3rem); color: var(--light); margin-bottom: 2.5rem; }
+    h3 { font-size: 1.6rem; color: var(--orange); margin-bottom: 0.5rem; }
+
+    p { font-size: 1.05rem; color: var(--cream); max-width: 62ch; }
+    p + p { margin-top: 1rem; }
+
+    a { color: var(--orange); text-decoration: none; }
+    a:hover { color: var(--orange-lt); }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    .section-label {
+      display: inline-block;
+      font-family: var(--font-ui);
+      font-size: 0.72rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
-      display: block;
-    }
-    .nav-brand small {
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--black);
+      background: var(--orange);
+      padding: 0.25rem 0.6rem 0.2rem;
+      margin-bottom: 1.25rem;
+      clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 100%, 6px 100%);
     }
 
-    nav a {
-      display: block;
-      padding: 5px 20px;
-      font-size: 0.83rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      border-left: 2px solid transparent;
-      transition: color 0.15s, border-color 0.15s;
-      line-height: 1.5;
+    .pinstripe {
+      height: 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--orange)    0px,
+        var(--orange)    1px,
+        transparent      1px,
+        transparent      5px,
+        var(--orange)    5px,
+        var(--orange)    6px,
+        transparent      6px,
+        transparent      14px
+      );
+      opacity: 0.55;
     }
-    nav a:hover { color: var(--accent); }
-    nav a.section-head {
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      padding-top: 16px;
-      padding-bottom: 4px;
+
+    .section-dark  { background: var(--black); padding: 6rem 0; }
+    .section-mid   { background: var(--mid);   padding: 6rem 0; }
+    .section-light { background: var(--dark);  padding: 6rem 0; }
+
+    .section-dark::before,
+    .section-mid::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 8px 8px;
       pointer-events: none;
     }
-    nav a.sub { padding-left: 32px; }
-
-    /* ── Main content ── */
-    main {
-      flex: 1;
-      max-width: 820px;
-      padding: 56px 48px 100px;
-    }
-
-    section { margin-bottom: 64px; }
-
-    h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 10px; }
-    h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-    h3 { font-size: 1.05rem; font-weight: 600; margin: 28px 0 10px; }
-    h4 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 20px 0 8px; }
-
-    p { margin-bottom: 14px; }
-    p:last-child { margin-bottom: 0; }
-
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; color: var(--accent-hover); }
-
-    ul, ol { padding-left: 20px; margin-bottom: 14px; }
-    li { margin-bottom: 6px; line-height: 1.5; }
-    li:last-child { margin-bottom: 0; }
-
-    code {
-      font-family: "SF Mono", "Fira Mono", "Menlo", monospace;
-      font-size: 0.84em;
-      background: var(--bg-code);
-      color: var(--text);
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    pre {
-      background: var(--bg-code);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px 20px;
-      overflow-x: auto;
-      margin-bottom: 14px;
-    }
-    pre code { background: none; padding: 0; font-size: 0.85rem; }
-
-    .callout {
-      background: var(--bg-subtle);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      border-radius: 6px;
-      padding: 14px 18px;
-      margin-bottom: 18px;
-      font-size: 0.9rem;
-    }
-    .callout strong { display: block; margin-bottom: 4px; }
-
-    /* ── Hero ── */
-    .hero { margin-bottom: 56px; }
-    .hero h1 { margin-bottom: 12px; }
-    .hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 560px; }
-    .hero-actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; align-items: center; }
+    .section-dark, .section-mid { position: relative; }
 
     .btn {
       display: inline-block;
-      padding: 9px 20px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: opacity 0.15s;
-    }
-    .btn:hover { opacity: 0.85; text-decoration: none; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-secondary {
-      background: var(--bg-subtle);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
-    /* ── Mode badge ── */
-    .mode-badge {
-      display: inline-block;
-      font-size: 0.72rem;
+      font-family: var(--font-ui);
       font-weight: 700;
-      padding: 2px 10px;
-      border-radius: 100px;
-      letter-spacing: 0.04em;
-      vertical-align: middle;
-      margin-left: 8px;
+      font-size: 1rem;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
+      padding: 0.75rem 2rem;
+      transition: background 0.15s, color 0.15s;
     }
-    .mode-waxon  { background: #e8f0fe; color: #1a56b0; }
-    .mode-waxoff { background: #e6f4ea; color: #137333; }
-    @media (prefers-color-scheme: dark) {
-      .mode-waxon  { background: #1a2d4a; color: #6eb0ff; }
-      .mode-waxoff { background: #1a3a25; color: #6fcf97; }
+    .btn-primary {
+      background: var(--orange);
+      color: var(--black);
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 100%, 10px 100%);
     }
+    .btn-primary:hover { background: var(--orange-lt); color: var(--black); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--cream);
+      border: 1px solid #3a3530;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 100%, 10px 100%);
+    }
+    .btn-secondary:hover { color: var(--light); border-color: var(--tan); }
+    .btn-large { font-size: 1.2rem; padding: 1rem 2.8rem; }
 
-    /* ── Stats table ── */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 0;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-      margin-bottom: 14px;
-      font-size: 0.9rem;
+    /* ── Header ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--black);
+      border-bottom: 2px solid var(--orange);
     }
-    .stats-grid .label {
-      font-family: "SF Mono", "Fira Mono", monospace;
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 9px 14px;
-      background: var(--bg-subtle);
-      border-bottom: 1px solid var(--border);
-      color: var(--text-muted);
-      white-space: nowrap;
-    }
-    .stats-grid .desc {
-      padding: 9px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .stats-grid .label:last-of-type,
-    .stats-grid .desc:last-child {
-      border-bottom: none;
-    }
-
-    /* ── Settings table ── */
-    .settings-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      margin-bottom: 14px;
-    }
-    .settings-table th {
-      text-align: left;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-    }
-    .settings-table td {
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .settings-table tr:last-child td { border-bottom: none; }
-    .settings-table td:first-child { font-weight: 600; white-space: nowrap; }
-    .settings-table td:nth-child(2) { color: var(--text-muted); white-space: nowrap; }
-    .settings-table { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    .settings-table thead th:first-child { border-radius: 8px 0 0 0; }
-    .settings-table thead th:last-child  { border-radius: 0 8px 0 0; }
-
-    /* ── Presets table ── */
-    .presets-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.88rem;
-      margin-bottom: 14px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .presets-table th {
-      text-align: left;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-subtle);
-    }
-    .presets-table td {
-      padding: 9px 12px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .presets-table tr:last-child td { border-bottom: none; }
-    .presets-table td:first-child { font-weight: 600; }
-
-    /* ── Pipeline steps ── */
-    .pipeline {
-      counter-reset: step;
-      list-style: none;
-      padding: 0;
-      margin-bottom: 14px;
-    }
-    .pipeline li {
-      counter-increment: step;
-      display: flex;
-      gap: 16px;
-      align-items: flex-start;
-      margin-bottom: 16px;
-    }
-    .pipeline li::before {
-      content: counter(step);
-      min-width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #fff;
+    .header-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      height: 64px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 0.8rem;
-      font-weight: 700;
-      margin-top: 1px;
-      flex-shrink: 0;
+      justify-content: space-between;
     }
-    .pipeline li div { flex: 1; }
-    .pipeline li strong { display: block; font-size: 0.95rem; margin-bottom: 3px; }
-    .pipeline li span { font-size: 0.88rem; color: var(--text-muted); }
-
-    /* ── Tag ── */
-    .tag {
-      display: inline-block;
-      background: var(--tag-bg);
-      color: var(--tag-text);
-      font-size: 0.72rem;
+    .wordmark {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      letter-spacing: 0.06em;
+      color: var(--light);
+    }
+    nav { display: flex; align-items: center; gap: 1.5rem; }
+    nav a {
+      font-family: var(--font-ui);
+      font-size: 1rem;
       font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 100px;
-      letter-spacing: 0.03em;
-      vertical-align: middle;
-      margin-left: 6px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--cream);
     }
+    nav a:hover { color: var(--orange-lt); }
+    nav .nav-cta {
+      background: var(--orange);
+      color: var(--black);
+      padding: 0.4rem 1.1rem;
+      clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 100%, 7px 100%);
+    }
+    nav .nav-cta:hover { background: var(--orange-lt); color: var(--black); }
+
+    /* ── Hero ── */
+    .hero {
+      background: var(--dark);
+      padding: 7rem 2rem 6rem;
+      max-width: 1080px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .hero-eyebrow {
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--tan);
+      margin-bottom: 1.25rem;
+    }
+    .hero-sub {
+      font-size: 1.15rem;
+      max-width: 52ch;
+      color: var(--cream);
+      line-height: 1.7;
+      margin-top: 1.5rem;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      margin-top: 2.5rem;
+      flex-wrap: wrap;
+    }
+    .hero-req {
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      color: var(--tan);
+      margin-top: 1.25rem;
+    }
+    .hero-stripe {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      background: repeating-linear-gradient(
+        180deg,
+        var(--orange) 0px,
+        var(--orange) 24px,
+        transparent 24px,
+        transparent 36px
+      );
+      opacity: 0.6;
+    }
+
+    /* ── Screenshots ── */
+    .screenshot-block { margin-bottom: 5rem; }
+    .screenshot-block:last-child { margin-bottom: 0; }
+    .screenshot-label {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      color: var(--orange);
+      margin-bottom: 1.25rem;
+      letter-spacing: 0.05em;
+    }
+    .screenshot-desc {
+      font-size: 1rem;
+      color: var(--cream);
+      max-width: 60ch;
+      margin-bottom: 2rem;
+    }
+    .screenshot-img {
+      width: 100%;
+      max-width: 960px;
+      border-radius: 10px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.65);
+      display: block;
+    }
+
+    /* ── Features ── */
+    .section-intro {
+      margin-bottom: 3rem;
+      font-size: 1.1rem;
+      max-width: 55ch;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2px;
+      background: var(--orange);
+    }
+    .feature-card {
+      background: var(--black);
+      padding: 1.75rem 1.75rem;
+    }
+    .section-mid .feature-card { background: var(--mid); }
+    .feature-card h3 { font-size: 1.3rem; margin-bottom: 0.5rem; }
+    .feature-card p { font-size: 0.95rem; max-width: none; color: var(--cream); }
+
+    /* ── Workflow ── */
+    .workflow-chain {
+      font-family: var(--font-ui);
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      color: var(--cream);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 2rem;
+    }
+    .workflow-step {
+      background: var(--mid);
+      border: 1px solid #3a3530;
+      padding: 0.6rem 1.2rem;
+      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 100%, 8px 100%);
+    }
+    .workflow-step.active {
+      background: var(--orange);
+      color: var(--black);
+      border-color: var(--orange);
+    }
+    .workflow-arrow {
+      color: var(--tan);
+      font-size: 1.2rem;
+    }
+
+    /* ── Contact form ── */
+    .contact-form {
+      margin: 2.5rem auto 0;
+      max-width: 520px;
+      text-align: left;
+    }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label {
+      display: block;
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--tan);
+      margin-bottom: 0.4rem;
+    }
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      background: var(--mid);
+      border: 1px solid #3a3226;
+      color: var(--light);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      padding: 0.65rem 0.9rem;
+      border-radius: 2px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-group input::placeholder,
+    .form-group textarea::placeholder { color: var(--tan); opacity: 0.6; }
+    .form-group input:focus,
+    .form-group textarea:focus { border-color: var(--orange); }
+    .form-group textarea { resize: vertical; min-height: 120px; }
+    .contact-form .btn-primary { margin-top: 0.5rem; }
+    .contact-form .btn-primary:disabled { opacity: 0.6; cursor: default; }
+    .form-success-msg {
+      font-family: var(--font-ui);
+      font-size: 1.3rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--orange);
+      margin-top: 2.5rem;
+    }
+    .contact-center { text-align: center; }
+    .contact-center p { margin: 0 auto; }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--black);
+      border-top: 1px solid #2a2520;
+      padding: 1.5rem 2rem;
+    }
+    .footer-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      color: var(--tan);
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .footer-links { display: flex; gap: 1.5rem; }
+    .footer-links a { color: var(--tan); }
+    .footer-links a:hover { color: var(--orange-lt); }
 
     /* ── Responsive ── */
-    @media (max-width: 800px) {
-      body { flex-direction: column; }
-      nav {
-        position: static;
-        height: auto;
-        width: 100%;
-        min-width: 0;
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        padding: 16px 0;
-        flex-direction: row;
-        flex-wrap: wrap;
-        overflow-x: auto;
-      }
-      .nav-brand { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-      nav a.section-head { display: none; }
-      nav a { padding: 4px 12px; white-space: nowrap; }
-      nav a.sub { padding-left: 12px; }
-      main { padding: 32px 24px 60px; }
-      h1 { font-size: 1.8rem; }
+    @media (max-width: 720px) {
+      nav a:not(.nav-cta) { display: none; }
+      .features-grid { grid-template-columns: 1fr; }
+      .hero-stripe { display: none; }
+      h1 { font-size: clamp(3.5rem, 18vw, 6rem); }
+      .footer-inner { flex-direction: column; text-align: center; }
+      .workflow-chain { gap: 0.5rem; }
     }
   </style>
 </head>
 <body>
 
-<nav>
-  <div class="nav-brand">
-    <span>WaxOn/WaxOff</span>
-    <small>Manual — v1.1.23</small>
-  </div>
-  <a class="section-head" href="#">Overview</a>
-  <a href="#overview">Introduction</a>
-  <a href="#getting-started">Getting Started</a>
-  <a href="#interface">The Interface</a>
-  <a class="section-head" href="#">WaxOn Mode</a>
-  <a class="sub" href="#waxon-overview">Overview</a>
-  <a class="sub" href="#waxon-presets">Presets</a>
-  <a class="sub" href="#waxon-settings">Settings</a>
-  <a class="sub" href="#waxon-pipeline">Pipeline</a>
-  <a class="sub" href="#waxon-mix">Mix Mode</a>
-  <a class="sub" href="#waxon-output">Output Files</a>
-  <a class="section-head" href="#">WaxOff Mode</a>
-  <a class="sub" href="#waxoff-overview">Overview</a>
-  <a class="sub" href="#waxoff-presets">Presets</a>
-  <a class="sub" href="#waxoff-settings">Settings</a>
-  <a class="sub" href="#waxoff-pipeline">Pipeline</a>
-  <a class="sub" href="#waxoff-output">Output Files</a>
-  <a class="section-head" href="#">Reference</a>
-  <a href="#file-stats">File Stats</a>
-  <a href="#formats">Supported Formats</a>
-  <a href="#tips">Tips &amp; Workflow</a>
-  <a class="section-head" href="#">Deep Dive</a>
-  <a href="theory.html">Theory of Operation</a>
-</nav>
-
-<main>
-
-  <!-- Hero -->
-  <div class="hero" id="overview">
-    <h1>WaxOn/WaxOff</h1>
-    <p>Podcast audio prep for macOS — from raw recording to finished delivery in two modes, one app.</p>
-    <p style="margin-top:10px; font-size:0.95rem;"><strong>WaxOn</strong> prepares raw recordings for editing. <strong>WaxOff</strong> finalizes your edited mix for distribution. Both share the same drag-and-drop workflow, waveform viewer, and file stats panel.</p>
-    <div class="hero-actions">
-      <a class="btn btn-primary" href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.1.23.dmg">Download v1.1.23</a>
-      <a class="btn btn-secondary" href="https://github.com/sevmorris/WaxOnWaxOff">GitHub</a>
-      <a class="btn btn-secondary" href="theory.html">Theory of Operation →</a>
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <span class="wordmark">WaxOn/WaxOff</span>
+      <nav>
+        <a href="manual/">Manual</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.1.23.dmg" class="nav-cta">Download</a>
+      </nav>
     </div>
+  </header>
+
+  <!-- HERO -->
+  <div style="background: var(--dark);">
+    <section class="hero">
+      <div class="hero-eyebrow">Free &middot; macOS &middot; Podcast Audio Prep</div>
+      <h1>WaxOn<br>WaxOff</h1>
+      <p class="hero-sub">Two tools, one workflow. <strong>WaxOn</strong> prepares raw recordings for editing. <strong>WaxOff</strong> delivers your finished mix to broadcast standard.</p>
+      <div class="hero-actions">
+        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.1.23.dmg" class="btn btn-primary btn-large">Download v1.1.23</a>
+        <a href="manual/" class="btn btn-secondary btn-large">Manual</a>
+      </div>
+      <p class="hero-req">macOS 14 Sonoma or later &middot; Apple Silicon &amp; Intel</p>
+      <div class="hero-stripe"></div>
+    </section>
   </div>
 
-  <!-- Getting Started -->
-  <section id="getting-started">
-    <h2>Getting Started</h2>
+  <div class="pinstripe"></div>
 
-    <h3>System Requirements</h3>
-    <ul>
-      <li>macOS 14.0 (Sonoma) or later</li>
-      <li>Apple Silicon or Intel Mac</li>
-      <li>FFmpeg — bundled with the app, no separate install needed</li>
-    </ul>
+  <!-- SCREENSHOTS -->
+  <section class="section-dark" id="screenshots">
+    <div class="container">
 
-    <h3>Installation</h3>
-    <ol>
-      <li>Download the DMG from the link above</li>
-      <li>Open the DMG and drag <strong>WaxOn/WaxOff</strong> to your Applications folder</li>
-      <li>Before launching, open Terminal and run:</li>
-    </ol>
-    <pre><code>xattr -cr /Applications/WaxOnWaxOff.app</code></pre>
+      <div class="screenshot-block">
+        <div class="section-label">WaxOn</div>
+        <div class="screenshot-label">Raw Recording Prep</div>
+        <p class="screenshot-desc">Drop in raw recordings before editing. High-pass filtering, loudness normalization, phase rotation, and brick-wall limiting — all in one pass.</p>
+        <img class="screenshot-img" src="screenshots/screenshot-waxon.png" alt="WaxOn mode showing waveform and settings panel" loading="lazy">
+      </div>
 
-    <div class="callout">
-      <strong>Why is this necessary?</strong>
-      WaxOn/WaxOff is not notarized with Apple. Without clearing the quarantine attribute, macOS Gatekeeper will refuse to open it. The <code>xattr -cr</code> command removes the quarantine flag — it does not disable any macOS security features.
-    </div>
+      <div class="screenshot-block">
+        <div class="section-label">WaxOff</div>
+        <div class="screenshot-label">Delivery &amp; Mastering</div>
+        <p class="screenshot-desc">Run your finished, edited mix through WaxOff for broadcast-standard loudness normalization and MP3 encoding.</p>
+        <img class="screenshot-img" src="screenshots/screenshot-waxoff.png" alt="WaxOff mode showing waveform and settings panel" loading="lazy">
+      </div>
 
-    <h3>First Launch — Mode Picker</h3>
-    <p>On first launch (and any time you click the active mode button in the toolbar), a compact mode picker appears. Choose <strong>WaxOn</strong> to prepare raw recordings, or <strong>WaxOff</strong> to finalize a mix. Each mode maintains its own independent file list — switching modes doesn't disturb your work in the other mode.</p>
-  </section>
-
-  <!-- Interface -->
-  <section id="interface">
-    <h2>The Interface</h2>
-    <p>Both modes share the same window layout. The window is divided into four areas.</p>
-
-    <h3>Toolbar</h3>
-    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by a Preset picker, and then the action buttons. Clicking the active mode button returns to the mode picker.</p>
-
-    <h3>File List</h3>
-    <p>The left panel shows all loaded files. Each row displays the filename and a status label. Drag rows to reorder; drag the vertical divider to resize the panel.</p>
-    <ul>
-      <li><strong>Waiting</strong> — file queued, analysis pending</li>
-      <li><strong>Calculating stats</strong> — audio stats are being computed</li>
-      <li><strong>Processing</strong> — pipeline is running; a progress bar appears under the row</li>
-      <li><strong>Output: …</strong> — processed; click the folder icon to reveal in Finder</li>
-      <li><strong>Error</strong> — something went wrong; the message is shown inline</li>
-    </ul>
-    <p>WaxOn processes up to 3 files concurrently. Files waiting their turn show a muted static progress bar so it's clear they are queued and not stalled.</p>
-    <p>Select files and press <kbd>Delete</kbd> to remove them, or use <kbd>⌘⌥Delete</kbd> to clear the entire list.</p>
-
-    <h3>Waveform Panel</h3>
-    <p>The right panel shows different content depending on context:</p>
-    <ul>
-      <li><strong>File selected</strong> — waveform with a stats strip below it</li>
-      <li><strong>Mix in progress</strong> — a spinner with a live phase label showing the current stage</li>
-      <li><strong>Nothing selected</strong> — a prompt to select a file</li>
-    </ul>
-    <p>A toggle button in the top-right corner switches between the waveform view and the <strong>Console</strong> — a scrollable log showing what WaxOn is doing during processing. A Verbose checkbox reveals additional detail such as filter parameters and per-file loudnorm measurements.</p>
-
-    <h3>Settings Sidebar</h3>
-    <p>A collapsible panel on the right edge of the window contains all processing settings for the current mode. Toggle it open or closed with the <strong>⊟</strong> button at the far right of the toolbar. Settings persist between sessions.</p>
-  </section>
-
-  <!-- WaxOn Mode -->
-  <section id="waxon-overview">
-    <h2>WaxOn Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting, outputting 24-bit WAV files ready to drop into Logic Pro, Reaper, or any other editor.</p>
-    <p>WaxOn does not do noise reduction, de-essing, or restoration. It's a first-step ingest processor: get your raw recordings into a consistent, workable format before editing.</p>
-
-    <h3>Quick Start</h3>
-    <ol>
-      <li>Click <strong>WaxOn</strong> in the toolbar (or choose it from the mode picker)</li>
-      <li>Select a preset from the Preset menu in the toolbar, or configure settings manually in the Settings sidebar</li>
-      <li>Drag your audio files onto the window</li>
-      <li>Click <strong>Process</strong> — or select 2+ files and click <strong>Mix</strong> to combine them</li>
-    </ol>
-  </section>
-
-  <section id="waxon-presets">
-    <h2>WaxOn Presets <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>Presets save and restore a complete group of WaxOn settings in one click. The Preset menu is in the toolbar, to the right of the mode switcher.</p>
-
-    <h3>Built-In Presets</h3>
-    <table class="presets-table">
-      <thead>
-        <tr>
-          <th>Preset</th>
-          <th>HPF</th>
-          <th>Loudness Norm</th>
-          <th>Target</th>
-          <th>Output</th>
-          <th>Sample Rate</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Defaults</td>
-          <td>80 Hz</td>
-          <td>Off</td>
-          <td>—</td>
-          <td>Mono L</td>
-          <td>44.1 kHz</td>
-        </tr>
-        <tr>
-          <td>Edit Prep</td>
-          <td>80 Hz</td>
-          <td>On</td>
-          <td>−30 LUFS</td>
-          <td>Mono L</td>
-          <td>44.1 kHz</td>
-        </tr>
-        <tr>
-          <td>Edit Prep EBU</td>
-          <td>80 Hz</td>
-          <td>On</td>
-          <td>−23 LUFS</td>
-          <td>Mono L</td>
-          <td>44.1 kHz</td>
-        </tr>
-        <tr>
-          <td>Mix 2 Channel</td>
-          <td>20 Hz (DC Block)</td>
-          <td>On</td>
-          <td>−24 LUFS</td>
-          <td>Stereo</td>
-          <td>44.1 kHz</td>
-        </tr>
-        <tr>
-          <td>Mix Mono</td>
-          <td>20 Hz (DC Block)</td>
-          <td>On</td>
-          <td>−24 LUFS</td>
-          <td>Mono L</td>
-          <td>44.1 kHz</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <p><strong>Defaults</strong> resets all WaxOn settings to factory values — a quick way to start fresh.</p>
-    <p><strong>Edit Prep</strong> is optimized for single-mic podcast recordings destined for DAW editing. −30 LUFS leaves generous headroom for editing and processing.</p>
-    <p><strong>Edit Prep EBU</strong> targets the EBU R128 dialogue reference level of −23 LUFS. Tracks feel natural at calibrated monitor levels and still leave headroom before typical delivery targets.</p>
-    <p><strong>Mix 2 Channel</strong> and <strong>Mix Mono</strong> are both configured for multi-track blending: DC Block removes only infrasonic content and DC offset (not voice frequencies), and loudness normalization ensures all files arrive at the mix at equal perceived loudness. Use 2 Channel when you want a stereo blend; use Mono when the output is a single podcast track destined for per-track DAW editing.</p>
-
-    <h3>Custom Presets</h3>
-    <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets from the same menu.</p>
-  </section>
-
-  <section id="waxon-settings">
-    <h2>WaxOn Settings <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <table class="settings-table">
-      <thead>
-        <tr>
-          <th>Setting</th>
-          <th>Range / Options</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Sample Rate</td>
-          <td>44.1 kHz · 48 kHz</td>
-          <td>Output sample rate. 48 kHz for video projects; 44.1 kHz for audio-only. Uses FFmpeg's high-quality resampler.</td>
-        </tr>
-        <tr>
-          <td>Output</td>
-          <td>Mono · Stereo</td>
-          <td>Stereo passes both channels through unchanged. Mono extracts a single channel from a stereo source.</td>
-        </tr>
-        <tr>
-          <td>Channel</td>
-          <td>Left · Right</td>
-          <td>Mono mode only. Which channel to extract. Use Left for a standard single-mic recording on channel 1. Grayed out when Output is Stereo.</td>
-        </tr>
-        <tr>
-          <td>Ceiling</td>
-          <td>−1.0 to −3.0 dB</td>
-          <td>True peak ceiling for the brick-wall limiter. −1.0 dB is a safe default for most delivery formats.</td>
-        </tr>
-        <tr>
-          <td>High Pass</td>
-          <td>20–90 Hz · default 80 Hz</td>
-          <td>High-pass filter cutoff. 80 Hz removes most rumble and handling noise without thinning the voice. Lower for sources with significant bass content.</td>
-        </tr>
-        <tr>
-          <td>Loudness Norm</td>
-          <td>On · Off</td>
-          <td>Enables two-pass EBU R128 loudness normalization. Adds one analysis pass per file but produces consistent levels across a batch. Off = filtering and limiting only.</td>
-        </tr>
-        <tr>
-          <td>Target</td>
-          <td>−16 to −35 LUFS · default −30</td>
-          <td>Integrated loudness target when Loudness Norm is on. −30 LUFS is conservative for ingest — leaves plenty of headroom for editing. Grayed out when Loudness Norm is off.</td>
-        </tr>
-        <tr>
-          <td>Output Dir</td>
-          <td>Path or empty</td>
-          <td>Where output files are written. Empty = same folder as the source. Set a path to collect all outputs in one place.</td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section id="waxon-pipeline">
-    <h2>WaxOn Processing Pipeline <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>Every file passes through the same three-stage chain using FFmpeg internally.</p>
-
-    <ol class="pipeline">
-      <li>
-        <div>
-          <strong>Filter, Channel &amp; Resample</strong>
-          <span>High-pass filter at the configured cutoff, a 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 32-bit float WAV at the target sample rate.</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <strong>Loudness Normalization <span class="tag">Optional</span></strong>
-          <span>Two-pass EBU R128. First pass measures integrated loudness, true peak, LRA, and threshold. Second pass applies linear gain to hit the configured target. Linear mode preserves the natural dynamic shape of the recording — no compression, no transient changes.</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <strong>Brick-Wall Limiting</strong>
-          <span>The signal is upsampled to 2× the target rate, passed through FFmpeg's <code>alimiter</code> with a 5 ms attack and 50 ms release, then resampled back and written as 24-bit WAV. Running at 2× makes inter-sample peaks visible to the limiter, preventing true peak violations in the final file.</span>
-        </div>
-      </li>
-    </ol>
-
-    <h3>Mix Pipeline</h3>
-    <p>When Loudness Norm is on, Mix adds two stages before the chain above. When off, only the amix stage is added.</p>
-    <ul>
-      <li><strong>Per-file leveling <span class="tag">Loudnorm only</span></strong> — each input is individually normalized to the target LUFS using a two-pass EBU R128 analysis and linear gain. All files arrive at the mix at equal perceived loudness, regardless of how they were recorded.</li>
-      <li><strong>amix</strong> — FFmpeg's <code>amix</code> blends the files. When Loudness Norm is on, <code>normalize=0</code> is used (files are already level-matched and the final loudnorm pass corrects the summing gain increase). When off, <code>normalize=1</code> scales by 1/N to prevent level buildup. The combined signal then runs through all three stages identically to a single-file job.</li>
-    </ul>
-    <p>The waveform panel shows a live phase indicator during a mix: <em>Leveling file 1 of N… → … → Mixing N files… → Filtering… → Analyzing loudness… → Normalizing… → Limiting…</em></p>
-
-    <h3>Output Format</h3>
-    <p>All WaxOn outputs are <strong>24-bit WAV</strong>, regardless of input format. Lossless, uncompressed, and compatible with every DAW.</p>
-  </section>
-
-  <section id="waxon-mix">
-    <h2>Mix Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>Mix combines two or more audio files into a single processed output. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing — ensuring a balanced blend regardless of source levels. The full WaxOn pipeline then runs on the combined signal.</p>
-
-    <h3>Two Common Workflows</h3>
-    <p><strong>Mix raw recordings in one step.</strong> Drag two unprocessed tracks (e.g. host and guest recorded separately) into WaxOn, select both, and click Mix. The high-pass filter cleans up low-frequency buildup from the individual recordings before they are blended. Use the default High Pass setting (80 Hz) or adjust to taste.</p>
-    <p><strong>Mix pre-cleaned files.</strong> If you have already processed your individual tracks through WaxOn (or cleaned them in a DAW), you can mix the outputs directly. In this case the high-pass filter has already done its work. Set High Pass to <strong>DC Block</strong> (20 Hz) in Settings — it will remove only DC offset and infrasonic content without touching the voice range.</p>
-
-    <h3>How to Mix</h3>
-    <ol>
-      <li>Load your files and select two or more in the file list (<kbd>⌘-click</kbd> to multi-select)</li>
-      <li>Click <strong>Mix</strong></li>
-      <li>Watch the waveform panel for live progress</li>
-      <li>When complete, the mixed file appears in the list as a processed item</li>
-    </ol>
-
-    <div class="callout">
-      <strong>Note:</strong> Mix runs a single job and cannot run concurrently with Process. The Mix button is disabled while processing is in progress.
     </div>
   </section>
 
-  <section id="waxon-output">
-    <h2>WaxOn Output Files <span class="mode-badge mode-waxon">WaxOn</span></h2>
+  <div class="pinstripe"></div>
 
-    <h3>Individual Files</h3>
-    <pre><code>{original-name}-{rate}waxon-{limit}.wav</code></pre>
-    <p>Examples: <code>episode-01-44kwaxon-1dB.wav</code> &nbsp; <code>guest-48kwaxon-1dB.wav</code></p>
+  <!-- WAXON FEATURES -->
+  <section class="section-mid" id="waxon">
+    <div class="container">
+      <div class="section-label">WaxOn</div>
+      <h2>Raw Recording Prep</h2>
+      <p class="section-intro">Use WaxOn on raw recordings before you edit. Drop your files in, configure what you care about, and get to work.</p>
 
-    <h3>Mix Output</h3>
-    <pre><code>mix-{rate}waxon-{limit}.wav</code></pre>
-    <p>Example: <code>mix-44kwaxon-1dB.wav</code></p>
-
-    <h3>Location</h3>
-    <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code>. Existing files with the same name are overwritten.</p>
-  </section>
-
-  <!-- WaxOff Mode -->
-  <section id="waxoff-overview">
-    <h2>WaxOff Mode <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <p>WaxOff finalizes your edited podcast mix for distribution. It applies EBU R128 loudness normalization, optional phase rotation, and delivers 24-bit WAV, MP3, or both — ready to upload to your podcast host.</p>
-    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment to hit the target loudness — no dynamic processing, no changes to stereo image or transients. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
-
-    <h3>Quick Start</h3>
-    <ol>
-      <li>Click <strong>WaxOff</strong> in the toolbar</li>
-      <li>Select a preset from the Preset menu in the toolbar, or dial in your settings manually</li>
-      <li>Drag your finished mix file onto the window</li>
-      <li>Click <strong>Process</strong></li>
-    </ol>
-  </section>
-
-  <section id="waxoff-presets">
-    <h2>WaxOff Presets <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <p>Presets save and restore a complete group of WaxOff settings in one click. The Preset menu is in the toolbar, to the right of the mode switcher.</p>
-
-    <h3>Built-In Presets</h3>
-    <table class="presets-table">
-      <thead>
-        <tr>
-          <th>Preset</th>
-          <th>Target</th>
-          <th>True Peak</th>
-          <th>Output</th>
-          <th>MP3</th>
-          <th>Sample Rate</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Podcast Standard</td>
-          <td>−18 LUFS</td>
-          <td>−1.0 dBTP</td>
-          <td>WAV + MP3</td>
-          <td>160 kbps</td>
-          <td>44.1 kHz</td>
-        </tr>
-        <tr>
-          <td>Podcast Loud</td>
-          <td>−16 LUFS</td>
-          <td>−1.0 dBTP</td>
-          <td>WAV + MP3</td>
-          <td>160 kbps</td>
-          <td>44.1 kHz</td>
-        </tr>
-        <tr>
-          <td>WAV Only (Mastering)</td>
-          <td>−18 LUFS</td>
-          <td>−1.0 dBTP</td>
-          <td>WAV only</td>
-          <td>—</td>
-          <td>48 kHz</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <p><strong>Podcast Standard</strong> is correct for most podcast hosting platforms (Spotify, Apple Podcasts, Buzzsprout, etc.).</p>
-    <p><strong>Podcast Loud</strong> targets −16 LUFS for a louder perceived result, still within typical platform limits. Use this if your finished episodes consistently feel quiet on shuffle.</p>
-    <p><strong>WAV Only (Mastering)</strong> outputs a 48 kHz WAV with no MP3. Use when handing off to a mastering engineer or delivering to a video platform.</p>
-
-    <h3>Custom Presets</h3>
-    <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets from the same menu.</p>
-  </section>
-
-  <section id="waxoff-settings">
-    <h2>WaxOff Settings <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <table class="settings-table">
-      <thead>
-        <tr>
-          <th>Setting</th>
-          <th>Range / Options</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Sample Rate</td>
-          <td>44.1 kHz · 48 kHz</td>
-          <td>Output sample rate for the WAV (and source for MP3 encoding). 44.1 kHz for podcast delivery; 48 kHz for video or mastering handoff.</td>
-        </tr>
-        <tr>
-          <td>Output</td>
-          <td>WAV · MP3 · Both</td>
-          <td>WAV is always 24-bit PCM. MP3 is CBR at the chosen bitrate. Both produces two output files.</td>
-        </tr>
-        <tr>
-          <td>MP3 Bitrate</td>
-          <td>128 · 160 · 192 kbps</td>
-          <td>CBR bitrate for MP3 output. 160 kbps is a good default for podcast delivery. Grayed out when Output is WAV only.</td>
-        </tr>
-        <tr>
-          <td>True Peak</td>
-          <td>−3.0 to −0.1 dBTP · default −1.0</td>
-          <td>Maximum true peak ceiling. −1.0 dBTP is the standard for podcast streaming platforms and prevents inter-sample clipping on compressed streams.</td>
-        </tr>
-        <tr>
-          <td>Target LUFS</td>
-          <td>−24 to −14 LUFS · default −18</td>
-          <td>Integrated loudness target. −18 LUFS is the podcast standard used by most hosting platforms. −16 LUFS gives a louder result.</td>
-        </tr>
-        <tr>
-          <td>Phase Rotation</td>
-          <td>On · Off · default On</td>
-          <td>Applies a 150 Hz all-pass filter before normalization. Reduces crest factor on bass-heavy material, improving headroom and limiter performance. On by default.</td>
-        </tr>
-        <tr>
-          <td>Output Dir</td>
-          <td>Path or empty</td>
-          <td>Where output files are saved. Empty = same folder as the source.</td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section id="waxoff-pipeline">
-    <h2>WaxOff Processing Pipeline <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <p>WaxOff uses FFmpeg's <code>loudnorm</code> filter in a two-pass pipeline — the only correct way to apply EBU R128 linear normalization.</p>
-
-    <ol class="pipeline">
-      <li>
-        <div>
-          <strong>Analysis Pass</strong>
-          <span>FFmpeg's <code>loudnorm</code> filter measures integrated loudness (I), true peak (TP), and loudness range (LRA) for the entire file. If Phase Rotation is enabled, a 150 Hz allpass is applied before measurement so the rotation is accounted for in the measured values. The measured values are used by the next pass.</span>
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>High-Pass Filter</h3>
+          <p>Configurable cutoff from 20 to 90 Hz. Removes rumble, HVAC hum, and handling noise. Set to 20 Hz for DC block only.</p>
         </div>
-      </li>
-      <li>
-        <div>
-          <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. This applies a single precise linear gain — no limiting, no dynamic processing, no change to stereo image or transients. Output: 24-bit WAV at the target sample rate.</span>
+        <div class="feature-card">
+          <h3>Loudness Normalization</h3>
+          <p>Optional two-pass EBU R128 with configurable target (−35 to −16 LUFS). Linear gain only — dynamics fully preserved.</p>
         </div>
-      </li>
-      <li>
-        <div>
-          <strong>MP3 Encoding <span class="tag">Optional</span></strong>
-          <span>If Output is MP3 or Both, the normalized WAV is encoded using <code>libmp3lame</code> at the chosen CBR bitrate. The WAV is always written first; MP3 is derived from it.</span>
+        <div class="feature-card">
+          <h3>Brick-Wall Limiting</h3>
+          <p>2× oversampled true peak control at your chosen ceiling (−1 to −3 dB). Keeps transients honest.</p>
         </div>
-      </li>
-    </ol>
+        <div class="feature-card">
+          <h3>Phase Rotation</h3>
+          <p>200 Hz allpass reduces peak asymmetry and improves limiter headroom on voice recordings.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Mix Mode</h3>
+          <p>Select 2+ files and combine them. When loudness norm is on, each file is individually leveled before mixing, then the combined output is normalized — ensuring a balanced blend.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Presets &amp; Batch Processing</h3>
+          <p>Five built-in presets plus custom presets. Up to 3 concurrent jobs with per-file progress.</p>
+        </div>
+      </div>
 
-    <p>The waveform panel shows live phase labels while processing: <em>Analyzing loudness… → Normalizing… → Encoding MP3…</em></p>
-
-    <h3>Why Two Passes?</h3>
-    <p>EBU R128 loudness measurement requires the entire file to compute integrated loudness (gated measurement over the full duration). You can't know the correct gain until you've read every sample, so two passes are unavoidable for accurate normalization. WaxOff makes this transparent — you drop the file, click Process, and both passes happen automatically.</p>
-  </section>
-
-  <section id="waxoff-output">
-    <h2>WaxOff Output Files <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-
-    <h3>Naming</h3>
-    <pre><code>{original-name}-lev-{target}LUFS.wav
-{original-name}-lev-{target}LUFS.mp3</code></pre>
-    <p>Examples: <code>episode-42-final-lev--18LUFS.wav</code> &nbsp; <code>episode-42-final-lev--18LUFS.mp3</code></p>
-
-    <h3>Location</h3>
-    <p>Output files are written alongside the source by default, or to your configured output directory. Existing files with the same name are overwritten.</p>
-  </section>
-
-  <!-- File Stats -->
-  <section id="file-stats">
-    <h2>File Stats</h2>
-    <p>Selecting a file in either mode displays a stats strip below the waveform. Stats are computed asynchronously as files load and typically appear within a second or two of dropping a file in.</p>
-    <p>The strip has two rows separated by a divider: file info on top, audio analysis below.</p>
-
-    <h4>File Info Row</h4>
-    <div class="stats-grid">
-      <div class="label">FORMAT</div>
-      <div class="desc">Container format — WAV, MP3, FLAC, etc.</div>
-      <div class="label">SR</div>
-      <div class="desc">Sample rate — 44.1 kHz, 48 kHz, etc.</div>
-      <div class="label">CH</div>
-      <div class="desc">Channel layout — Stereo or Mono</div>
-      <div class="label">BIT</div>
-      <div class="desc">Bit depth — 16-bit, 24-bit, 32-bit. Not shown for lossy formats.</div>
-      <div class="label">DUR</div>
-      <div class="desc">Duration in M:SS or H:MM:SS</div>
-      <div class="label">BR</div>
-      <div class="desc">Bit rate derived from file size and duration (Mbps or kbps)</div>
-    </div>
-
-    <h4>Audio Stats Row</h4>
-    <div class="stats-grid">
-      <div class="label">RMS</div>
-      <div class="desc">Root Mean Square level in dBFS — represents average loudness over the entire file</div>
-      <div class="label">PEAK</div>
-      <div class="desc">Sample peak level in dBFS — the highest sample value across all channels</div>
-      <div class="label">CREST</div>
-      <div class="desc">Crest factor (PEAK − RMS) in dB — indicates dynamic range. Higher values mean more headroom between peaks and average level</div>
-      <div class="label">LUFS</div>
-      <div class="desc">Integrated loudness per ITU-R BS.1770-4 — the broadcast and streaming standard. Computed with K-weighting and two-stage gating (absolute −70 LUFS, relative −10 LU)</div>
-    </div>
-
-    <div class="callout">
-      <strong>LUFS vs. RMS</strong>
-      Both measure loudness, but LUFS is perceptually weighted and gated — silence doesn't drag the number down, and high-frequency content is weighted more like human hearing. For comparing files intended for broadcast or streaming, LUFS is the more meaningful number.
+      <p style="margin-top: 2rem; font-family: var(--font-ui); font-size: 0.85rem; letter-spacing: 0.1em; color: var(--tan);">Output: <code style="color: var(--cream);">{name}-{rate}waxon-{limit}.wav</code> &nbsp;&middot;&nbsp; 24-bit WAV</p>
     </div>
   </section>
 
-  <!-- Supported Formats -->
-  <section id="formats">
-    <h2>Supported Formats</h2>
-    <p>WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV.</p>
-    <p>MP4 and MOV are video containers — WaxOn/WaxOff extracts the audio track and processes it normally. All processing uses FFmpeg, bundled inside the app — no separate installation required. Unsupported file types are silently rejected; a notice appears if any files in a drop were skipped.</p>
+  <div class="pinstripe"></div>
+
+  <!-- WAXOFF FEATURES -->
+  <section class="section-dark" id="waxoff">
+    <div class="container">
+      <div class="section-label">WaxOff</div>
+      <h2>Delivery &amp; Mastering</h2>
+      <p class="section-intro">Run your finished, edited mix through WaxOff. Broadcast-standard loudness normalization, true peak control, and MP3 output.</p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>EBU R128 Normalization</h3>
+          <p>Two-pass analysis plus linear gain. No dynamic processing — stereo image and transients are completely unchanged.</p>
+        </div>
+        <div class="feature-card">
+          <h3>True Peak Control</h3>
+          <p>Configurable ceiling from −3.0 to −0.1 dBTP (default −1.0). Compliant with podcast platform requirements.</p>
+        </div>
+        <div class="feature-card">
+          <h3>WAV + MP3 Output</h3>
+          <p>24-bit WAV, CBR MP3 at 128, 160, or 192 kbps, or both simultaneously. Deliver exactly what your platform needs.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Phase Rotation</h3>
+          <p>Optional 150 Hz allpass to reduce crest factor on bass-heavy material before final delivery.</p>
+        </div>
+      </div>
+
+      <p style="margin-top: 2rem; font-family: var(--font-ui); font-size: 0.85rem; letter-spacing: 0.1em; color: var(--tan);">Output: <code style="color: var(--cream);">{name}-lev-{target}LUFS.wav / .mp3</code></p>
+    </div>
   </section>
 
-  <!-- Tips -->
-  <section id="tips">
-    <h2>Tips &amp; Workflow</h2>
+  <div class="pinstripe"></div>
 
-    <h3>The Full Podcast Workflow</h3>
-    <ol>
-      <li>Record host and guest on separate tracks</li>
-      <li>Drop both files into <strong>WaxOn</strong></li>
-      <li>Select both and click <strong>Mix</strong> to produce a single blended track, or process them separately and combine in your DAW</li>
-      <li>Edit in your DAW — remove noise, add music, cut and arrange</li>
-      <li>Export your finished mix from the DAW</li>
-      <li>Drop the export into <strong>WaxOff</strong> and click Process</li>
-      <li>Upload the WaxOff output to your podcast host</li>
-    </ol>
+  <!-- WORKFLOW -->
+  <section class="section-light" id="workflow">
+    <div class="container">
+      <div class="section-label">Workflow</div>
+      <h2>The Full Picture</h2>
+      <p>WaxOn and WaxOff are two stages of the same pipeline — raw prep before editing, delivery prep after.</p>
 
-    <h3>Checking Levels Before Processing</h3>
-    <p>Select a file and read the stats strip before hitting Process. The <strong>LUFS</strong> value tells you how loud the file is. In WaxOn, if LUFS is much lower than your target, normalization will apply significant gain — which is fine for ingest but worth knowing. In WaxOff, comparing input LUFS to your target tells you how much gain WaxOff will apply.</p>
+      <div class="workflow-chain">
+        <span class="workflow-step">Raw Recordings</span>
+        <span class="workflow-arrow">&#8594;</span>
+        <span class="workflow-step active">WaxOn</span>
+        <span class="workflow-arrow">&#8594;</span>
+        <span class="workflow-step">Edit in DAW</span>
+        <span class="workflow-arrow">&#8594;</span>
+        <span class="workflow-step active">WaxOff</span>
+        <span class="workflow-arrow">&#8594;</span>
+        <span class="workflow-step">Distribute</span>
+      </div>
 
-    <h3>WaxOn: Loudnorm On or Off?</h3>
-    <p>For consistent batch ingest where files were recorded at different gain levels, turn Loudness Norm on — it ensures every file lands at the same integrated loudness before the limiter. For a single file or when you want to preserve the original level relationship between takes, leave it off and let the limiter handle ceiling compliance only.</p>
-
-    <h3>WaxOff: Choosing a LUFS Target</h3>
-    <p>−18 LUFS is the standard for most podcast platforms. −16 LUFS gives a louder result but is still within typical platform limits. Going higher than −14 LUFS risks clipping or rejection by some platforms. When in doubt, use the Podcast Standard preset.</p>
-
-    <h3>WaxOn: Mono vs. Stereo for Podcasts</h3>
-    <p>Most podcast editing workflows prefer mono tracks per speaker — easier to pan, balance, and process individually. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface captures both mics on a single stereo file, use Mix to blend them before editing.</p>
-
-    <h3>WaxOff: Phase Rotation</h3>
-    <p>Leave Phase Rotation on unless you have a specific reason to turn it off. The 150 Hz allpass filter reduces the crest factor of bass-heavy material, which gives the loudness normalizer and limiter more headroom to work with. The effect on audio character is inaudible.</p>
-
-    <hr style="border:none; border-top: 1px solid var(--border); margin: 48px 0 32px;">
-    <p style="font-size:0.85rem; color: var(--text-muted);">
-      WaxOn/WaxOff is free software licensed under the <a href="https://github.com/sevmorris/WaxOnWaxOff/blob/main/LICENSE">GPL-3.0</a>.
-      Built by <a href="https://github.com/sevmorris">Seven Morris</a> with AI collaboration.
-    </p>
+      <p style="margin-top: 3rem;"><strong>Supported formats:</strong> WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled — no separate installation required.</p>
+    </div>
   </section>
 
-</main>
+  <div class="pinstripe"></div>
+
+  <!-- FEEDBACK -->
+  <section class="section-dark" id="feedback">
+    <div class="container contact-center">
+      <div class="section-label">Feedback</div>
+      <h2>Get in Touch</h2>
+      <p>Bug report, feature request, or just want to say the app is useful? Send a note.</p>
+
+      <form class="contact-form" id="contact-form" action="https://formspree.io/f/meerqpbv" method="POST">
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" required placeholder="Your name">
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" rows="5" required placeholder="What's on your mind..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-large">Send</button>
+      </form>
+
+      <div id="form-success" hidden>
+        <p class="form-success-msg">Message sent. Thanks.</p>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const form = document.getElementById('contact-form');
+    const success = document.getElementById('form-success');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector('button[type="submit"]');
+      btn.textContent = 'Sending\u2026';
+      btn.disabled = true;
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'Accept': 'application/json' }
+        });
+        if (res.ok) {
+          form.hidden = true;
+          success.hidden = false;
+        } else {
+          btn.textContent = 'Send';
+          btn.disabled = false;
+          alert('Something went wrong. Please try again or email 7morris@gmail.com directly.');
+        }
+      } catch {
+        btn.textContent = 'Send';
+        btn.disabled = false;
+        alert('Something went wrong. Please try again or email 7morris@gmail.com directly.');
+      }
+    });
+  </script>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <span>&copy; 2026 <a href="https://sevmorris.github.io" style="color: var(--tan);">Seven Morris</a></span>
+      <div class="footer-links">
+        <a href="manual/">Manual</a>
+        <a href="manual/theory.html">Theory of Operation</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
 </body>
 </html>
