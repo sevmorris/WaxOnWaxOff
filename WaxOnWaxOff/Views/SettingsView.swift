@@ -62,6 +62,20 @@ struct SettingsView: View {
 
                 Divider().padding(.vertical, 6)
 
+                row("Noise Reduction") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Toggle("", isOn: $viewModel.settings.noiseReductionEnabled)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                            Text("RNNoise (ML)")
+                        }
+                        Text("Check output before editing — artifacts are possible on heavy noise")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 row("Loudness Norm") {
                     Toggle("", isOn: $viewModel.settings.loudnormEnabled)
                         .toggleStyle(.switch)
@@ -78,20 +92,6 @@ struct SettingsView: View {
                 }
                 .disabled(!viewModel.settings.loudnormEnabled)
                 .opacity(!viewModel.settings.loudnormEnabled ? 0.4 : 1)
-
-                row("Noise Reduction") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Toggle("", isOn: $viewModel.settings.noiseReductionEnabled)
-                                .toggleStyle(.switch)
-                                .labelsHidden()
-                            Text("RNNoise (ML)")
-                        }
-                        Text("Best on clean recordings with consistent background noise")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
 
                 Divider().padding(.vertical, 6)
 
