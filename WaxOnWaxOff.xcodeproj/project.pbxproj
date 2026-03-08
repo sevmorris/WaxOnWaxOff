@@ -8,11 +8,29 @@
 
 /* Begin PBXFileReference section */
 		C6DEF1382EC98B05003A77C7 /* WaxOnWaxOff.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaxOnWaxOff.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		738488A095C14915AEB595B2 /* rnnoise */ = {isa = PBXFileReference; lastKnownFileType = file; name = rnnoise; path = WaxOnWaxOff/rnnoise; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXBuildFile section */
+		39B1C655FCFC4AF39D85DB92 /* rnnoise in Resources */ = {isa = PBXBuildFile; fileRef = 738488A095C14915AEB595B2 /* rnnoise */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		469B33FBB309481A99E82EBA /* rnnoise */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				rnnoise,
+			);
+			target = C6DEF1372EC98B05003A77C7 /* WaxOnWaxOff */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C6DEF13A2EC98B05003A77C7 /* WaxOnWaxOff */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				469B33FBB309481A99E82EBA /* rnnoise */,
+			);
 			path = WaxOnWaxOff;
 			sourceTree = "<group>";
 		};
@@ -109,6 +127,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				39B1C655FCFC4AF39D85DB92 /* rnnoise in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

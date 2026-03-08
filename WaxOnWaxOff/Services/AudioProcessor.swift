@@ -138,23 +138,30 @@ actor AudioProcessor {
         try await runFFmpeg(exe: tools.ffmpeg, args: amixArgs)
         try Task.checkCancellation()
 
-        // Step 2: Highpass + phase rotation + channel selection + resample
+        // Step 2: Noise reduction (optional) + highpass + phase rotation + channel selection + resample
         onPhase?("Filtering…")
         let isStereo = settings.outputChannels == .stereo
         let outputChannelCount = isStereo ? "2" : "1"
         let phaseFilter = "allpass=f=200:t=q:w=0.707,"
         let midURL = work.appendingPathComponent("mix_mid.wav")
 
+        var nrPrefix = ""
+        if settings.noiseReductionEnabled,
+           let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
+            nrPrefix = "arnndn=m=\(modelURL.path),"
+        }
+
         let step1Af: String
         if isStereo {
-            step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
         } else {
             let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
-            step1Af = "highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
+            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
         }
 
         let mixChannelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
-        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz  |  \(mixChannelDesc)  |  \(rateTag) kHz", .verbose)
+        let nrDesc = settings.noiseReductionEnabled ? "  |  RNNoise" : ""
+        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz\(nrDesc)  |  \(mixChannelDesc)  |  \(rateTag) kHz", .verbose)
 
         try await runFFmpeg(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
@@ -260,20 +267,27 @@ actor AudioProcessor {
 
         let phaseFilter = "allpass=f=200:t=q:w=0.707,"
 
+        var nrPrefix = ""
+        if settings.noiseReductionEnabled,
+           let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
+            nrPrefix = "arnndn=m=\(modelURL.path),"
+        }
+
         let step1Af: String
         let outputChannelCount: String
         if isStereo {
-            step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
             outputChannelCount = "2"
         } else {
             let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
-            step1Af = "highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
+            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
             outputChannelCount = "1"
         }
 
         onLog?("▶ \(filename)", .info)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
-        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
+        let nrDesc = settings.noiseReductionEnabled ? "  |  RNNoise" : ""
+        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz\(nrDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
 
         try await runFFmpeg(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
