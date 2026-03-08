@@ -60,16 +60,6 @@ struct SettingsView: View {
                     }
                 }
 
-                row("Noise Reduction") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Toggle("RNNoise (ML)", isOn: $viewModel.settings.noiseReductionEnabled)
-                            .toggleStyle(.switch)
-                        Text("Best on clean recordings with consistent background noise")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
                 Divider().padding(.vertical, 6)
 
                 row("Loudness Norm") {
@@ -88,6 +78,20 @@ struct SettingsView: View {
                 }
                 .disabled(!viewModel.settings.loudnormEnabled)
                 .opacity(!viewModel.settings.loudnormEnabled ? 0.4 : 1)
+
+                row("Noise Reduction") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Toggle("", isOn: $viewModel.settings.noiseReductionEnabled)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                            Text("RNNoise (ML)")
+                        }
+                        Text("Best on clean recordings with consistent background noise")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 Divider().padding(.vertical, 6)
 
