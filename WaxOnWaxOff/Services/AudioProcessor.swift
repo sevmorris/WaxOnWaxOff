@@ -91,14 +91,34 @@ actor AudioProcessor {
             let target = settings.loudnormTarget
             let tp = settings.limitDb
             var prenormed: [URL] = []
+            // When NR is off, apply RNNoise to temp copies for analysis only
+            let nrModelURL = !settings.noiseReductionEnabled
+                ? Bundle.main.url(forResource: "rnnoise", withExtension: nil)
+                : nil
+
             for (i, url) in inputs.enumerated() {
                 let fname = url.lastPathComponent
                 onPhase?("Leveling file \(i + 1) of \(n)…")
                 onLog?("  [\(i + 1)/\(n)] \(fname) — analyzing…", .verbose)
+
+                // Use NR'd temp for measurement when NR isn't enabled on the output
+                let analysisURL: URL
+                if let modelURL = nrModelURL {
+                    let nrTemp = work.appendingPathComponent("nr_analysis_\(i).wav")
+                    try await runFFmpeg(exe: tools.ffmpeg, args: [
+                        "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", url.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-c:a", "pcm_s24le", "-ar", "\(sr)", nrTemp.path
+                    ])
+                    analysisURL = nrTemp
+                } else {
+                    analysisURL = url
+                }
+
                 let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
                 let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                     "-nostdin", "-hide_banner",
-                    "-i", url.path, "-af", analyzeAf,
+                    "-i", analysisURL.path, "-af", analyzeAf,
                     "-f", "null", "/dev/null"
                 ])
                 try Task.checkCancellation()
@@ -176,11 +196,28 @@ actor AudioProcessor {
             let target = settings.loudnormTarget
             let tp = settings.limitDb
             onPhase?("Analyzing loudness…")
+
+            // NR for measurement accuracy on the mix (same logic as single-file path)
+            let mixAnalysisInput: URL
+            if !settings.noiseReductionEnabled,
+               let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
+                let nrMixTemp = work.appendingPathComponent("mix_nr_analysis.wav")
+                onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
+                try await runFFmpeg(exe: tools.ffmpeg, args: [
+                    "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                    "-i", midURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                    "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrMixTemp.path
+                ])
+                mixAnalysisInput = nrMixTemp
+            } else {
+                mixAnalysisInput = midURL
+            }
+
             onLog?("  loudnorm: analyzing mix…", .verbose)
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
             let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
-                "-i", midURL.path, "-af", analyzeAf,
+                "-i", mixAnalysisInput.path, "-af", analyzeAf,
                 "-f", "null", "/dev/null"
             ])
 
@@ -302,11 +339,31 @@ actor AudioProcessor {
         if settings.loudnormEnabled {
             let target = settings.loudnormTarget
             let tp = settings.limitDb
+
+            // When NR is off, run RNNoise on a temp copy for the analysis pass only.
+            // This prevents broadband noise from inflating the loudness measurement,
+            // ensuring speech hits the target LUFS more accurately.
+            let analysisInput: URL
+            if !settings.noiseReductionEnabled,
+               let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
+                let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
+                let nrAf = "arnndn=m=\(modelURL.path)"
+                onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
+                try await runFFmpeg(exe: tools.ffmpeg, args: [
+                    "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                    "-i", midURL.path, "-af", nrAf,
+                    "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
+                ])
+                analysisInput = nrTempURL
+            } else {
+                analysisInput = midURL
+            }
+
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
             onLog?("  loudnorm: analyzing…", .verbose)
             let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
-                "-i", midURL.path, "-af", analyzeAf,
+                "-i", analysisInput.path, "-af", analyzeAf,
                 "-f", "null", "/dev/null"
             ])
 

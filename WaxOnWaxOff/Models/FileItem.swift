@@ -14,6 +14,23 @@ struct AudioStats: Equatable, Sendable {
     let peak: Double
     let crest: Double
     let lufs: Double
+    /// Estimated noise floor in dBFS (10th percentile of block RMS values).
+    /// nil if not enough blocks to estimate.
+    let noiseFloor: Double?
+
+    init(rms: Double, peak: Double, crest: Double, lufs: Double, noiseFloor: Double? = nil) {
+        self.rms = rms
+        self.peak = peak
+        self.crest = crest
+        self.lufs = lufs
+        self.noiseFloor = noiseFloor
+    }
+
+    /// True when the noise floor is high enough to potentially skew loudness measurements.
+    var hasHighNoiseFloor: Bool {
+        guard let nf = noiseFloor else { return false }
+        return nf > -50.0
+    }
 }
 
 enum FileStatus: Equatable, Sendable {
@@ -53,6 +70,10 @@ struct FileItem: Identifiable, Equatable {
     var isProcessed: Bool {
         if case .processed = status { return true }
         return false
+    }
+
+    var hasHighNoiseFloor: Bool {
+        stats?.hasHighNoiseFloor ?? false
     }
 
     var outputURL: URL? {
