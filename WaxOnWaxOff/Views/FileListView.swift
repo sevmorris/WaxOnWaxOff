@@ -38,6 +38,13 @@ struct FileRowView: View {
                 Text(file.url.lastPathComponent)
                     .font(.body)
 
+                if file.hasHighNoiseFloor {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                        .help("High noise floor — loudness normalization may be less accurate. Consider enabling Noise Reduction.")
+                }
+
                 if file.isProcessed {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")

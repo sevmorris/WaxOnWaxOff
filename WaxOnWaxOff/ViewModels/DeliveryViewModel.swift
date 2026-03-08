@@ -187,7 +187,9 @@ final class DeliveryViewModel {
                 if let idx = files.firstIndex(where: { $0.id == file.id }) {
                     files[idx].waveform = waveform
                 }
-            } catch {}
+            } catch {
+                // Waveform generation failed — non-critical, file is still usable
+            }
         }
     }
 
@@ -198,7 +200,9 @@ final class DeliveryViewModel {
                 if let idx = files.firstIndex(where: { $0.id == id }) {
                     files[idx].outputWaveform = waveform
                 }
-            } catch {}
+            } catch {
+                // Output waveform generation failed — non-critical, processed file is unaffected
+            }
         }
     }
 }

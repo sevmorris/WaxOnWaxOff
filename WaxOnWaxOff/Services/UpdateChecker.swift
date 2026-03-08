@@ -67,20 +67,23 @@ actor UpdateChecker {
     }
 }
 
+/// Show an update dialog. When `silent` is true (launch check), only prompt if
+/// an update is actually available — don't bother the user with "you're up to date".
 @MainActor
-func checkForUpdates() async {
+func checkForUpdates(silent: Bool = false) async {
     let result = await UpdateChecker().check()
-
-    let alert = NSAlert()
 
     switch result {
     case .upToDate(let version):
+        guard !silent else { return }
+        let alert = NSAlert()
         alert.messageText = "You're up to date"
         alert.informativeText = "WaxOn/WaxOff \(version) is the latest version."
         alert.addButton(withTitle: "OK")
         alert.runModal()
 
     case .available(let version, let downloadURL, let releaseURL):
+        let alert = NSAlert()
         alert.messageText = "Update Available"
         alert.informativeText = "WaxOn/WaxOff \(version) is available."
         alert.addButton(withTitle: "Download")
@@ -94,6 +97,8 @@ func checkForUpdates() async {
         }
 
     case .error(let message):
+        guard !silent else { return }
+        let alert = NSAlert()
         alert.messageText = "Update Check Failed"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")

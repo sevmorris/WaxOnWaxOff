@@ -37,12 +37,22 @@ struct FileInfoStatsView: View {
                       valueColor: stats.map { peakColor($0.peak) } ?? .primary)
             statBlock("CREST", stats.map { String(format: "%.1f dB",   $0.crest) } ?? "---")
             statBlock("LUFS",  stats.map { String(format: "%.1f",      $0.lufs)  } ?? "---")
+            if let nf = stats?.noiseFloor {
+                statBlock("FLOOR", String(format: "%.1f dBFS", nf),
+                          valueColor: noiseFloorColor(nf))
+            }
         }
     }
 
     private func peakColor(_ peak: Double) -> Color {
         if peak >= 0   { return .red }
         if peak >= -3  { return .orange }
+        return .primary
+    }
+
+    private func noiseFloorColor(_ nf: Double) -> Color {
+        if nf > -40 { return .red }
+        if nf > -50 { return .orange }
         return .primary
     }
 

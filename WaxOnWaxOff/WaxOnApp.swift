@@ -14,10 +14,7 @@ struct WaxOnWaxOffApp: App {
 
     init() {
         Task {
-            let result = await UpdateChecker().check()
-            if case .available = result {
-                await checkForUpdates()
-            }
+            await checkForUpdates(silent: true)
         }
     }
 

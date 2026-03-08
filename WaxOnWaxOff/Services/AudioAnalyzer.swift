@@ -93,11 +93,13 @@ enum AudioAnalyzer {
         var blockChannelSumSq = [Double](repeating: 0, count: channels)
         var blockCurrentFrames = 0
         var blockMeanSqs = [Double]()
+        var blockRmsValues = [Double]()  // per-block RMS for noise floor estimation
 
         file.framePosition = 0
         var sumSquares: Double = 0
         var peak: Double = 0
         var totalFrames: Int = 0
+        var blockMonoSumSq: Double = 0  // mono sum-of-squares for current block
 
         while file.framePosition < frameCount {
             do {
@@ -133,6 +135,11 @@ enum AudioAnalyzer {
                     monoSample += Float(x)
                 }
 
+                monoSample /= Float(channels)
+                let doubleMono = Double(monoSample)
+                sumSquares += doubleMono * doubleMono
+                blockMonoSumSq += doubleMono * doubleMono
+
                 // Complete a block when it reaches 400 ms
                 blockCurrentFrames += 1
                 if blockCurrentFrames >= blockFrames {
@@ -140,13 +147,15 @@ enum AudioAnalyzer {
                     for ch in 0..<channels { avgSq += blockChannelSumSq[ch] / Double(blockCurrentFrames) }
                     avgSq /= Double(channels)
                     blockMeanSqs.append(avgSq)
+
+                    // Track per-block mono RMS for noise floor estimation
+                    let blockRms = sqrt(blockMonoSumSq / Double(blockCurrentFrames))
+                    blockRmsValues.append(blockRms)
+
                     blockChannelSumSq = [Double](repeating: 0, count: channels)
+                    blockMonoSumSq = 0
                     blockCurrentFrames = 0
                 }
-
-                monoSample /= Float(channels)
-                let doubleMono = Double(monoSample)
-                sumSquares += doubleMono * doubleMono
 
                 for ch in 0..<channels {
                     peak = max(peak, abs(Double(channelData[ch][frame])))
@@ -161,6 +170,9 @@ enum AudioAnalyzer {
             for ch in 0..<channels { avgSq += blockChannelSumSq[ch] / Double(blockCurrentFrames) }
             avgSq /= Double(channels)
             blockMeanSqs.append(avgSq)
+
+            let blockRms = sqrt(blockMonoSumSq / Double(blockCurrentFrames))
+            blockRmsValues.append(blockRms)
         }
 
         guard totalFrames > 0 else {
@@ -173,7 +185,18 @@ enum AudioAnalyzer {
         let crestDb = peakDb - rmsDb
         let lufs = computeGatedLUFS(blockMeanSqs: blockMeanSqs)
 
-        return AudioStats(rms: rmsDb, peak: peakDb, crest: crestDb, lufs: lufs)
+        // Noise floor: 10th percentile of per-block RMS (quietest blocks ≈ room tone / noise)
+        let noiseFloor: Double?
+        if blockRmsValues.count >= 5 {
+            let sorted = blockRmsValues.sorted()
+            let p10Index = max(0, Int(Double(sorted.count) * 0.1))
+            let p10Rms = sorted[p10Index]
+            noiseFloor = 20 * log10(max(p10Rms, 1e-12))
+        } else {
+            noiseFloor = nil
+        }
+
+        return AudioStats(rms: rmsDb, peak: peakDb, crest: crestDb, lufs: lufs, noiseFloor: noiseFloor)
     }
 
     /// Applies ITU-R BS.1770 absolute + relative gating to block mean-squares.
