@@ -321,6 +321,7 @@
   <a href="#phase-rotation">Phase Rotation</a>
   <a href="#mix-summing">Mix Summing</a>
   <a href="#dithering">Dithering</a>
+  <a href="#rnnoise">RNNoise</a>
   <a class="section-head" href="#">Design Decisions</a>
   <a href="#waxon-design">WaxOn Design</a>
   <a href="#waxoff-design">WaxOff Design</a>
@@ -344,6 +345,8 @@
     <h3>WaxOn <span class="mode-badge mode-waxon">WaxOn</span></h3>
     <div class="chain">
       <div class="chain-row">
+        <div class="chain-node optional">RNNoise<br><span style="font-size:0.75rem;font-weight:400;">ML noise reduction</span></div>
+        <div class="chain-arrow">→</div>
         <div class="chain-node">High-Pass Filter</div>
         <div class="chain-arrow">→</div>
         <div class="chain-node">Channel Select<br><span style="font-size:0.75rem;font-weight:400;">mono only</span></div>
@@ -634,6 +637,59 @@
     <p><strong>For MP3 output, dithering is inapplicable for a separate reason.</strong> MP3 encoding applies its own psychoacoustic quantization. The codec analyzes the signal using a masking model and allocates bits to spectral bands according to audibility thresholds. The quantization step sizes used by the MP3 encoder are orders of magnitude coarser than one LSB of 16-bit PCM. Any TPDF dither noise added before encoding would be completely absorbed into the codec's own quantization decisions — it contributes nothing and changes nothing. Adding dither before a lossy encoder is like whispering into a jackhammer.</p>
   </section>
 
+  <!-- RNNoise -->
+  <section id="rnnoise">
+    <h2>RNNoise: ML Noise Reduction</h2>
+
+    <h3>Background and Origins</h3>
+    <p>RNNoise was developed by Jean-Marc Valin at Mozilla in 2017–2018 and released as open source under the BSD license. Valin is also a principal author of the <strong>Opus</strong> audio codec — the codec used by WebRTC, Discord, Zoom, and virtually every real-time web audio application. His work on Opus included extensive research into perceptual audio coding and voice intelligibility under compression, which directly informed the approach taken in RNNoise.</p>
+    <p>The project grew from a practical problem in WebRTC: browser-based voice communication was plagued by background noise (keyboard clicks, HVAC, crowd noise, fan hum) that conventional noise suppression handled poorly — either leaving too much noise or introducing the characteristic warbling, underwater artifacts of aggressive spectral subtraction. Valin's hypothesis was that a machine learning approach trained specifically on speech could do better.</p>
+    <p>The original paper, <em>A Hybrid DSP/Deep Learning Approach to Real-Time Full-Band Speech Enhancement</em>, was presented at ITRW on Speech Communication in 2018. It has since been widely cited in the speech enhancement literature and influenced subsequent neural audio processing work at companies including Google, Microsoft, and Amazon.</p>
+
+    <h3>Architecture: Gated Recurrent Units</h3>
+    <p>RNNoise is a recurrent neural network using <strong>Gated Recurrent Units (GRUs)</strong> — a variant of LSTM that uses fewer parameters and trains faster while retaining the ability to model temporal dependencies across variable-length sequences. The architecture is deliberately small: the network has roughly 100,000 parameters total, making real-time inference feasible on hardware as constrained as embedded processors with no dedicated GPU.</p>
+    <p>The network processes audio in the frequency domain using the Opus codec's Bark-scale filterbank — 22 critical bands that approximate the frequency resolution of human hearing. This is a key design choice: rather than learning to operate on raw waveforms (which requires modeling extremely long-range sample dependencies) or on fixed FFT bins (which don't match perceptual resolution), RNNoise works on the same perceptual frequency representation that the ear itself uses.</p>
+    <p>For each 10 ms frame of audio, the network computes a set of spectral gains — one per band — between 0 and 1. A gain of 1.0 means that band is passed through unmodified. A gain of 0 means it is fully suppressed. Intermediate values attenuate partially. The gains are applied multiplicatively to the band energies, and the modified spectrum is reconstructed back to a waveform. The network never synthesizes audio; it only decides how much of each perceptual band to suppress in each frame.</p>
+
+    <h3>Training and the Model File</h3>
+    <p>The bundled model (<code>bd.rnnn</code> from the <a href="https://github.com/GregorR/rnnoise-models">rnnoise-models repository</a>) was trained on a large corpus of speech — multiple speakers, multiple languages, multiple recording conditions — mixed with a wide variety of noise types: HVAC, traffic, crowd noise, fan hum, electrical interference, and broadband pink and white noise. The model learns to identify which spectral components correspond to voice and which correspond to noise, using temporal context (the GRU's hidden state) to distinguish steady-state noise from transient speech components.</p>
+    <p>Training the model required both clean speech recordings and noise-only recordings, which were artificially mixed at various signal-to-noise ratios. The network learned the difference between speech-shaped energy and noise-shaped energy across thousands of examples. Because the training data was multilingual and broad-spectrum, the resulting model generalizes well across different speakers, accents, and recording conditions without any per-speaker adaptation.</p>
+
+    <h3>What It Suppresses Well — and Poorly</h3>
+    <p>RNNoise excels at <strong>steady-state, spectrally diffuse noise</strong>: HVAC hum, room tone, computer fan noise, broadband electrical hiss, and low-level crowd ambience. These share a characteristic spectral profile that is relatively stable over time and distributes energy broadly, making them easy for the network to distinguish from voice. On clean recordings with consistent low-level background noise, suppression is typically very effective and inaudible.</p>
+    <p>It handles poorly — and can introduce artifacts with — the following:</p>
+    <ul>
+      <li><strong>Highly variable or impulsive noise</strong>: loud intermittent events (door slams, keyboard bursts, chair squeaks) are often only partially removed and sometimes produce brief processing artifacts at the onset</li>
+      <li><strong>Noise-dominated recordings</strong>: when SNR is very low — background noise significantly louder than the voice — the network sometimes misclassifies voice components as noise and attenuates them, producing a thin, slightly hollow quality</li>
+      <li><strong>Music or complex tonal content</strong>: the network is trained on speech. It may suppress legitimate musical content that doesn't match speech energy patterns</li>
+      <li><strong>Narrowband tonal hum (mains hum at 50/60 Hz)</strong>: handled better by a dedicated notch filter. RNNoise can suppress it but is not specifically optimized for a single frequency</li>
+    </ul>
+    <p>The artifact profile when limits are exceeded is typically a subtle warbling or underwater quality — the same category of artifact produced by spectral subtraction noise gates, though usually less severe. On moderate-noise, clean-voice recordings, the algorithm is essentially transparent.</p>
+
+    <h3>Why It's Off by Default</h3>
+    <p>Noise reduction that works well on one recording can degrade another. The right call depends on:</p>
+    <ul>
+      <li>How much background noise is present and whether it's steady-state</li>
+      <li>Signal-to-noise ratio of the recording</li>
+      <li>Whether the noise is audible enough to matter to listeners</li>
+    </ul>
+    <p>WaxOn's high-pass filter already removes a significant portion of low-frequency noise energy. For many podcast recordings, this is sufficient, and adding a noise reduction pass is unnecessary processing. Enabling RNNoise on an already-clean recording will not degrade it noticeably, but it also won't help, and adds processing time.</p>
+    <p>The setting is off by default because "no unnecessary processing" is the conservative, correct baseline. Enable it when background noise is audible and distracting — and leave it off when the recording is already clean enough.</p>
+
+    <h3>Placement in the WaxOn Pipeline</h3>
+    <p>RNNoise runs as the <em>first</em> stage in the WaxOn chain, before the high-pass filter. This is intentional. Noise suppression should operate on the raw signal before any other DSP stages modify it, for two reasons:</p>
+    <ol>
+      <li><strong>The network was trained on natural speech recordings</strong>, not on high-pass-filtered audio. Presenting it with the unaltered signal gives it the spectral context it expects and produces the most accurate gain estimates.</li>
+      <li><strong>Noise in the low-frequency range contributes to the loudnorm measurement</strong> and limiter behavior downstream. Removing it first means the subsequent filter, normalization, and limiting stages operate on cleaner material — better level estimates, less limiter engagement on non-useful content.</li>
+    </ol>
+
+    <h3>FFmpeg Implementation</h3>
+    <p>The <code>arnndn</code> filter in FFmpeg wraps the RNNoise library. It requires an external model file provided via the <code>m=</code> parameter:</p>
+    <pre><code>arnndn=m=/path/to/model</code></pre>
+    <p>The model file is bundled in the app's resources directory. WaxOn locates it at runtime using <code>Bundle.main.url(forResource:withExtension:)</code> and passes the resolved path to FFmpeg. The filter is prepended to the filter chain only when Noise Reduction is enabled — when off, the chain begins with the high-pass filter as usual.</p>
+    <p>Processing latency for <code>arnndn</code> is negligible for batch processing purposes. The network processes audio in 10 ms frames. For a 60-minute recording, the total added processing time is a few seconds on Apple Silicon.</p>
+  </section>
+
   <!-- WaxOn Design -->
   <section id="waxon-design">
     <h2>WaxOn Design Rationale <span class="mode-badge mode-waxon">WaxOn</span></h2>
@@ -755,6 +811,10 @@
         </tr>
       </thead>
       <tbody>
+        <tr>
+          <td>RNNoise before HPF (WaxOn, optional)</td>
+          <td>Noise reduction runs on the unaltered signal — the spectral context the network was trained on. Removing noise first also produces cleaner input to every downstream stage.</td>
+        </tr>
         <tr>
           <td>HPF before all gain stages (WaxOn)</td>
           <td>Subsonic energy inflates loudness measurements and activates the limiter on content that isn't perceptually meaningful</td>
