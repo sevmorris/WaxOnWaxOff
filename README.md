@@ -69,6 +69,10 @@ Use WaxOff on your finished, edited mix. Apply broadcast-standard loudness norma
 Raw recordings → WaxOn → Edit in DAW → WaxOff → Distribute
 ```
 
+## Beyond Podcasting
+
+WaxOn was designed for podcast audio, but the prep pipeline — high-pass filtering, phase rotation, loudness normalization, and limiting — maps well to any voice-forward production workflow. If you're editing interviews, documentary dialog, or other spoken-word content outside a full DAW environment, it works the same way.
+
 ## Supported Formats
 
 WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled — no separate installation required.
