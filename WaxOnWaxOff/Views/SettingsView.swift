@@ -60,6 +60,16 @@ struct SettingsView: View {
                     }
                 }
 
+                row("Noise Reduction") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("RNNoise (ML)", isOn: $viewModel.settings.noiseReductionEnabled)
+                            .toggleStyle(.switch)
+                        Text("Best on clean recordings with consistent background noise")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Divider().padding(.vertical, 6)
 
                 row("Loudness Norm") {
