@@ -584,6 +584,11 @@
           <td>High-pass filter cutoff. 80 Hz removes most rumble and handling noise without thinning the voice. Lower for sources with significant bass content.</td>
         </tr>
         <tr>
+          <td>Noise Reduction</td>
+          <td>On · Off · default Off</td>
+          <td>Applies RNNoise, a recurrent neural network trained on speech, before the high-pass filter. Suppresses consistent background noise (HVAC, room tone, hum) with minimal voice coloration. Check output before editing — artifacts are possible on heavy noise. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</td>
+        </tr>
+        <tr>
           <td>Loudness Norm</td>
           <td>On · Off</td>
           <td>Enables two-pass EBU R128 loudness normalization. Adds one analysis pass per file but produces consistent levels across a batch. Off = filtering and limiting only.</td>
@@ -592,11 +597,6 @@
           <td>Target</td>
           <td>−16 to −35 LUFS · default −30</td>
           <td>Integrated loudness target when Loudness Norm is on. −30 LUFS is conservative for ingest — leaves plenty of headroom for editing. Grayed out when Loudness Norm is off.</td>
-        </tr>
-        <tr>
-          <td>Noise Reduction</td>
-          <td>On · Off · default Off</td>
-          <td>Applies RNNoise, a recurrent neural network trained on speech, before the high-pass filter. Suppresses consistent background noise (HVAC, room tone, hum) with minimal voice coloration. Best on clean recordings with low-level steady noise. Off by default — see <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</td>
         </tr>
         <tr>
           <td>Output Dir</td>
