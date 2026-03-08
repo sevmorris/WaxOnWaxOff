@@ -1,10 +1,10 @@
 **Podcast Audio Prep for macOS**
 
-[WaxOn/WaxOff](https://sevmorris.github.io/WaxOnWaxOff/) is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing — high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution — EBU R128 loudness normalization, true peak control, and MP3 encoding.
+[WaxOn/WaxOff](https://sevmorris.github.io/WaxOnWaxOff/) is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing: high-pass filtering, noise reduction, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution: EBU R128 loudness normalization, true peak control, and MP3 encoding.
 
 **[Download v1.3.0 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.3.0.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/manual/)**
 
-> ⚠️ **Important — Read Before First Launch**
+> ⚠️ **Important: Read Before First Launch**
 >
 > macOS will block the app because it is not notarized with Apple. After dragging WaxOn to Applications, **run this command in Terminal:**
 >
@@ -19,13 +19,14 @@
 Use WaxOn on raw recordings before editing. Drop your files in, configure what you care about, and get to editing.
 
 - **High-Pass Filter** — configurable cutoff (20–90 Hz, default 80 Hz) removes rumble, HVAC hum, and handling noise; set to 20 Hz for DC Block only
-- **Noise Reduction** — optional RNNoise ML-based background noise suppression (off by default); best on clean recordings with consistent steady noise
-- **Loudness Normalization** — optional two-pass EBU R128 with configurable target (−35 to −16 LUFS). Linear gain only — dynamics fully preserved
+- **Noise Reduction** — optional RNNoise ML-based background noise suppression (off by default); best for recordings with consistent steady-state background noise
+- **Loudness Normalization** — optional two-pass EBU R128 with configurable target (−35 to −16 LUFS); linear gain only, dynamics fully preserved. When NR is off, the analysis pass uses noise reduction internally to prevent broadband noise from skewing the measurement, keeping the output unmodified.
+- **Noise Floor Detection** — estimated noise floor displayed in the stats panel with color-coded warnings; a ⚠️ badge appears on files with high noise floors that may affect loudness accuracy
 - **Brick-Wall Limiting** — 2× oversampled true peak control at the chosen ceiling (−1 to −3 dB)
 - **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
 - **Mono or Stereo Output** — mono with left/right channel extraction, or stereo passthrough
 - **Sample Rate Conversion** — 44.1 kHz or 48 kHz output
-- **Mix** — select 2+ files and combine them. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing, then the combined output is normalized to the same target — ensuring a balanced blend regardless of source levels
+- **Mix** — select 2+ files and combine them. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing, then the combined output is normalized to the same target, ensuring a balanced blend regardless of source levels
 - **Presets** — five built-in presets (Defaults, Edit Prep, Edit Prep EBU, Mix 2 Channel, Mix Mono) plus custom presets saved and deleted from the toolbar menu
 - **Batch Processing** — up to 3 concurrent jobs with per-file progress
 
@@ -35,7 +36,7 @@ Use WaxOn on raw recordings before editing. Drop your files in, configure what y
 
 Use WaxOff on your finished, edited mix. Apply broadcast-standard loudness normalization and deliver as WAV, MP3, or both.
 
-- **EBU R128 Loudness Normalization** — two-pass analysis + linear gain. No dynamic processing; stereo image and transients are unchanged
+- **EBU R128 Loudness Normalization** — two-pass analysis + linear gain; no dynamic processing, stereo image and transients are unchanged
 - **True Peak Control** — configurable ceiling (−3.0 to −0.1 dBTP, default −1.0)
 - **WAV + MP3 Output** — 24-bit WAV, CBR MP3 (128/160/192 kbps), or both; MP3 always outputs at 44.1 kHz
 - **Phase Rotation** — optional 150 Hz allpass to reduce crest factor on bass-heavy material
@@ -55,7 +56,8 @@ Use WaxOff on your finished, edited mix. Apply broadcast-standard loudness norma
 ## Shared Features
 
 - **Waveform Preview** — select a file to view its waveform with dB scale
-- **File Stats** — format, sample rate, channels, bit depth, duration, bit rate, RMS, peak, crest factor, and integrated LUFS
+- **File Stats** — format, sample rate, channels, bit depth, duration, bit rate, RMS, peak, crest factor, integrated LUFS, and estimated noise floor
+- **Noise Floor Warning** — files with a high noise floor show a ⚠️ badge in the file list and a color-coded FLOOR stat (orange above −50 dBFS, red above −40 dBFS)
 - **Drag & Drop** — drop files anywhere on the window
 - **Resizable Layout** — drag the divider between file list and waveform panel
 - **Custom Output Directory** — optionally set a dedicated output folder
@@ -72,11 +74,11 @@ Raw recordings → WaxOn → Edit in DAW → WaxOff → Distribute
 
 ## Beyond Podcasting
 
-WaxOn was designed for podcast audio, but the prep pipeline — high-pass filtering, phase rotation, loudness normalization, and limiting — maps well to any voice-forward production workflow. If you're editing interviews, documentary dialog, or other spoken-word content outside a full DAW environment, it works the same way.
+WaxOn was designed for podcast audio, but the prep pipeline (high-pass filtering, phase rotation, loudness normalization, and limiting) maps well to any voice-forward production workflow. If you're editing interviews, documentary dialog, or other spoken-word content outside a full DAW environment, it works the same way.
 
 ## Supported Formats
 
-WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled — no separate installation required.
+WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled; no separate installation required.
 
 ## System Requirements
 
@@ -99,7 +101,7 @@ What I can say is that I think it matters how these tools get used, and by whom,
 
 The current app icon is my own design. AI can build the software, but I can still make the art myself.
 
-WaxOn/WaxOff has been built carefully and iteratively — tested in real podcast workflows, refined based on actual use, and updated continuously as improvements reveal themselves. That process takes real time and attention, even when AI is writing the code. The app is free and will stay that way. If you find it useful, a coffee is appreciated.
+WaxOn/WaxOff has been built carefully and iteratively, tested in real podcast workflows, refined based on actual use, and updated continuously as improvements reveal themselves. That process takes real time and attention, even when AI is writing the code. The app is free and will stay that way. If you find it useful, a coffee is appreciated.
 
 
 <p align="center"><a href="https://ko-fi.com/sevmo"><img src="assets/Caffeine_structure_sm.png" width="50%"></a></p>
