@@ -434,7 +434,7 @@
       <div class="screenshot-block">
         <div class="section-label">WaxOn</div>
         <div class="screenshot-label">Raw Recording Prep</div>
-        <p class="screenshot-desc">Drop in raw recordings before editing. High-pass filtering, loudness normalization, phase rotation, and brick-wall limiting — all in one pass.</p>
+        <p class="screenshot-desc">Drop in raw recordings before editing. Optional ML noise reduction, high-pass filtering, loudness normalization, phase rotation, and brick-wall limiting — all in one pass.</p>
         <img class="screenshot-img" src="screenshots/screenshot-waxon.png" alt="WaxOn mode showing waveform and settings panel" loading="lazy">
       </div>
 
@@ -461,6 +461,10 @@
         <div class="feature-card">
           <h3>High-Pass Filter</h3>
           <p>Configurable cutoff from 20 to 90 Hz. Removes rumble, HVAC hum, and handling noise. Set to 20 Hz for DC block only.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Noise Reduction</h3>
+          <p>Optional RNNoise ML noise suppression — a recurrent neural network trained on speech. Reduces steady background noise before any other processing. Off by default.</p>
         </div>
         <div class="feature-card">
           <h3>Loudness Normalization</h3>

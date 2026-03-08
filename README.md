@@ -19,6 +19,7 @@
 Use WaxOn on raw recordings before editing. Drop your files in, configure what you care about, and get to editing.
 
 - **High-Pass Filter** — configurable cutoff (20–90 Hz, default 80 Hz) removes rumble, HVAC hum, and handling noise; set to 20 Hz for DC Block only
+- **Noise Reduction** — optional RNNoise ML-based background noise suppression (off by default); best on clean recordings with consistent steady noise
 - **Loudness Normalization** — optional two-pass EBU R128 with configurable target (−35 to −16 LUFS). Linear gain only — dynamics fully preserved
 - **Brick-Wall Limiting** — 2× oversampled true peak control at the chosen ceiling (−1 to −3 dB)
 - **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
