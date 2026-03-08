@@ -53,7 +53,7 @@ struct WaxOffMainView: View {
                 }
             }
         }
-        .frame(minWidth: 900, minHeight: 540)
+        .frame(minWidth: 1092, minHeight: 624)
         .padding(.bottom)
         .dropDestination(for: URL.self) { urls, _ in
             viewModel.addFiles(urls)
@@ -144,7 +144,7 @@ struct WaxOffMainView: View {
                             .truncationMode(.middle)
 
                         WaveformView(waveformData: file.waveform)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 80, maxHeight: .infinity)
                             .background(.black.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
 
@@ -215,10 +215,9 @@ private struct DeliveryFileListView: View {
                 viewModel.moveFiles(from: source, to: destination)
             }
         }
-        .onKeyPress(.delete) {
-            guard !viewModel.selectedFileIDs.isEmpty else { return .ignored }
+        .onDeleteCommand {
+            guard !viewModel.selectedFileIDs.isEmpty else { return }
             viewModel.removeSelected()
-            return .handled
         }
     }
 }
