@@ -587,7 +587,7 @@
         <tr>
           <td>Noise Reduction</td>
           <td>On · Off · default Off</td>
-          <td>Applies RNNoise, a recurrent neural network trained on speech, before the high-pass filter. Suppresses consistent background noise (HVAC, room tone, hum) with minimal voice coloration. Check output before editing; artifacts are possible on heavy noise. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</td>
+          <td>Applies RNNoise, a recurrent neural network trained on mono speech, before the high-pass filter. Suppresses consistent background noise (HVAC, room tone, hum) with minimal voice coloration. For stereo output, channels are split and denoised independently to ensure balanced processing. Check output before editing; artifacts are possible on heavy noise. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</td>
         </tr>
         <tr>
           <td>Loudness Norm</td>
@@ -616,7 +616,7 @@
       <li>
         <div>
           <strong>Noise Reduction <span class="tag">Optional</span></strong>
-          <span>When enabled, RNNoise (<code>arnndn</code>) runs first on the raw signal before any other processing. A recurrent neural network trained on speech suppresses consistent background noise (HVAC hum, room tone, light broadband noise) with minimal effect on voice. Runs before the high-pass filter so the network sees the unaltered signal. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</span>
+          <span>When enabled, RNNoise (<code>arnndn</code>) runs first on the raw signal before any other processing. A recurrent neural network trained on speech suppresses consistent background noise (HVAC hum, room tone, light broadband noise) with minimal effect on voice. For stereo output, each channel is split and denoised independently before rejoining — RNNoise is a mono model and requires per-channel processing for balanced stereo results. Runs before the high-pass filter so the network sees the unaltered signal. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</span>
         </div>
       </li>
       <li>

@@ -105,9 +105,16 @@ actor AudioProcessor {
                 let analysisURL: URL
                 if let modelURL = nrModelURL {
                     let nrTemp = work.appendingPathComponent("nr_analysis_\(i).wav")
+                    // Split stereo → denoise each channel → rejoin for accurate analysis
+                    let nrFc = [
+                        "[0:a]channelsplit=channel_layout=stereo[L][R]",
+                        "[L]arnndn=m=\(modelURL.path)[Lnr]",
+                        "[R]arnndn=m=\(modelURL.path)[Rnr]",
+                        "[Lnr][Rnr]join=inputs=2:channel_layout=stereo"
+                    ].joined(separator: ";")
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", url.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-i", url.path, "-filter_complex", nrFc,
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", nrTemp.path
                     ])
                     analysisURL = nrTemp
@@ -165,29 +172,47 @@ actor AudioProcessor {
         let phaseFilter = "allpass=f=200:t=q:w=0.707,"
         let midURL = work.appendingPathComponent("mix_mid.wav")
 
-        var nrPrefix = ""
-        if settings.noiseReductionEnabled,
-           let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
-            nrPrefix = "arnndn=m=\(modelURL.path),"
-        }
-
-        let step1Af: String
-        if isStereo {
-            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
-        } else {
-            let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
-            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
-        }
+        let mixNrModelURL = settings.noiseReductionEnabled
+            ? Bundle.main.url(forResource: "rnnoise", withExtension: nil)
+            : nil
 
         let mixChannelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
         let nrDesc = settings.noiseReductionEnabled ? "  |  RNNoise" : ""
         onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz\(nrDesc)  |  \(mixChannelDesc)  |  \(rateTag) kHz", .verbose)
 
-        try await runFFmpeg(exe: tools.ffmpeg, args: [
-            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", rawMixURL.path, "-af", step1Af,
-            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
-        ])
+        if isStereo, let modelURL = mixNrModelURL {
+            // Split → denoise each channel independently → rejoin, then
+            // highpass + phase rotation + resample.
+            let fc = [
+                "[0:a]channelsplit=channel_layout=stereo[L][R]",
+                "[L]arnndn=m=\(modelURL.path)[Lnr]",
+                "[R]arnndn=m=\(modelURL.path)[Rnr]",
+                "[Lnr][Rnr]join=inputs=2:channel_layout=stereo,",
+                "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+            ].joined(separator: ";")
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", rawMixURL.path, "-filter_complex", fc,
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
+            ])
+        } else {
+            var nrPrefix = ""
+            if let modelURL = mixNrModelURL {
+                nrPrefix = "arnndn=m=\(modelURL.path),"
+            }
+            let step1Af: String
+            if isStereo {
+                step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+            } else {
+                let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
+                step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
+            }
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", rawMixURL.path, "-af", step1Af,
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
+            ])
+        }
         try Task.checkCancellation()
 
         // Step 3: Optional EBU R128 two-pass loudnorm on the mix
@@ -203,11 +228,25 @@ actor AudioProcessor {
                let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
                 let nrMixTemp = work.appendingPathComponent("mix_nr_analysis.wav")
                 onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
-                try await runFFmpeg(exe: tools.ffmpeg, args: [
-                    "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                    "-i", midURL.path, "-af", "arnndn=m=\(modelURL.path)",
-                    "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrMixTemp.path
-                ])
+                if isStereo {
+                    let nrFc = [
+                        "[0:a]channelsplit=channel_layout=stereo[L][R]",
+                        "[L]arnndn=m=\(modelURL.path)[Lnr]",
+                        "[R]arnndn=m=\(modelURL.path)[Rnr]",
+                        "[Lnr][Rnr]join=inputs=2:channel_layout=stereo"
+                    ].joined(separator: ";")
+                    try await runFFmpeg(exe: tools.ffmpeg, args: [
+                        "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", midURL.path, "-filter_complex", nrFc,
+                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrMixTemp.path
+                    ])
+                } else {
+                    try await runFFmpeg(exe: tools.ffmpeg, args: [
+                        "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", midURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrMixTemp.path
+                    ])
+                }
                 mixAnalysisInput = nrMixTemp
             } else {
                 mixAnalysisInput = midURL
@@ -304,33 +343,52 @@ actor AudioProcessor {
 
         let phaseFilter = "allpass=f=200:t=q:w=0.707,"
 
-        var nrPrefix = ""
-        if settings.noiseReductionEnabled,
-           let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
-            nrPrefix = "arnndn=m=\(modelURL.path),"
-        }
+        let nrEnabled = settings.noiseReductionEnabled
+        let nrModelURL = nrEnabled
+            ? Bundle.main.url(forResource: "rnnoise", withExtension: nil)
+            : nil
 
-        let step1Af: String
-        let outputChannelCount: String
-        if isStereo {
-            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
-            outputChannelCount = "2"
-        } else {
-            let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
-            step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
-            outputChannelCount = "1"
-        }
+        let outputChannelCount: String = isStereo ? "2" : "1"
 
         onLog?("▶ \(filename)", .info)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
-        let nrDesc = settings.noiseReductionEnabled ? "  |  RNNoise" : ""
+        let nrDesc = nrEnabled ? "  |  RNNoise" : ""
         onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz\(nrDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
 
-        try await runFFmpeg(exe: tools.ffmpeg, args: [
-            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", input.path, "-af", step1Af,
-            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
-        ])
+        if isStereo, let modelURL = nrModelURL {
+            // Split → denoise each channel independently → rejoin, then
+            // highpass + phase rotation + resample.
+            let fc = [
+                "[0:a]channelsplit=channel_layout=stereo[L][R]",
+                "[L]arnndn=m=\(modelURL.path)[Lnr]",
+                "[R]arnndn=m=\(modelURL.path)[Rnr]",
+                "[Lnr][Rnr]join=inputs=2:channel_layout=stereo,",
+                "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+            ].joined(separator: ";")
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", input.path, "-filter_complex", fc,
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
+            ])
+        } else {
+            // Mono output, or no NR — simple -af chain
+            var nrPrefix = ""
+            if let modelURL = nrModelURL {
+                nrPrefix = "arnndn=m=\(modelURL.path),"
+            }
+            let step1Af: String
+            if isStereo {
+                step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+            } else {
+                let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
+                step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
+            }
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", input.path, "-af", step1Af,
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
+            ])
+        }
 
         try Task.checkCancellation()
 
@@ -347,13 +405,26 @@ actor AudioProcessor {
             if !settings.noiseReductionEnabled,
                let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
                 let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
-                let nrAf = "arnndn=m=\(modelURL.path)"
                 onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
-                try await runFFmpeg(exe: tools.ffmpeg, args: [
-                    "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                    "-i", midURL.path, "-af", nrAf,
-                    "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
-                ])
+                if isStereo {
+                    let nrFc = [
+                        "[0:a]channelsplit=channel_layout=stereo[L][R]",
+                        "[L]arnndn=m=\(modelURL.path)[Lnr]",
+                        "[R]arnndn=m=\(modelURL.path)[Rnr]",
+                        "[Lnr][Rnr]join=inputs=2:channel_layout=stereo"
+                    ].joined(separator: ";")
+                    try await runFFmpeg(exe: tools.ffmpeg, args: [
+                        "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", midURL.path, "-filter_complex", nrFc,
+                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
+                    ])
+                } else {
+                    try await runFFmpeg(exe: tools.ffmpeg, args: [
+                        "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", midURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
+                    ])
+                }
                 analysisInput = nrTempURL
             } else {
                 analysisInput = midURL
