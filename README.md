@@ -19,12 +19,12 @@
 Use WaxOn on raw recordings before editing. Drop your files in, configure what you care about, and get to editing.
 
 - **High-Pass Filter** — configurable cutoff (20–90 Hz, default 80 Hz) removes rumble, HVAC hum, and handling noise; set to 20 Hz for DC Block only
-- **Noise Reduction** — optional RNNoise ML-based background noise suppression (off by default); best for recordings with consistent steady-state background noise
+- **Noise Reduction** — optional RNNoise ML-based background noise suppression (off by default); best for recordings with consistent steady-state background noise. For stereo output, channels are split and denoised independently to ensure balanced processing
 - **Loudness Normalization** — optional two-pass EBU R128 with configurable target (−35 to −16 LUFS); linear gain only, dynamics fully preserved. When NR is off, the analysis pass uses noise reduction internally to prevent broadband noise from skewing the measurement, keeping the output unmodified.
 - **Noise Floor Detection** — estimated noise floor displayed in the stats panel with color-coded warnings; a ⚠️ badge appears on files with high noise floors that may affect loudness accuracy
 - **Brick-Wall Limiting** — 2× oversampled true peak control at the chosen ceiling (−1 to −3 dB)
 - **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
-- **Mono or Stereo Output** — mono with left/right channel extraction, or stereo passthrough
+- **Mono or Stereo Output** — mono with left/right channel extraction, or stereo with per-channel noise reduction when NR is enabled
 - **Sample Rate Conversion** — 44.1 kHz or 48 kHz output
 - **Mix** — select 2+ files and combine them. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing, then the combined output is normalized to the same target, ensuring a balanced blend regardless of source levels
 - **Presets** — five built-in presets (Defaults, Edit Prep, Edit Prep EBU, Mix 2 Channel, Mix Mono) plus custom presets saved and deleted from the toolbar menu

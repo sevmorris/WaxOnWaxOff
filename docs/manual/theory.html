@@ -322,6 +322,7 @@
   <a href="#mix-summing">Mix Summing</a>
   <a href="#dithering">Dithering</a>
   <a href="#rnnoise">RNNoise</a>
+  <a class="sub" href="#rnnoise-stereo">Stereo Handling</a>
   <a href="#noise-floor">Noise Floor Estimation</a>
   <a href="#nr-measurement">NR-for-Measurement</a>
   <a class="section-head" href="#">Design Decisions</a>
@@ -347,7 +348,7 @@
     <h3>WaxOn <span class="mode-badge mode-waxon">WaxOn</span></h3>
     <div class="chain">
       <div class="chain-row">
-        <div class="chain-node optional">RNNoise<br><span style="font-size:0.75rem;font-weight:400;">ML noise reduction</span></div>
+        <div class="chain-node optional">RNNoise<br><span style="font-size:0.75rem;font-weight:400;">ML noise reduction<br>(stereo: per-channel split)</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node">High-Pass Filter</div>
         <div class="chain-arrow">→</div>
@@ -360,7 +361,7 @@
         <div class="chain-node">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Resample</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--text-muted);">Dashed border = optional stage. Output: 24-bit WAV.</p>
+    <p style="font-size:0.85rem;color:var(--text-muted);">Dashed border = optional stage. For stereo output with NR enabled, channels are split and denoised independently before rejoining. Output: 24-bit WAV.</p>
 
     <h3>WaxOff <span class="mode-badge mode-waxoff">WaxOff</span></h3>
     <div class="chain">
@@ -709,10 +710,22 @@
       <li><strong>Noise in the low-frequency range contributes to the loudnorm measurement</strong> and limiter behavior downstream. Removing it first means the subsequent filter, normalization, and limiting stages operate on cleaner material: better level estimates, less limiter engagement on non-useful content.</li>
     </ol>
 
+    <h3 id="rnnoise-stereo">Stereo Handling: Per-Channel Split</h3>
+    <p>RNNoise was designed and trained exclusively on <strong>mono 48 kHz speech</strong>. When FFmpeg's <code>arnndn</code> filter receives a stereo input, it creates separate denoiser instances per channel and processes them independently. In practice, this can produce unpredictable results: the per-channel recurrent states diverge, and one channel (typically the second) may be over-gated or heavily attenuated, even when both channels carry similar content and noise levels.</p>
+    <p>The root cause is that the model's internal gain computation is frame-by-frame and depends on its recurrent hidden state. With stereo input, slight differences between channels (different mic angles, room reflections, or even minor level offsets from recording) can cause the model to classify one channel as "more noisy" than the other and gate it more aggressively. The model has no concept of channel correlation or stereo coherence.</p>
+    <p>WaxOn solves this by <strong>splitting stereo audio into independent mono channels before applying RNNoise</strong>, then rejoining the denoised channels back into stereo. This uses FFmpeg's <code>filter_complex</code> graph:</p>
+    <pre><code>[0:a]channelsplit=channel_layout=stereo[L][R];
+[L]arnndn=m=/path/to/model[Lnr];
+[R]arnndn=m=/path/to/model[Rnr];
+[Lnr][Rnr]join=inputs=2:channel_layout=stereo</code></pre>
+    <p>Each channel receives its own fully independent denoiser instance with its own recurrent state, initialized cleanly. The model processes each as a standard mono stream — the format it was trained on — and the results are predictable and balanced. The remaining filter chain (high-pass, phase rotation, resample) runs on the rejoined stereo signal.</p>
+    <p>For <strong>mono output</strong>, the issue does not arise. When the user selects mono, a single channel is extracted via <code>pan</code> before (or at the same stage as) noise reduction, so <code>arnndn</code> always receives a mono signal. The simple <code>-af</code> chain is used in this case.</p>
+    <p>The same per-channel split is applied wherever <code>arnndn</code> touches stereo audio, including the <a href="#nr-measurement">NR-for-measurement</a> analysis paths.</p>
+
     <h3>FFmpeg Implementation</h3>
     <p>The <code>arnndn</code> filter in FFmpeg wraps the RNNoise library. It requires an external model file provided via the <code>m=</code> parameter:</p>
     <pre><code>arnndn=m=/path/to/model</code></pre>
-    <p>The model file is bundled in the app's resources directory. WaxOn locates it at runtime using <code>Bundle.main.url(forResource:withExtension:)</code> and passes the resolved path to FFmpeg. The filter is prepended to the filter chain only when Noise Reduction is enabled. When off, the chain begins with the high-pass filter as usual.</p>
+    <p>The model file is bundled in the app's resources directory. WaxOn locates it at runtime using <code>Bundle.main.url(forResource:withExtension:)</code> and passes the resolved path to FFmpeg. For mono output, the filter is prepended to the <code>-af</code> chain. For stereo output, WaxOn switches to a <code>-filter_complex</code> graph that splits, denoises, and rejoins the channels as described above. When Noise Reduction is off, the chain begins with the high-pass filter as usual.</p>
     <p>Processing latency for <code>arnndn</code> is negligible for batch processing purposes. The network processes audio in 10 ms frames. For a 60-minute recording, the total added processing time is a few seconds on Apple Silicon.</p>
   </section>
 
@@ -764,6 +777,7 @@
       <li><strong>Mix post-normalization</strong>: the loudnorm analysis on the combined mix output uses a temporary NR'd copy</li>
     </ul>
     <p>When Noise Reduction is already enabled, the audio reaching the loudnorm stage has already been noise-reduced. In that case, the NR-for-measurement step is unnecessary and does not run.</p>
+    <p>For stereo output, the NR-for-measurement paths use the same <a href="#rnnoise">per-channel split</a> as the main NR stage: stereo is split into independent mono channels, each denoised separately, then rejoined before the loudnorm analysis. This ensures consistent, balanced noise removal for accurate measurement regardless of channel layout.</p>
 
     <h3>Cost</h3>
     <p>NR-for-measurement adds one additional FFmpeg pass per loudnorm analysis (running RNNoise on the intermediate audio to a temporary file). For a typical podcast recording on Apple Silicon, this adds a few seconds. The temporary NR'd files are created in the working directory and deleted automatically after processing.</p>
@@ -776,7 +790,7 @@
     <h3>Stage Order</h3>
     <p>The WaxOn pipeline stage order is deliberate:</p>
     <ol>
-      <li><strong>Noise reduction first (when enabled)</strong>: The network was trained on unprocessed speech. Running it before any filtering gives it the spectral context it expects. Removing noise early also benefits every downstream stage: cleaner input to the high-pass filter, more accurate loudnorm measurements, less limiter engagement on non-useful content.</li>
+      <li><strong>Noise reduction first (when enabled)</strong>: The network was trained on unprocessed speech. Running it before any filtering gives it the spectral context it expects. Removing noise early also benefits every downstream stage: cleaner input to the high-pass filter, more accurate loudnorm measurements, less limiter engagement on non-useful content. For stereo output, channels are split and denoised independently to avoid the per-channel divergence issues inherent in RNNoise's mono-trained model (see <a href="#rnnoise">RNNoise: Stereo Handling</a>).</li>
       <li><strong>High-pass filter second</strong>: Subsonic content below 80 Hz is removed before any gain stage processes it. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't musically useful.</li>
       <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. The loudnorm analysis then also measures the real output signal.</li>
       <li><strong>Phase rotation before normalization</strong>: Reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
@@ -893,7 +907,7 @@
       <tbody>
         <tr>
           <td>RNNoise before HPF (WaxOn, optional)</td>
-          <td>Noise reduction runs on the unaltered signal, the spectral context the network was trained on. Removing noise first also produces cleaner input to every downstream stage.</td>
+          <td>Noise reduction runs on the unaltered signal, the spectral context the network was trained on. Removing noise first also produces cleaner input to every downstream stage. For stereo, channels are split and denoised independently to avoid RNNoise's mono-model divergence on multi-channel audio.</td>
         </tr>
         <tr>
           <td>HPF before all gain stages (WaxOn)</td>
