@@ -153,14 +153,14 @@
     }
     .wordmark {
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
       line-height: 1.1;
     }
-    .wordmark-name {
-      font-family: var(--font-display);
-      font-size: 2rem;
-      letter-spacing: 0.06em;
-      color: var(--light);
+    .wordmark img {
+      height: 48px;
+      width: 48px;
+      border-radius: 10px;
     }
     .wordmark-sub {
       font-family: var(--font-ui);
@@ -400,7 +400,7 @@
   <header>
     <div class="header-inner">
       <div class="wordmark">
-        <span class="wordmark-name">WaxOn/WaxOff</span>
+        <img src="icon.png" alt="WaxOn/WaxOff">
         <span class="wordmark-sub">Free &middot; macOS &middot; Podcast Audio Prep</span>
       </div>
       <nav>
@@ -414,7 +414,7 @@
   <!-- HERO -->
   <div style="background: var(--dark);">
     <section class="hero">
-      <h1>WaxOn/<br>WaxOff</h1>
+      <img src="icon.png" alt="WaxOn/WaxOff" style="height: 120px; width: 120px; border-radius: 22px; margin-bottom: 1.5rem; display: block; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
       <p class="hero-sub">Two tools, one workflow. <strong>WaxOn</strong> prepares raw recordings for editing. <strong>WaxOff</strong> delivers your finished mix to broadcast standard.</p>
       <div class="hero-actions">
         <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.3.0.dmg" class="btn btn-primary btn-large">Download v1.3.0</a>
