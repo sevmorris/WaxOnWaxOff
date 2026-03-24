@@ -1,6 +1,6 @@
 **Podcast Audio Prep for macOS**
 
-[WaxOn/WaxOff](https://sevmorris.github.io/WaxOnWaxOff/) is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing: high-pass filtering, noise reduction, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution: EBU R128 loudness normalization, true peak control, and MP3 encoding.
+[WaxOn/WaxOff](https://sevmorris.github.io/WaxOnWaxOff/) is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing: high-pass filtering, noise reduction, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution: EBU R128 loudness normalization, true peak control, and MP3 encoding. For third-party broadcast clips going into your mix, use [ClipHacker](https://sevmorris.github.io/ClipHacker/).
 
 **[Download v1.3.3 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.3.3.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/manual/)**
 
