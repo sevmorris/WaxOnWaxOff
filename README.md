@@ -99,8 +99,6 @@ But I hold that alongside some serious concerns. AI raises deep questions about 
 
 What I can say is that I think it matters how these tools get used, and by whom, and toward what ends. A free audio utility that helps independent podcasters is one kind of use. There are others that are far less benign. I'd rather be honest about that tension than pretend it doesn't exist.
 
-The current app icon is my own design. AI can build the software, but I can still make the art myself.
-
 WaxOn/WaxOff has been built carefully and iteratively, tested in real podcast workflows, refined based on actual use, and updated continuously as improvements reveal themselves. That process takes real time and attention, even when AI is writing the code. The app is free and will stay that way. If you find it useful, a coffee is appreciated.
 
 
