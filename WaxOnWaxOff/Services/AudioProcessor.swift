@@ -42,7 +42,7 @@ actor AudioProcessor {
                 index += 1
                 group.addTask {
                     try Task.checkCancellation()
-                    await self.onFileStarted?(input.id)
+                    self.onFileStarted?(input.id)
                     return try await self.processOne(input.url, id: input.id, tools: tools)
                 }
             }

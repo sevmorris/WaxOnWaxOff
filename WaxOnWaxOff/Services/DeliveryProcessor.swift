@@ -23,7 +23,7 @@ struct LoudnormMeasurements: Sendable {
         self.targetOffset = targetOffset
     }
 
-    private static func parseNumber(_ value: Any?) -> Double? {
+    private nonisolated static func parseNumber(_ value: Any?) -> Double? {
         if let num = value as? Double { return num }
         if let str = value as? String { return Double(str) }
         return nil
