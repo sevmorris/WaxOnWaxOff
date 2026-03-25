@@ -361,7 +361,7 @@
 <nav>
   <div class="nav-brand">
     <span>WaxOn/WaxOff</span>
-    <small>Manual — v1.3.0</small>
+    <small>Manual — v1.4.6</small>
   </div>
   <a class="section-head" href="#">Overview</a>
   <a href="#overview">Introduction</a>
@@ -372,7 +372,6 @@
   <a class="sub" href="#waxon-presets">Presets</a>
   <a class="sub" href="#waxon-settings">Settings</a>
   <a class="sub" href="#waxon-pipeline">Pipeline</a>
-  <a class="sub" href="#waxon-mix">Mix Mode</a>
   <a class="sub" href="#waxon-output">Output Files</a>
   <a class="section-head" href="#">WaxOff Mode</a>
   <a class="sub" href="#waxoff-overview">Overview</a>
@@ -396,7 +395,7 @@
     <p>Podcast audio prep for macOS. From raw recording to finished delivery in two modes, one app.</p>
     <p style="margin-top:10px; font-size:0.95rem;"><strong>WaxOn</strong> prepares raw recordings for editing. <strong>WaxOff</strong> finalizes your edited mix for distribution. Both share the same drag-and-drop workflow, waveform viewer, and file stats panel.</p>
     <div class="hero-actions">
-      <a class="btn btn-primary" href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.3.0.dmg">Download v1.3.0</a>
+      <a class="btn btn-primary" href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.4.6.dmg">Download v1.4.6</a>
       <a class="btn btn-secondary" href="https://github.com/sevmorris/WaxOnWaxOff">GitHub</a>
       <a class="btn btn-secondary" href="theory.html">Theory of Operation →</a>
     </div>
@@ -455,7 +454,6 @@
     <p>The right panel shows different content depending on context:</p>
     <ul>
       <li><strong>File selected</strong> — waveform with a stats strip below it</li>
-      <li><strong>Mix in progress</strong> — a spinner with a live phase label showing the current stage</li>
       <li><strong>Nothing selected</strong> — a prompt to select a file</li>
     </ul>
     <p>A toggle button in the top-right corner switches between the waveform view and the <strong>Console</strong>, a scrollable log showing what WaxOn is doing during processing. A Verbose checkbox reveals additional detail such as filter parameters and per-file loudnorm measurements.</p>
@@ -475,7 +473,7 @@
       <li>Click <strong>WaxOn</strong> in the toolbar (or choose it from the mode picker)</li>
       <li>Select a preset from the Preset menu in the toolbar, or configure settings manually in the Settings sidebar</li>
       <li>Drag your audio files onto the window</li>
-      <li>Click <strong>Process</strong>, or select 2+ files and click <strong>Mix</strong> to combine them</li>
+      <li>Click <strong>Process</strong></li>
     </ol>
   </section>
 
@@ -520,29 +518,12 @@
           <td>Mono L</td>
           <td>44.1 kHz</td>
         </tr>
-        <tr>
-          <td>Mix 2 Channel</td>
-          <td>20 Hz (DC Block)</td>
-          <td>On</td>
-          <td>−24 LUFS</td>
-          <td>Stereo</td>
-          <td>44.1 kHz</td>
-        </tr>
-        <tr>
-          <td>Mix Mono</td>
-          <td>20 Hz (DC Block)</td>
-          <td>On</td>
-          <td>−24 LUFS</td>
-          <td>Mono L</td>
-          <td>44.1 kHz</td>
-        </tr>
       </tbody>
     </table>
 
     <p><strong>Defaults</strong> resets all WaxOn settings to factory values. A quick way to start fresh.</p>
     <p><strong>Edit Prep</strong> is optimized for single-mic podcast recordings destined for DAW editing. −30 LUFS leaves generous headroom for editing and processing.</p>
     <p><strong>Edit Prep EBU</strong> targets the EBU R128 dialogue reference level of −23 LUFS. Tracks feel natural at calibrated monitor levels and still leave headroom before typical delivery targets.</p>
-    <p><strong>Mix 2 Channel</strong> and <strong>Mix Mono</strong> are both configured for multi-track blending: DC Block removes only infrasonic content and DC offset (not voice frequencies), and loudness normalization ensures all files arrive at the mix at equal perceived loudness. Use 2 Channel when you want a stereo blend; use Mono when the output is a single podcast track destined for per-track DAW editing.</p>
 
     <h3>Custom Presets</h3>
     <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets from the same menu.</p>
@@ -639,37 +620,8 @@
       </li>
     </ol>
 
-    <h3>Mix Pipeline</h3>
-    <p>When Loudness Norm is on, Mix adds two stages before the chain above. When off, only the amix stage is added.</p>
-    <ul>
-      <li><strong>Per-file leveling <span class="tag">Loudnorm only</span></strong> — each input is individually normalized to the target LUFS using a two-pass EBU R128 analysis and linear gain. All files arrive at the mix at equal perceived loudness, regardless of how they were recorded.</li>
-      <li><strong>amix</strong> — FFmpeg's <code>amix</code> blends the files. When Loudness Norm is on, <code>normalize=0</code> is used (files are already level-matched and the final loudnorm pass corrects the summing gain increase). When off, <code>normalize=1</code> scales by 1/N to prevent level buildup. The combined signal then runs through all stages identically to a single-file job.</li>
-    </ul>
-    <p>The waveform panel shows a live phase indicator during a mix: <em>Leveling file 1 of N… → … → Mixing N files… → Filtering… → Analyzing loudness… → Normalizing… → Limiting…</em></p>
-
     <h3>Output Format</h3>
     <p>All WaxOn outputs are <strong>24-bit WAV</strong>, regardless of input format. Lossless, uncompressed, and compatible with every DAW.</p>
-  </section>
-
-  <section id="waxon-mix">
-    <h2>Mix Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>Mix combines two or more audio files into a single processed output. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing, ensuring a balanced blend regardless of source levels. The full WaxOn pipeline then runs on the combined signal.</p>
-
-    <h3>Two Common Workflows</h3>
-    <p><strong>Mix raw recordings in one step.</strong> Drag two unprocessed tracks (e.g. host and guest recorded separately) into WaxOn, select both, and click Mix. The high-pass filter cleans up low-frequency buildup from the individual recordings before they are blended. Use the default High Pass setting (80 Hz) or adjust to taste.</p>
-    <p><strong>Mix pre-cleaned files.</strong> If you have already processed your individual tracks through WaxOn (or cleaned them in a DAW), you can mix the outputs directly. In this case the high-pass filter has already done its work. Set High Pass to <strong>DC Block</strong> (20 Hz) in Settings; it will remove only DC offset and infrasonic content without touching the voice range.</p>
-
-    <h3>How to Mix</h3>
-    <ol>
-      <li>Load your files and select two or more in the file list (<kbd>⌘-click</kbd> to multi-select)</li>
-      <li>Click <strong>Mix</strong></li>
-      <li>Watch the waveform panel for live progress</li>
-      <li>When complete, the mixed file appears in the list as a processed item</li>
-    </ol>
-
-    <div class="callout">
-      <strong>Note:</strong> Mix runs a single job and cannot run concurrently with Process. The Mix button is disabled while processing is in progress.
-    </div>
   </section>
 
   <section id="waxon-output">
@@ -678,10 +630,6 @@
     <h3>Individual Files</h3>
     <pre><code>{original-name}-{rate}waxon-{limit}.wav</code></pre>
     <p>Examples: <code>episode-01-44kwaxon-1dB.wav</code> &nbsp; <code>guest-48kwaxon-1dB.wav</code></p>
-
-    <h3>Mix Output</h3>
-    <pre><code>mix-{rate}waxon-{limit}.wav</code></pre>
-    <p>Example: <code>mix-44kwaxon-1dB.wav</code></p>
 
     <h3>Location</h3>
     <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code>. Existing files with the same name are overwritten.</p>
@@ -908,8 +856,7 @@
     <h3>The Full Podcast Workflow</h3>
     <ol>
       <li>Record host and guest on separate tracks</li>
-      <li>Drop both files into <strong>WaxOn</strong></li>
-      <li>Select both and click <strong>Mix</strong> to produce a single blended track, or process them separately and combine in your DAW</li>
+      <li>Drop both files into <strong>WaxOn</strong> and click <strong>Process</strong></li>
       <li>Edit in your DAW: remove noise, add music, cut and arrange</li>
       <li>Export your finished mix from the DAW</li>
       <li>Drop the export into <strong>WaxOff</strong> and click Process</li>
@@ -929,7 +876,7 @@
     <p>−18 LUFS is the standard for most podcast platforms. −16 LUFS gives a louder result but is still within typical platform limits. Going higher than −14 LUFS risks clipping or rejection by some platforms. When in doubt, use the Podcast Standard preset.</p>
 
     <h3>WaxOn: Mono vs. Stereo for Podcasts</h3>
-    <p>Most podcast editing workflows prefer mono tracks per speaker, which are easier to pan, balance, and process individually. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface captures both mics on a single stereo file, use Mix to blend them before editing.</p>
+    <p>Most podcast editing workflows prefer mono tracks per speaker, which are easier to pan, balance, and process individually. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface captures both mics on a single stereo file, set Output to Stereo and process before bringing into your DAW.</p>
 
     <h3>WaxOff: Phase Rotation</h3>
     <p>Leave Phase Rotation on unless you have a specific reason to turn it off. The 150 Hz allpass filter reduces the crest factor of bass-heavy material, giving the loudness normalizer and limiter more headroom. The effect on audio character is inaudible.</p>

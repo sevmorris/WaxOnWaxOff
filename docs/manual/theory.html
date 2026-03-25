@@ -319,7 +319,6 @@
   <a href="#two-pass">Two-Pass Normalization</a>
   <a href="#true-peak">True Peak &amp; Oversampling</a>
   <a href="#phase-rotation">Phase Rotation</a>
-  <a href="#mix-summing">Mix Summing</a>
   <a href="#dithering">Dithering</a>
   <a href="#rnnoise">RNNoise</a>
   <a class="sub" href="#rnnoise-stereo">Stereo Handling</a>
@@ -376,17 +375,6 @@
     </div>
     <p style="font-size:0.85rem;color:var(--text-muted);">Phase rotation and MP3 encode are optional. Output: 24-bit WAV and/or MP3.</p>
 
-    <h3>WaxOn Mix</h3>
-    <p>Additional stages run before the standard WaxOn chain. Per-file leveling only applies when Loudness Norm is enabled.</p>
-    <div class="chain">
-      <div class="chain-row">
-        <div class="chain-node optional">Per-file Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass, per input</span></div>
-        <div class="chain-arrow">→</div>
-        <div class="chain-node">amix<br><span style="font-size:0.75rem;font-weight:400;">normalize=0 (or 1)</span></div>
-        <div class="chain-arrow">→</div>
-        <div class="chain-node" style="color:var(--text-muted);border-style:dashed;font-style:italic;">WaxOn chain above</div>
-      </div>
-    </div>
   </section>
 
   <!-- EBU R128 -->
@@ -597,33 +585,6 @@
     <p>On typical podcast recordings with moderate proximity effect, allpass phase rotation at 200 Hz reduces crest factor by 1–4 dB. A 3 dB crest factor reduction means the limiter needs to apply 3 dB less gain reduction to stay below the same ceiling at the same loudness target. That translates directly to less audible limiting artifacts. On clean, well-recorded speech with minimal bass buildup, the crest factor reduction is smaller (0.5–1 dB), but the allpass has no downside: it costs nothing in audio quality and can only help.</p>
   </section>
 
-  <!-- Mix Summing -->
-  <section id="mix-summing">
-    <h2>Mix Summing</h2>
-
-    <p>When two or more audio signals are summed, the combined level increases. By how much depends on the correlation between the signals:</p>
-    <ul>
-      <li><strong>Perfectly correlated</strong> (identical content, e.g. duplicate tracks): +20·log₁₀(N) dB</li>
-      <li><strong>Uncorrelated</strong> (independent noise sources): +10·log₁₀(N) dB</li>
-      <li><strong>Typical podcast speakers</strong> (largely uncorrelated, some shared room): approximately +10·log₁₀(N) dB</li>
-    </ul>
-    <div class="formula">
-      2 tracks → ~+3 dB &nbsp;&nbsp; 4 tracks → ~+6 dB &nbsp;&nbsp; 8 tracks → ~+9 dB
-    </div>
-
-    <h3>Without Loudness Normalization</h3>
-    <p>When Loudness Norm is off, WaxOn's Mix stage uses FFmpeg's <code>amix</code> with <code>normalize=1</code>, which scales each input by 1/N before summing. This keeps the output level consistent with the individual inputs regardless of how many files are combined. The downstream filter and limiter chain receives appropriately leveled material and behaves predictably.</p>
-
-    <h3>With Loudness Normalization</h3>
-    <p>When Loudness Norm is on, WaxOn takes a more rigorous approach. Each input file is individually normalized to the configured LUFS target before mixing: a full two-pass EBU R128 analysis and linear gain applied per file. This addresses a fundamental limitation of <code>normalize=1</code>: simple 1/N scaling keeps levels consistent in absolute terms, but it does not account for files recorded at different levels. A quiet guest recording and a loud host recording, both scaled by 1/2 before mixing, still arrive at the mix at different perceived loudnesses.</p>
-    <p>With per-file pre-normalization, all inputs arrive at the mix at equal perceived loudness before they are blended. The <code>amix</code> call then uses <code>normalize=0</code>: files are already level-matched, so 1/N scaling would only dilute a well-calibrated blend. The summing process will increase the level (~+3 dB for two uncorrelated sources), but the final loudnorm pass on the combined output corrects it back to the configured target.</p>
-
-    <div class="callout">
-      <strong>Why not pre-normalize when Loudnorm is off?</strong>
-      Pre-normalization requires two additional FFmpeg passes per file (analysis + normalization). When Loudness Norm is disabled, the user has opted out of level processing. In that case the original <code>normalize=1</code> behavior is preserved: simple 1/N scaling keeps the mix level predictable without touching individual file dynamics.
-    </div>
-  </section>
-
   <!-- Dithering -->
   <section id="dithering">
     <h2>Quantization, Dithering, and Why It Doesn't Apply Here</h2>
@@ -774,8 +735,6 @@
     <p>NR-for-measurement activates in three places:</p>
     <ul>
       <li><strong>Single-file processing</strong>: the loudnorm analysis pass runs on a temporary NR'd copy</li>
-      <li><strong>Mix pre-normalization</strong>: each input file's per-file loudnorm analysis uses a temporary NR'd copy</li>
-      <li><strong>Mix post-normalization</strong>: the loudnorm analysis on the combined mix output uses a temporary NR'd copy</li>
     </ul>
     <p>When Noise Reduction is already enabled, the audio reaching the loudnorm stage has already been noise-reduced. In that case, the NR-for-measurement step is unnecessary and does not run.</p>
     <p>For stereo output, the NR-for-measurement paths use the same <a href="#rnnoise">per-channel split</a> as the main NR stage: stereo is split into independent mono channels, each denoised separately, then rejoined before the loudnorm analysis. This ensures consistent, balanced noise removal for accurate measurement regardless of channel layout.</p>
@@ -797,9 +756,6 @@
       <li><strong>Phase rotation before normalization</strong>: Reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
       <li><strong>Limiter last</strong>: After any loudness normalization, with oversampling to catch true peaks.</li>
     </ol>
-
-    <h3>Mix Stage Order</h3>
-    <p>The Mix pipeline extends this logic with a pre-mix leveling step. When Loudness Norm is on, each input file is normalized to the target LUFS before the amix stage, so all sources arrive at the mix at equal perceived loudness. Using <code>normalize=0</code> after pre-normalization lets the summing level increase accumulate naturally; the final loudnorm pass on the combined output then corrects the level to target, the same way it would for a single-file job. The result is a mix that is balanced by loudness measurement, not by accident of recording level.</p>
 
     <h3>LRA=20 in WaxOn Loudnorm</h3>
     <p>WaxOn's loudnorm hardcodes <code>LRA=20</code>. The LRA parameter tells the loudnorm filter how aggressively to constrain the dynamic range; lower values apply more dynamic compression. At LRA=20, the filter applies essentially no dynamic processing. It acts as a pure linear gain offset.</p>
@@ -941,14 +897,6 @@
         <tr>
           <td>Pre-encode −2 dBTP limiter (WaxOff MP3)</td>
           <td>Loudnorm TP is a soft target; MP3 encoding adds further inter-sample peaks; −2 dBTP provides 1 dB headroom for decoded files to land at or below −1.0 dBTP</td>
-        </tr>
-        <tr>
-          <td>Per-file pre-normalization (Mix + Loudnorm)</td>
-          <td>All inputs arrive at the mix at equal perceived loudness; <code>normalize=0</code> lets the mix sum naturally, with the final loudnorm correcting the output level to target</td>
-        </tr>
-        <tr>
-          <td>amix normalize=1 (Mix, Loudnorm off)</td>
-          <td>When Loudnorm is off, 1/N scaling prevents level from increasing with file count; downstream chain receives consistent levels regardless of how many files are mixed</td>
         </tr>
         <tr>
           <td>MP3 derived from WAV output</td>
