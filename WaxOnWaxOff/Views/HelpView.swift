@@ -37,14 +37,15 @@ struct HelpView: View {
                     ])
                 }
                 section("WaxOn — Output Naming") {
-                    code("{original-name}-{samplerate}waxon-{limit}dB.wav")
-                    text("Example: interview-44kwaxon-1dB.wav")
+                    code("{original-name}-{samplerate}{ds-}waxon-{limit}dB.wav")
+                    text("Examples: interview-44kwaxon-1dB.wav / interview-44kds-waxon-1dB.wav")
                 }
                 section("WaxOn — Processing Pipeline") {
                     numberedList([
                         "High-pass filter at the chosen cutoff (default 80 Hz) — removes rumble, HVAC hum, and handling noise.",
                         "Channel selection (mono mode only) — extracts the left or right channel.",
                         "Resampling to the target sample rate.",
+                        "De-esser (if enabled) — gentle sibilance reduction at 7.5 kHz.",
                         "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain. No dynamic compression; dynamics are fully preserved.",
                         "Brick-wall limiting — 2× oversampled true peak control at the chosen ceiling."
                     ])
@@ -56,6 +57,8 @@ struct HelpView: View {
                     definition("Channel", "Left or Right — which channel to extract in Mono mode.")
                     definition("Ceiling", "Brick-wall limiter ceiling: −3, −2, or −1 dB. Controls the maximum true peak of the output.")
                     definition("High Pass", "High-pass filter cutoff frequency. Default 80 Hz, range 40–90 Hz.")
+                    definition("Noise Reduction", "Enables RNNoise neural network noise reduction (arnndn). Check output before editing — artifacts are possible on heavy noise.")
+                    definition("De-esser", "Enables gentle sibilance reduction (adeesser, 7.5 kHz, intensity 0.3). Reduces harshness on voiced content.")
                     definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and limiting are applied.")
                     definition("Target", "Integrated loudness target when Loudness Norm is on. Default −30 LUFS, range −35 to −16 LUFS. Lower values leave more headroom for editing.")
                     definition("Output Dir", "Where processed files are saved. Defaults to the same folder as the source.")
