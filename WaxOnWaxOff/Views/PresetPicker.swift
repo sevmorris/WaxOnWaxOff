@@ -9,7 +9,7 @@ struct WaxOffPresetPicker: View {
         HStack(spacing: 8) {
             Menu {
                 Section("Built-in Presets") {
-                    ForEach(Preset.builtIn) { preset in
+                    ForEach(WaxOffPreset.builtIn) { preset in
                         Button(preset.name) {
                             viewModel.applyPreset(preset)
                         }

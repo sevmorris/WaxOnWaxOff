@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-struct Preset: Identifiable, Codable, Equatable {
+struct WaxOffPreset: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
     var settings: WaxOffSettings
@@ -12,8 +12,8 @@ struct Preset: Identifiable, Codable, Equatable {
         self.settings = settings
     }
 
-    static let builtIn: [Preset] = [
-        Preset(
+    static let builtIn: [WaxOffPreset] = [
+        WaxOffPreset(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
             name: "Podcast Standard",
             settings: WaxOffSettings(
@@ -26,7 +26,7 @@ struct Preset: Identifiable, Codable, Equatable {
                 phaseRotationEnabled: true
             )
         ),
-        Preset(
+        WaxOffPreset(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
             name: "Podcast Loud",
             settings: WaxOffSettings(
@@ -39,7 +39,7 @@ struct Preset: Identifiable, Codable, Equatable {
                 phaseRotationEnabled: true
             )
         ),
-        Preset(
+        WaxOffPreset(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
             name: "WAV Only (Mastering)",
             settings: WaxOffSettings(
@@ -56,8 +56,8 @@ struct Preset: Identifiable, Codable, Equatable {
 }
 
 @Observable
-final class PresetStore {
-    var presets: [Preset] = []
+final class WaxOffPresetStore {
+    var presets: [WaxOffPreset] = []
     var selectedPresetID: UUID?
 
     private let userDefaultsKey = "WaxOffUserPresets"
@@ -66,22 +66,22 @@ final class PresetStore {
         loadPresets()
     }
 
-    var allPresets: [Preset] {
-        Preset.builtIn + presets
+    var allPresets: [WaxOffPreset] {
+        WaxOffPreset.builtIn + presets
     }
 
-    var selectedPreset: Preset? {
+    var selectedPreset: WaxOffPreset? {
         guard let id = selectedPresetID else { return nil }
         return allPresets.first { $0.id == id }
     }
 
     func savePreset(name: String, settings: WaxOffSettings) {
-        let preset = Preset(name: name, settings: settings)
+        let preset = WaxOffPreset(name: name, settings: settings)
         presets.append(preset)
         saveToUserDefaults()
     }
 
-    func deletePreset(_ preset: Preset) {
+    func deletePreset(_ preset: WaxOffPreset) {
         presets.removeAll { $0.id == preset.id }
         if selectedPresetID == preset.id {
             selectedPresetID = nil
@@ -89,13 +89,13 @@ final class PresetStore {
         saveToUserDefaults()
     }
 
-    func isBuiltIn(_ preset: Preset) -> Bool {
-        Preset.builtIn.contains { $0.id == preset.id }
+    func isBuiltIn(_ preset: WaxOffPreset) -> Bool {
+        WaxOffPreset.builtIn.contains { $0.id == preset.id }
     }
 
     private func loadPresets() {
         guard let data = UserDefaults.standard.data(forKey: userDefaultsKey) else { return }
-        presets = (try? JSONDecoder().decode([Preset].self, from: data)) ?? []
+        presets = (try? JSONDecoder().decode([WaxOffPreset].self, from: data)) ?? []
     }
 
     private func saveToUserDefaults() {
