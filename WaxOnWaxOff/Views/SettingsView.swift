@@ -76,6 +76,15 @@ struct SettingsView: View {
                     }
                 }
 
+                row("De-esser") {
+                    HStack(spacing: 8) {
+                        Toggle("", isOn: $viewModel.settings.deEsserEnabled)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        Text("Gentle (7.5 kHz)")
+                    }
+                }
+
                 row("Loudness Norm") {
                     Toggle("", isOn: $viewModel.settings.loudnormEnabled)
                         .toggleStyle(.switch)

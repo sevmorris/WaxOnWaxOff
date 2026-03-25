@@ -215,6 +215,22 @@ actor AudioProcessor {
         }
         try Task.checkCancellation()
 
+        // Step 2.5: De-esser (optional)
+        let mixPostDsURL: URL
+        if settings.deEsserEnabled {
+            let dsMixURL = work.appendingPathComponent("mix_ds.wav")
+            onLog?("  de-esser: adeesser 7.5 kHz", .verbose)
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", midURL.path, "-af", "adeesser=i=0.3:m=o:f=7500:s=p",
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dsMixURL.path
+            ])
+            mixPostDsURL = dsMixURL
+            try Task.checkCancellation()
+        } else {
+            mixPostDsURL = midURL
+        }
+
         // Step 3: Optional EBU R128 two-pass loudnorm on the mix
         let limiterInput: URL
         if settings.loudnormEnabled {
@@ -237,19 +253,19 @@ actor AudioProcessor {
                     ].joined(separator: ";")
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path, "-filter_complex", nrFc,
+                        "-i", mixPostDsURL.path, "-filter_complex", nrFc,
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrMixTemp.path
                     ])
                 } else {
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-i", mixPostDsURL.path, "-af", "arnndn=m=\(modelURL.path)",
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrMixTemp.path
                     ])
                 }
                 mixAnalysisInput = nrMixTemp
             } else {
-                mixAnalysisInput = midURL
+                mixAnalysisInput = mixPostDsURL
             }
 
             onLog?("  loudnorm: analyzing mix…", .verbose)
@@ -271,13 +287,13 @@ actor AudioProcessor {
 
             try await runFFmpeg(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", midURL.path, "-af", normAf,
+                "-i", mixPostDsURL.path, "-af", normAf,
                 "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
             ])
 
             limiterInput = normURL
         } else {
-            limiterInput = midURL
+            limiterInput = mixPostDsURL
         }
         try Task.checkCancellation()
 
@@ -330,7 +346,8 @@ actor AudioProcessor {
         let limitAmp = pow(10.0, settings.limitDb / 20.0)
         let limitTag = formatDbTag(settings.limitDb)
         let outDir = bestOutputDir(for: input)
-        let outName = "\(stem)-\(rateTag)waxon-\(limitTag).wav"
+        let dsTag = settings.deEsserEnabled ? "ds-" : ""
+        let outName = "\(stem)-\(rateTag)\(dsTag)waxon-\(limitTag).wav"
         let finalURL = outDir.appendingPathComponent(outName)
         let tmpURL = outDir.appendingPathComponent(".\(outName).tmp")
 
@@ -392,6 +409,22 @@ actor AudioProcessor {
 
         try Task.checkCancellation()
 
+        // De-esser (optional)
+        let postDsURL: URL
+        if settings.deEsserEnabled {
+            let dsURL = work.appendingPathComponent("\(stem)_ds.wav")
+            onLog?("  de-esser: adeesser 7.5 kHz", .verbose)
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", midURL.path, "-af", "adeesser=i=0.3:m=o:f=7500:s=p",
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dsURL.path
+            ])
+            postDsURL = dsURL
+            try Task.checkCancellation()
+        } else {
+            postDsURL = midURL
+        }
+
         // Loudness normalization (optional, two-pass EBU R128)
         let limiterInput: URL
         if settings.loudnormEnabled {
@@ -415,19 +448,19 @@ actor AudioProcessor {
                     ].joined(separator: ";")
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path, "-filter_complex", nrFc,
+                        "-i", postDsURL.path, "-filter_complex", nrFc,
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 } else {
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-i", postDsURL.path, "-af", "arnndn=m=\(modelURL.path)",
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 }
                 analysisInput = nrTempURL
             } else {
-                analysisInput = midURL
+                analysisInput = postDsURL
             }
 
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
@@ -448,13 +481,13 @@ actor AudioProcessor {
 
             try await runFFmpeg(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", midURL.path, "-af", normAf,
+                "-i", postDsURL.path, "-af", normAf,
                 "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
             ])
 
             limiterInput = normURL
         } else {
-            limiterInput = midURL
+            limiterInput = postDsURL
         }
 
         try Task.checkCancellation()
