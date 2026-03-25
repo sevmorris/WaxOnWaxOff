@@ -98,13 +98,6 @@ struct ContentView: View {
             }
 
             Button {
-                viewModel.mixSelected()
-            } label: {
-                Label("Mix", systemImage: "waveform.badge.plus")
-            }
-            .disabled(viewModel.selectedFileIDs.count < 2 || viewModel.isProcessing)
-
-            Button {
                 viewModel.removeSelected()
             } label: {
                 Label("Remove", systemImage: "minus.circle")
@@ -166,14 +159,6 @@ struct ContentView: View {
                     FileInfoStatsView(file: file)
                 }
                 .padding()
-            } else if let phase = viewModel.mixPhase {
-                VStack(spacing: 10) {
-                    ProgressView().scaleEffect(1.2)
-                    Text(phase)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack {
                     Image(systemName: "waveform")

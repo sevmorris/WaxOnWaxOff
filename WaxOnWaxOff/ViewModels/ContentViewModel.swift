@@ -11,7 +11,6 @@ final class ContentViewModel {
         didSet { settings.save() }
     }
     var isProcessing = false
-    var mixPhase: String? = nil
     var alertMessage: String?
     var presetStore = WaxOnPresetStore()
     var log = ProcessingLog()
@@ -148,7 +147,6 @@ final class ContentViewModel {
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
-        mixPhase = nil
         for i in files.indices {
             if case .processing = files[i].status {
                 if let stats = files[i].analysisStats {
@@ -157,41 +155,6 @@ final class ContentViewModel {
                     files[i].status = .pending
                 }
             }
-        }
-    }
-
-    func mixSelected() {
-        guard selectedFileIDs.count >= 2 else { return }
-        let selectedURLs = files.filter { selectedFileIDs.contains($0.id) }.map { $0.url }
-        isProcessing = true
-        log.clear()
-        processingTask = Task {
-            do {
-                let processor = AudioProcessor(settings: settings,
-                    onLog: { [weak self] message, level in
-                        Task { @MainActor [weak self] in
-                            self?.log.append(message, level: level)
-                        }
-                    })
-                let result = try await processor.mixAndProcess(inputs: selectedURLs) { [weak self] phase in
-                    Task { @MainActor [weak self] in
-                        self?.mixPhase = phase
-                    }
-                }
-                let newItem = FileItem(url: result.output)
-                files.append(newItem)
-                if let idx = files.firstIndex(where: { $0.id == newItem.id }) {
-                    files[idx].status = .processed(outputURL: result.output)
-                }
-                generateOutputWaveform(id: newItem.id, url: result.output)
-                await NotificationService.showCompletionNotification(fileCount: 1)
-            } catch is CancellationError {
-            } catch {
-                alertMessage = error.localizedDescription
-            }
-            isProcessing = false
-            mixPhase = nil
-            processingTask = nil
         }
     }
 
