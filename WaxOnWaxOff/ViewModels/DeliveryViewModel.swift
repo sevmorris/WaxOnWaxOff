@@ -13,7 +13,7 @@ final class DeliveryViewModel {
     var isProcessing = false
     var deliveryPhase: String? = nil
     var alertMessage: String?
-    var presetStore = PresetStore()
+    var presetStore = WaxOffPresetStore()
 
     private var processingTask: Task<Void, Never>?
 
@@ -142,7 +142,7 @@ final class DeliveryViewModel {
 
     // MARK: - Presets
 
-    func applyPreset(_ preset: Preset) {
+    func applyPreset(_ preset: WaxOffPreset) {
         settings = preset.settings
         presetStore.selectedPresetID = preset.id
     }
