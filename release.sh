@@ -29,6 +29,7 @@ STAGING="/tmp/waxon_dmg_${VERSION}"
 DMG="/tmp/WaxOnWaxOff-${TAG}.dmg"
 MOUNT="/tmp/waxon_verify_${VERSION}"
 MANUAL="$PROJECT_DIR/docs/index.html"
+MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step()  { echo "\n▶ $*"; }
@@ -128,10 +129,11 @@ ok "DMG contains $DMG_VERSION"
 
 # ── Update manual download link and version badge ─────────────────────────────
 step "Updating manual download link"
-sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\">Download v[0-9][0-9.]*|WaxOnWaxOff-${TAG}.dmg\">Download ${TAG}|g" "$MANUAL"
-sed -i '' "s|Manual — v[0-9][0-9.]*|Manual — ${TAG}|g" "$MANUAL"
+sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\">Download v[0-9][0-9.]*|WaxOnWaxOff-${TAG}.dmg\">Download ${TAG}|g" "$MANUAL" "$MANUAL_IDX"
+sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\" class=\"nav-cta\">Download|WaxOnWaxOff-${TAG}.dmg\" class=\"nav-cta\">Download|g" "$MANUAL"
+sed -i '' "s|Manual — v[0-9][0-9.]*|Manual — ${TAG}|g" "$MANUAL_IDX"
 sed -i '' "s|\[Download v[0-9][0-9.]* (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v[0-9][0-9.]*.dmg)|\[Download ${TAG} (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-${TAG}.dmg)|g" README.md
-git add "$MANUAL" README.md
+git add "$MANUAL" "$MANUAL_IDX" README.md
 git commit -m "docs: update download link to ${TAG}"
 ok "Manual points to ${TAG}"
 
