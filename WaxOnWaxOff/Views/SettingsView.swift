@@ -85,6 +85,8 @@ struct SettingsView: View {
                     }
                 }
 
+                Divider().padding(.vertical, 6)
+
                 row("Loudness Norm") {
                     Toggle("", isOn: $viewModel.settings.loudnormEnabled)
                         .toggleStyle(.switch)
