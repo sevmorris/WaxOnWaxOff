@@ -7,7 +7,7 @@ struct EmptyStateView: View {
         VStack(spacing: 12) {
             Image(mode == .waxOn ? "WaxOnIcon" : "WaxOffIcon")
                 .resizable()
-                .frame(width: 200, height: 200)
+                .frame(width: 160, height: 160)
 
             Text("Drag and drop audio files here to get started.")
                 .font(.body)
