@@ -4,7 +4,7 @@ import AVFoundation
 enum AudioAnalyzer {
     static func info(url: URL) async throws -> FileInfo {
         try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let info = try gatherInfo(url: url)
                     continuation.resume(returning: info)
@@ -41,7 +41,7 @@ enum AudioAnalyzer {
 
     static func analyze(url: URL) async throws -> AudioStats {
         try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let stats = try performAnalysis(url: url)
                     continuation.resume(returning: stats)
@@ -120,6 +120,7 @@ enum AudioAnalyzer {
                 var monoSample: Float = 0
                 for ch in 0..<channels {
                     let x = Double(channelData[ch][frame])
+                    peak = max(peak, abs(x))
 
                     // Stage 1: pre-filter (biquad, transposed direct form II)
                     let y1 = kw.pre_b0 * x + preW1[ch]
@@ -155,10 +156,6 @@ enum AudioAnalyzer {
                     blockChannelSumSq = [Double](repeating: 0, count: channels)
                     blockMonoSumSq = 0
                     blockCurrentFrames = 0
-                }
-
-                for ch in 0..<channels {
-                    peak = max(peak, abs(Double(channelData[ch][frame])))
                 }
             }
             totalFrames += frames
