@@ -777,6 +777,9 @@
   <section id="waxoff-design">
     <h2>WaxOff Design Rationale <span class="mode-badge mode-waxoff">WaxOff</span></h2>
 
+    <h3>Always Stereo Output</h3>
+    <p>WaxOff always outputs 2-channel stereo regardless of the input channel count. If the source is mono, FFmpeg upmixes it to dual-mono — identical left and right channels. This is correct behavior for podcast delivery: most platforms and players expect stereo files, some handle mono inconsistently, and the file size difference is negligible at typical podcast bitrates. A dual-mono stereo file sounds completely natural — the content is centered as expected, with no audible difference from a true stereo file for voice content.</p>
+
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
 
