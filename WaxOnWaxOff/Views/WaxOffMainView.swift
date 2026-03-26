@@ -126,7 +126,7 @@ struct WaxOffMainView: View {
     @ViewBuilder
     private var fileListSection: some View {
         if viewModel.files.isEmpty {
-            EmptyStateView()
+            EmptyStateView(mode: .waxOff)
         } else {
             DeliveryFileListView(viewModel: viewModel)
         }

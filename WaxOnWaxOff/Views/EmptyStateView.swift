@@ -1,11 +1,13 @@
 import SwiftUI
 
 struct EmptyStateView: View {
+    let mode: AppMode
+
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "waveform.path")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
+            Image(mode == .waxOn ? "WaxOnIcon" : "WaxOffIcon")
+                .resizable()
+                .frame(width: 200, height: 200)
 
             Text("Drag and drop audio files here to get started.")
                 .font(.body)
@@ -23,5 +25,5 @@ struct EmptyStateView: View {
 }
 
 #Preview {
-    EmptyStateView()
+    EmptyStateView(mode: .waxOn)
 }
