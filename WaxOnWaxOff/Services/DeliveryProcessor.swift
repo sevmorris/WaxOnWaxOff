@@ -171,6 +171,7 @@ actor DeliveryProcessor {
             "-i", input.path,
             "-af", filterChain,
             "-ar", String(settings.sampleRate),
+            "-ac", "2",
             "-c:a", "pcm_s24le",
             "-f", "wav",
             output.path
@@ -207,6 +208,7 @@ actor DeliveryProcessor {
             "-c:a", "libmp3lame",
             "-b:a", "\(settings.mp3Bitrate)k",
             "-ar", String(mp3SampleRate),
+            "-ac", "2",
             "-f", "mp3",
             output.path
         ]

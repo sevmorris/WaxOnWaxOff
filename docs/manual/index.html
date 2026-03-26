@@ -766,7 +766,7 @@
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. This applies a single precise linear gain: no limiting, no dynamic processing, no change to stereo image or transients. Output: 24-bit WAV at the target sample rate.</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. This applies a single precise linear gain: no limiting, no dynamic processing, no change to stereo image or transients. Output is always stereo (2-channel) — mono sources are upmixed to dual-mono. Output: 24-bit WAV at the target sample rate.</span>
         </div>
       </li>
       <li>
@@ -790,6 +790,9 @@
     <pre><code>{original-name}-lev-{target}LUFS.wav
 {original-name}-lev-{target}LUFS.mp3</code></pre>
     <p>Examples: <code>episode-42-final-lev--18LUFS.wav</code> &nbsp; <code>episode-42-final-lev--18LUFS.mp3</code></p>
+
+    <h3>Channels</h3>
+    <p>WaxOff always outputs stereo (2-channel). If the source is mono, FFmpeg upmixes it to dual-mono — identical left and right channels, centered as expected. There is no channel setting in WaxOff.</p>
 
     <h3>Location</h3>
     <p>Output files are written alongside the source by default, or to your configured output directory. Existing files with the same name are overwritten.</p>
