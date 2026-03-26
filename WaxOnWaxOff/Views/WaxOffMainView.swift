@@ -171,21 +171,6 @@ struct WaxOffMainView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .background {
-                if let url = Bundle.main.url(forResource: "WaxOff_bg", withExtension: "png"),
-                   let nsImage = NSImage(contentsOf: url) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: nsImage.size.width * 0.1875,
-                               height: nsImage.size.height * 0.1875)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity,
-                               alignment: .bottomTrailing)
-                        .padding(.bottom, 10)
-                        .padding(.trailing, 24)
-                        .padding([.top, .leading], 12)
-                }
-            }
         }
     }
 
