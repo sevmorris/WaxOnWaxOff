@@ -23,12 +23,17 @@ struct WaxOffSettingsView: View {
                 }
 
                 row("Output") {
-                    Picker("", selection: $viewModel.settings.outputMode) {
-                        Text("WAV").tag(OutputMode.wav)
-                        Text("MP3").tag(OutputMode.mp3)
-                        Text("Both").tag(OutputMode.both)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker("", selection: $viewModel.settings.outputMode) {
+                            Text("WAV").tag(OutputMode.wav)
+                            Text("MP3").tag(OutputMode.mp3)
+                            Text("Both").tag(OutputMode.both)
+                        }
+                        .pickerStyle(.segmented)
+                        Text("Always stereo — mono sources upmixed to dual-mono")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
-                    .pickerStyle(.segmented)
                 }
 
                 row("MP3 Bitrate") {
