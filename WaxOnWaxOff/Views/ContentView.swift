@@ -130,7 +130,7 @@ struct ContentView: View {
     @ViewBuilder
     private var fileListSection: some View {
         if viewModel.files.isEmpty {
-            EmptyStateView()
+            EmptyStateView(mode: appState.mode ?? .waxOn)
         } else {
             FileListView(viewModel: viewModel)
         }
