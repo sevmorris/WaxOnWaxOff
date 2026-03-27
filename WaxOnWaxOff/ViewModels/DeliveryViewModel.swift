@@ -18,7 +18,7 @@ final class DeliveryViewModel {
     private var processingTask: Task<Void, Never>?
 
     private static let validExtensions: Set<String> = [
-        "wav", "aif", "aiff", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
+        "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
         "mp4", "mov"
     ]
 

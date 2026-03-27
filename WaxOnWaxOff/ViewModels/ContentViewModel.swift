@@ -17,7 +17,7 @@ final class ContentViewModel {
     private var processingTask: Task<Void, Never>?
 
     private static let validExtensions: Set<String> = [
-        "wav", "aif", "aiff", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
+        "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
         "mp4", "mov"
     ]
 
@@ -31,7 +31,7 @@ final class ContentViewModel {
         let rejected = audioURLs.count - valid.count
 
         if rejected > 0 {
-            alertMessage = "\(rejected) file\(rejected == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, mp3, flac, m4a, ogg, opus, caf, wma, aac, mp4, mov."
+            alertMessage = "\(rejected) file\(rejected == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, ogg, opus, caf, wma, aac, mp4, mov."
         }
 
         let newFiles = valid.map { FileItem(url: $0) }

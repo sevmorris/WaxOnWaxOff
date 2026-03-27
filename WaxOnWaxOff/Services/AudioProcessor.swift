@@ -154,6 +154,22 @@ actor AudioProcessor {
             postDsURL = midURL
         }
 
+        // Level riding (optional, dynaudnorm downward-only)
+        let postLevelURL: URL
+        if settings.levelRidingEnabled {
+            let levelURL = work.appendingPathComponent("\(stem)_leveled.wav")
+            onLog?("  level riding: dynaudnorm (downward only, no boost)", .verbose)
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", postDsURL.path, "-af", "dynaudnorm=p=0.95:m=1.0:g=31",
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, levelURL.path
+            ])
+            postLevelURL = levelURL
+            try Task.checkCancellation()
+        } else {
+            postLevelURL = postDsURL
+        }
+
         // Loudness normalization (optional, two-pass EBU R128)
         let limiterInput: URL
         if settings.loudnormEnabled {
@@ -177,19 +193,19 @@ actor AudioProcessor {
                     ].joined(separator: ";")
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postDsURL.path, "-filter_complex", nrFc,
+                        "-i", postLevelURL.path, "-filter_complex", nrFc,
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 } else {
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postDsURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-i", postLevelURL.path, "-af", "arnndn=m=\(modelURL.path)",
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 }
                 analysisInput = nrTempURL
             } else {
-                analysisInput = postDsURL
+                analysisInput = postLevelURL
             }
 
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
@@ -210,13 +226,13 @@ actor AudioProcessor {
 
             try await runFFmpeg(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", postDsURL.path, "-af", normAf,
+                "-i", postLevelURL.path, "-af", normAf,
                 "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
             ])
 
             limiterInput = normURL
         } else {
-            limiterInput = postDsURL
+            limiterInput = postLevelURL
         }
 
         try Task.checkCancellation()
