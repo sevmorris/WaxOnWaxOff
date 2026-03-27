@@ -85,6 +85,20 @@ struct SettingsView: View {
                     }
                 }
 
+                row("Level Riding") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Toggle("", isOn: $viewModel.settings.levelRidingEnabled)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                            Text("Tame wild swings")
+                        }
+                        Text("Attenuates loud sections only — never boosts quiet ones")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Divider().padding(.vertical, 6)
 
                 row("Loudness Norm") {

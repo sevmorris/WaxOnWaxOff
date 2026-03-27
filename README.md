@@ -77,7 +77,7 @@ WaxOn was designed for podcast audio, but the prep pipeline (high-pass filtering
 
 ## Supported Formats
 
-WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled; no separate installation required.
+WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled; no separate installation required.
 
 ## System Requirements
 
