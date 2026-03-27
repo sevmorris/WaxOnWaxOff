@@ -44,32 +44,6 @@ struct WaxOnPreset: Identifiable, Codable, Equatable {
                 dcBlockHz: 80
             )
         ),
-        WaxOnPreset(
-            id: UUID(uuidString: "A0000000-0000-0000-0000-000000000004")!,
-            name: "Mix 2 Channel",
-            settings: WaxOnSettings(
-                sampleRate: .s44100,
-                outputChannels: .stereo,
-                channel: .left,
-                limitDb: -1.0,
-                loudnormEnabled: true,
-                loudnormTarget: -24.0,
-                dcBlockHz: 20
-            )
-        ),
-        WaxOnPreset(
-            id: UUID(uuidString: "A0000000-0000-0000-0000-000000000005")!,
-            name: "Mix Mono",
-            settings: WaxOnSettings(
-                sampleRate: .s44100,
-                outputChannels: .mono,
-                channel: .left,
-                limitDb: -1.0,
-                loudnormEnabled: true,
-                loudnormTarget: -24.0,
-                dcBlockHz: 20
-            )
-        )
     ]
 }
 
