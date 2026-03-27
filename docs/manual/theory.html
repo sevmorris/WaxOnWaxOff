@@ -324,6 +324,7 @@
   <a class="sub" href="#rnnoise-stereo">Stereo Handling</a>
   <a href="#noise-floor">Noise Floor Estimation</a>
   <a href="#nr-measurement">NR-for-Measurement</a>
+  <a href="#level-riding">Level Riding</a>
   <a class="section-head" href="#">Design Decisions</a>
   <a href="#waxon-design">WaxOn Design</a>
   <a href="#waxoff-design">WaxOff Design</a>
@@ -355,6 +356,10 @@
         <div class="chain-node">Channel Select<br><span style="font-size:0.75rem;font-weight:400;">mono only</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass + Resample</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node optional">De-esser<br><span style="font-size:0.75rem;font-weight:400;">7.5 kHz</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node optional">Level Riding<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm downward-only</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
@@ -743,6 +748,35 @@
     <p>NR-for-measurement adds one additional FFmpeg pass per loudnorm analysis (running RNNoise on the intermediate audio to a temporary file). For a typical podcast recording on Apple Silicon, this adds a few seconds. The temporary NR'd files are created in the working directory and deleted automatically after processing.</p>
   </section>
 
+  <!-- Level Riding -->
+  <section id="level-riding">
+    <h2>Level Riding</h2>
+    <p>Level Riding is an optional WaxOn processing stage that uses FFmpeg's <code>dynaudnorm</code> filter to attenuate sections that are significantly louder than the rest of the recording. It runs after the de-esser and before loudness normalization.</p>
+
+    <h3>The Problem It Solves</h3>
+    <p>Standard loudness normalization (EBU R128) applies a single linear gain to the entire file. If a recording has a few unusually loud passages — a host who got louder mid-sentence, a guest with inconsistent mic technique, a sudden laugh — those peaks dominate the integrated measurement. The result is a file where the loud sections land near target and the rest of the content is quieter than intended.</p>
+    <p>Level Riding addresses this by pulling down the loud sections before normalization measures the file, giving the loudnorm stage a more consistent signal to work with.</p>
+
+    <h3>How dynaudnorm Works</h3>
+    <p><code>dynaudnorm</code> divides the audio into overlapping frames (default 500 ms each) and computes the peak amplitude within a Gaussian-smoothed window of neighboring frames (default: 31 frames = 15.5 seconds of context). It then applies gain to bring each frame's peak toward a target amplitude. The Gaussian smoothing ensures transitions are gradual — no abrupt gain jumps between frames.</p>
+    <p>The key parameters WaxOn uses:</p>
+    <ul>
+      <li><code>p=0.95</code> — target peak amplitude (≈ −0.4 dBFS). Frames whose smoothed peak exceeds this value are attenuated toward it.</li>
+      <li><code>m=1.0</code> — maximum gain factor. A value of 1.0 means the filter can <em>only attenuate</em> — it will never boost a frame. Gain is capped at unity.</li>
+      <li><code>g=31</code> — Gaussian window size in frames (15.5 seconds). Controls how broadly the filter looks at surrounding context when computing gain. Larger values = smoother, slower response.</li>
+    </ul>
+
+    <h3>Why m=1.0 Is the Right Choice</h3>
+    <p>Without the <code>m=1.0</code> constraint, <code>dynaudnorm</code> is a full leveler: quiet frames get boosted toward the target just as much as loud frames get attenuated. This is the standard AGC behavior — useful for broadcast ingest but problematic for pre-edit podcast prep. Boosting quiet sections amplifies the noise floor, creates pumping on breath pauses, and destroys the dynamic character the editor needs to work with.</p>
+    <p>With <code>m=1.0</code>, the behavior changes entirely. To boost a frame from, say, −50 dBFS to the target would require a gain factor much greater than 1.0 — which is blocked. So the noise floor, room tone, and quiet passages are left completely untouched. Only frames whose peak is already above the target receive gain — and that gain is less than 1.0 (attenuation). The effective behavior is a downward-only, slow-attack, slow-release broadband compressor.</p>
+
+    <h3>Placement in the Pipeline</h3>
+    <p>Level Riding runs after the de-esser and before loudness normalization. This placement is deliberate: the loudnorm analysis pass sees a more consistent signal, so the linear gain it applies is more accurate. A recording with a few loud outlier sections would otherwise cause loudnorm to underestimate the average loudness and leave the output quieter than intended at the target LUFS.</p>
+
+    <h3>When to Use It</h3>
+    <p>Level Riding is off by default. It's appropriate for recordings with genuinely inconsistent levels — an interviewee who speaks at widely varying volumes, a host who leaned into the mic during an emphatic point, or a multi-speaker recording where one participant is noticeably louder than another. For well-recorded content with consistent mic technique, the effect will be minimal and the default pipeline is sufficient.</p>
+  </section>
+
   <!-- WaxOn Design -->
   <section id="waxon-design">
     <h2>WaxOn Design Rationale <span class="mode-badge mode-waxon">WaxOn</span></h2>
@@ -754,6 +788,8 @@
       <li><strong>High-pass filter second</strong>: Subsonic content below 80 Hz is removed before any gain stage processes it. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't musically useful.</li>
       <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. The loudnorm analysis then also measures the real output signal.</li>
       <li><strong>Phase rotation before normalization</strong>: Reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
+      <li><strong>De-esser before level riding and normalization</strong>: Sibilance reduction runs on the pre-normalized signal. Removing harsh high-frequency peaks before the level riding and loudnorm stages means those stages measure a more representative signal and don't over-attenuate or compensate for transient sibilance energy.</li>
+      <li><strong>Level riding before normalization</strong>: Downward-only gain riding runs after de-essing. Taming loud outlier sections before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the recording, not the outliers. This makes the subsequent linear gain more accurate.</li>
       <li><strong>Limiter last</strong>: After any loudness normalization, with oversampling to catch true peaks.</li>
     </ol>
 
