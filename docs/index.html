@@ -443,7 +443,7 @@
       <div class="screenshot-block">
         <div class="section-label">WaxOn</div>
         <div class="screenshot-label">Raw Recording Prep</div>
-        <p class="screenshot-desc">Drop in raw recordings before editing. ML noise reduction, high-pass filtering, de-essing, loudness normalization, and brick-wall limiting — all in one pass.</p>
+        <p class="screenshot-desc">Drop in raw recordings before editing. ML noise reduction, high-pass filtering, de-essing, level riding, loudness normalization, and brick-wall limiting — all in one pass.</p>
         <img class="screenshot-img" src="screenshots/waxon-file.png" alt="WaxOn mode with file loaded showing waveform and stats" loading="lazy">
       </div>
 
@@ -491,12 +491,20 @@
           <p>2× oversampled true peak control at your chosen ceiling (−1 to −3 dB). Keeps transients honest.</p>
         </div>
         <div class="feature-card">
+          <h3>De-esser</h3>
+          <p>Optional gentle sibilance reduction at 7.5 kHz. Reduces harshness on voiced content without affecting the rest of the spectrum.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Level Riding</h3>
+          <p>Optional downward-only dynamic normalization. Tames loud sections without touching the noise floor or quiet material — never boosts.</p>
+        </div>
+        <div class="feature-card">
           <h3>Phase Rotation</h3>
           <p>200 Hz allpass reduces peak asymmetry and improves limiter headroom on voice recordings.</p>
         </div>
         <div class="feature-card">
           <h3>Presets &amp; Batch Processing</h3>
-          <p>Five built-in presets plus custom presets. Up to 3 concurrent jobs with per-file progress.</p>
+          <p>Three built-in presets plus custom presets. Up to 3 concurrent jobs with per-file progress.</p>
         </div>
       </div>
 
@@ -557,7 +565,7 @@
         <span class="workflow-step">Distribute</span>
       </div>
 
-      <p style="margin-top: 3rem;"><strong>Supported formats:</strong> WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled — no separate installation required.</p>
+      <p style="margin-top: 3rem;"><strong>Supported formats:</strong> WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled — no separate installation required.</p>
     </div>
   </section>
 

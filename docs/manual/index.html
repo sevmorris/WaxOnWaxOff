@@ -465,8 +465,8 @@
   <!-- WaxOn Mode -->
   <section id="waxon-overview">
     <h2>WaxOn Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, optional noise reduction, loudness normalization, phase rotation, and brick-wall limiting, outputting 24-bit WAV files ready to drop into Logic Pro, Reaper, or any other editor.</p>
-    <p>WaxOn is a first-step ingest processor: get your raw recordings into a consistent, workable format before editing. It does not do de-essing, spectral repair, or multiband restoration. For recordings with serious noise problems, dedicated tools like iZotope RX are the right choice; WaxOn's built-in noise reduction handles light to moderate steady-state background noise.</p>
+    <p>WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, optional noise reduction, optional de-essing, optional level riding, loudness normalization, phase rotation, and brick-wall limiting, outputting 24-bit WAV files ready to drop into Logic Pro, Reaper, or any other editor.</p>
+    <p>WaxOn is a first-step ingest processor: get your raw recordings into a consistent, workable format before editing. It does not do spectral repair or multiband restoration. For recordings with serious noise problems, dedicated tools like iZotope RX are the right choice; WaxOn's built-in noise reduction handles light to moderate steady-state background noise.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -571,6 +571,16 @@
           <td>Applies RNNoise, a recurrent neural network trained on mono speech, before the high-pass filter. Suppresses consistent background noise (HVAC, room tone, hum) with minimal voice coloration. For stereo output, channels are split and denoised independently to ensure balanced processing. Check output before editing; artifacts are possible on heavy noise. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</td>
         </tr>
         <tr>
+          <td>De-esser</td>
+          <td>On · Off · default Off</td>
+          <td>Gentle sibilance reduction (<code>adeesser</code>, 7.5 kHz, intensity 0.3). Reduces harshness on voiced content. Check output on heavily sibilant recordings.</td>
+        </tr>
+        <tr>
+          <td>Level Riding</td>
+          <td>On · Off · default Off</td>
+          <td>Downward-only dynamic normalization. Attenuates loud sections toward a target peak; never boosts quiet material or the noise floor. Use for recordings with inconsistent levels. See <a href="theory.html#level-riding">Theory of Operation</a>.</td>
+        </tr>
+        <tr>
           <td>Loudness Norm</td>
           <td>On · Off</td>
           <td>Enables two-pass EBU R128 loudness normalization. When NR is off, the analysis pass applies noise reduction internally to prevent broadband noise from skewing the measurement; the output itself is not affected. Off = filtering and limiting only.</td>
@@ -591,7 +601,7 @@
 
   <section id="waxon-pipeline">
     <h2>WaxOn Processing Pipeline <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>Every file passes through an FFmpeg processing chain. Three stages by default, four when Noise Reduction is enabled.</p>
+    <p>Every file passes through an FFmpeg processing chain. Three required stages plus up to four optional ones.</p>
 
     <ol class="pipeline">
       <li>
@@ -604,6 +614,18 @@
         <div>
           <strong>Filter, Channel &amp; Resample</strong>
           <span>High-pass filter at the configured cutoff, a 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 32-bit float WAV at the target sample rate.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>De-esser <span class="tag">Optional</span></strong>
+          <span>Gentle sibilance reduction using FFmpeg's <code>adeesser</code> filter at 7.5 kHz with intensity 0.3. Reduces harshness on voiced content. Off by default.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Level Riding <span class="tag">Optional</span></strong>
+          <span>Downward-only dynamic normalization using FFmpeg's <code>dynaudnorm</code> (p=0.95, m=1.0, g=31). Attenuates sections whose peak exceeds the target; never boosts quiet material. The noise floor and quiet passages are untouched. Use for recordings with wide level swings. See <a href="theory.html#level-riding">Level Riding</a> in the Theory of Operation.</span>
         </div>
       </li>
       <li>
@@ -848,7 +870,7 @@
   <!-- Supported Formats -->
   <section id="formats">
     <h2>Supported Formats</h2>
-    <p>WAV, AIFF, AIF, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV.</p>
+    <p>WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV.</p>
     <p>MP4 and MOV are video containers; WaxOn/WaxOff extracts the audio track and processes it normally. All processing uses FFmpeg, bundled inside the app. No separate installation required. Unsupported file types are silently rejected; a notice appears if any files in a drop were skipped.</p>
   </section>
 
