@@ -26,8 +26,7 @@ Use WaxOn on raw recordings before editing. Drop your files in, configure what y
 - **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
 - **Mono or Stereo Output** — mono with left/right channel extraction, or stereo with per-channel noise reduction when NR is enabled
 - **Sample Rate Conversion** — 44.1 kHz or 48 kHz output
-- **Mix** — select 2+ files and combine them. When Loudness Norm is on, each file is individually leveled to the target LUFS before mixing, then the combined output is normalized to the same target, ensuring a balanced blend regardless of source levels
-- **Presets** — five built-in presets (Defaults, Edit Prep, Edit Prep EBU, Mix 2 Channel, Mix Mono) plus custom presets saved and deleted from the toolbar menu
+- **Presets** — three built-in presets (Defaults, Edit Prep, Edit Prep EBU) plus custom presets saved and deleted from the toolbar menu
 - **Batch Processing** — up to 3 concurrent jobs with per-file progress
 
 **Output:** `{name}-{rate}waxon-{limit}.wav` (24-bit WAV)
