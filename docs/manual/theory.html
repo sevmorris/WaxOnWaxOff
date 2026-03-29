@@ -4,34 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WaxOn/WaxOff — Theory of Operation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:           #ffffff;
-      --bg-subtle:    #f5f5f7;
-      --bg-code:      #f0f0f2;
-      --border:       #d2d2d7;
-      --text:         #1d1d1f;
-      --text-muted:   #6e6e73;
-      --accent:       #0066cc;
-      --accent-hover: #0055b3;
-      --nav-bg:       #fafafa;
-      --tag-bg:       #e8f0fe;
-      --tag-text:     #1a56b0;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg:           #111113;
-        --bg-subtle:    #1c1c1e;
-        --bg-code:      #2a2a2d;
-        --border:       #3a3a3c;
-        --text:         #f2f2f7;
-        --text-muted:   #8e8e93;
-        --accent:       #4da3ff;
-        --accent-hover: #79bcff;
-        --nav-bg:       #1c1c1e;
-        --tag-bg:       #1a2d4a;
-        --tag-text:     #6eb0ff;
-      }
+      --black:     #0e0e0e;
+      --dark:      #1a1816;
+      --mid:       #242018;
+      --light:     #f2ead8;
+      --cream:     #e8dfc8;
+      --muted:     #9c8a6a;
+      --orange:    #d4520a;
+      --orange-lt: #e8641c;
+      --border:    rgba(156,138,106,0.2);
+      --code-bg:   #111110;
+      --font-disp: 'Bebas Neue', 'Arial Narrow', sans-serif;
+      --font-ui:   'Barlow Condensed', 'Arial Narrow', sans-serif;
+      --font-body: 'Barlow', Arial, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Mono', 'Menlo', monospace;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -39,12 +30,23 @@
     html { scroll-behavior: smooth; font-size: 16px; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      font-family: var(--font-body);
+      background: var(--dark);
+      color: var(--light);
       line-height: 1.6;
       display: flex;
       min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      background-size: 180px 180px;
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 999;
     }
 
     /* ── Sidebar ── */
@@ -54,7 +56,7 @@
       height: 100vh;
       width: 230px;
       min-width: 230px;
-      background: var(--nav-bg);
+      background: var(--black);
       border-right: 1px solid var(--border);
       overflow-y: auto;
       padding: 28px 0 40px;
@@ -68,121 +70,165 @@
       margin-bottom: 16px;
     }
     .nav-brand span {
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
+      font-family: var(--font-disp);
+      font-size: 1.6rem;
+      letter-spacing: 0.04em;
+      color: var(--light);
       display: block;
+      line-height: 1.1;
     }
     .nav-brand small {
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      font-family: var(--font-ui);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--orange);
     }
 
     nav a {
+      font-family: var(--font-ui);
       display: block;
       padding: 5px 20px;
-      font-size: 0.83rem;
-      color: var(--text-muted);
+      font-size: 0.88rem;
+      color: var(--muted);
       text-decoration: none;
       border-left: 2px solid transparent;
       transition: color 0.15s, border-color 0.15s;
       line-height: 1.5;
     }
-    nav a:hover { color: var(--accent); }
+    nav a:hover {
+      color: var(--orange-lt);
+      border-left-color: var(--orange);
+      text-decoration: none;
+    }
     nav a.section-head {
       font-size: 0.7rem;
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
+      letter-spacing: 0.12em;
+      color: var(--orange);
       padding-top: 16px;
       padding-bottom: 4px;
       pointer-events: none;
+      border-left-color: transparent;
     }
     nav a.sub { padding-left: 32px; }
     nav a.back-link {
-      font-size: 0.78rem;
-      color: var(--accent);
+      font-family: var(--font-ui);
+      font-size: 0.82rem;
+      color: var(--orange);
       margin-bottom: 8px;
     }
+    nav a.back-link:hover { color: var(--orange-lt); }
 
     /* ── Main content ── */
     main {
       flex: 1;
       max-width: 820px;
       padding: 56px 48px 100px;
+      background: var(--dark);
     }
 
     section { margin-bottom: 64px; }
 
-    h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 10px; }
-    h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-    h3 { font-size: 1.05rem; font-weight: 600; margin: 28px 0 10px; }
-    h4 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 20px 0 8px; }
+    h1 {
+      font-family: var(--font-disp);
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      letter-spacing: 0.02em;
+      line-height: 1;
+      color: var(--light);
+      margin-bottom: 10px;
+    }
+    h2 {
+      font-family: var(--font-disp);
+      font-size: clamp(1.6rem, 2.5vw, 2.4rem);
+      letter-spacing: 0.02em;
+      line-height: 1;
+      color: var(--light);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      font-family: var(--font-ui);
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--orange);
+      margin: 28px 0 10px;
+    }
+    h4 {
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin: 20px 0 8px;
+    }
 
-    p { margin-bottom: 14px; }
+    p { margin-bottom: 14px; color: var(--cream); }
     p:last-child { margin-bottom: 0; }
 
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; color: var(--accent-hover); }
+    a { color: var(--orange); text-decoration: none; }
+    a:hover { color: var(--orange-lt); text-decoration: none; }
 
-    ul, ol { padding-left: 20px; margin-bottom: 14px; }
+    ul, ol { padding-left: 20px; margin-bottom: 14px; color: var(--cream); }
     li { margin-bottom: 6px; line-height: 1.5; }
     li:last-child { margin-bottom: 0; }
 
     code {
-      font-family: "SF Mono", "Fira Mono", "Menlo", monospace;
+      font-family: var(--font-mono);
       font-size: 0.84em;
-      background: var(--bg-code);
-      color: var(--text);
+      background: var(--code-bg);
+      color: var(--cream);
       padding: 2px 6px;
-      border-radius: 4px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
     }
 
     pre {
-      background: var(--bg-code);
+      background: var(--code-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 4px;
       padding: 16px 20px;
       overflow-x: auto;
       margin-bottom: 14px;
     }
-    pre code { background: none; padding: 0; font-size: 0.85rem; }
+    pre code { background: none; padding: 0; font-size: 0.85rem; border: none; }
 
     .callout {
-      background: var(--bg-subtle);
+      background: var(--mid);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      border-radius: 6px;
+      border-left: 3px solid var(--orange);
+      border-radius: 0;
       padding: 14px 18px;
       margin-bottom: 18px;
       font-size: 0.9rem;
     }
-    .callout strong { display: block; margin-bottom: 4px; }
+    .callout-warn { border-left-color: #e6820a; }
+    .callout strong { display: block; margin-bottom: 4px; color: var(--orange); }
 
     /* ── Hero ── */
     .hero { margin-bottom: 56px; }
     .hero h1 { margin-bottom: 12px; }
-    .hero p { font-size: 1.05rem; color: var(--text-muted); max-width: 600px; }
+    .hero p { font-size: 1.05rem; color: var(--cream); max-width: 600px; }
 
     /* ── Mode badge ── */
     .mode-badge {
       display: inline-block;
+      font-family: var(--font-ui);
       font-size: 0.72rem;
       font-weight: 700;
       padding: 2px 10px;
-      border-radius: 100px;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.08em;
       vertical-align: middle;
       margin-left: 8px;
       text-transform: uppercase;
     }
-    .mode-waxon  { background: #e8f0fe; color: #1a56b0; }
-    .mode-waxoff { background: #e6f4ea; color: #137333; }
-    @media (prefers-color-scheme: dark) {
-      .mode-waxon  { background: #1a2d4a; color: #6eb0ff; }
-      .mode-waxoff { background: #1a3a25; color: #6fcf97; }
-    }
+    .mode-waxon  { background: var(--orange); color: var(--black); }
+    .mode-waxoff { background: transparent; border: 1px solid var(--orange); color: var(--orange); }
 
     /* ── Signal chain diagram ── */
     .chain {
@@ -197,28 +243,30 @@
       gap: 0;
     }
     .chain-node {
-      background: var(--bg-subtle);
+      background: var(--mid);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 0;
       padding: 10px 16px;
+      font-family: var(--font-ui);
       font-size: 0.85rem;
       font-weight: 600;
       white-space: nowrap;
+      color: var(--light);
     }
     .chain-node.optional {
       border-style: dashed;
-      color: var(--text-muted);
+      color: var(--muted);
     }
     .chain-arrow {
       display: flex;
       align-items: center;
       padding: 0 6px;
-      color: var(--text-muted);
+      color: var(--orange);
       font-size: 0.9rem;
     }
     .chain-label {
       font-size: 0.75rem;
-      color: var(--text-muted);
+      color: var(--muted);
       padding: 2px 0 0 0;
       font-style: italic;
     }
@@ -230,51 +278,55 @@
       font-size: 0.88rem;
       margin-bottom: 14px;
       border: 1px solid var(--border);
-      border-radius: 8px;
       overflow: hidden;
     }
     .compare-table th {
       text-align: left;
+      font-family: var(--font-ui);
       font-size: 0.75rem;
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      background: var(--black);
       padding: 8px 14px;
       border-bottom: 1px solid var(--border);
-      background: var(--bg-subtle);
     }
     .compare-table td {
       padding: 10px 14px;
       border-bottom: 1px solid var(--border);
       vertical-align: top;
       line-height: 1.5;
+      color: var(--cream);
     }
     .compare-table tr:last-child td { border-bottom: none; }
-    .compare-table td:first-child { font-weight: 600; white-space: nowrap; width: 180px; }
+    .compare-table td:first-child { font-weight: 600; white-space: nowrap; width: 180px; color: var(--light); }
 
     /* ── Formula block ── */
     .formula {
-      font-family: "SF Mono", "Fira Mono", "Menlo", monospace;
+      font-family: var(--font-mono);
       font-size: 0.9rem;
-      background: var(--bg-code);
+      background: var(--code-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 0;
       padding: 14px 20px;
       margin-bottom: 14px;
       line-height: 2;
+      color: var(--cream);
     }
 
     /* ── Tag ── */
     .tag {
       display: inline-block;
-      background: var(--tag-bg);
-      color: var(--tag-text);
+      background: transparent;
+      color: var(--orange);
+      border: 1px solid var(--orange);
+      font-family: var(--font-ui);
       font-size: 0.72rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 100px;
-      letter-spacing: 0.03em;
+      font-weight: 700;
+      padding: 1px 7px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       vertical-align: middle;
       margin-left: 6px;
     }
@@ -299,7 +351,7 @@
       nav a { padding: 4px 12px; white-space: nowrap; }
       nav a.sub { padding-left: 12px; }
       main { padding: 32px 24px 60px; }
-      h1 { font-size: 1.8rem; }
+      h1 { font-size: 2.2rem; }
     }
   </style>
 </head>
@@ -366,7 +418,7 @@
         <div class="chain-node">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Resample</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--text-muted);">Dashed border = optional stage. For stereo output with NR enabled, channels are split and denoised independently before rejoining. Output: 24-bit WAV.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Dashed border = optional stage. For stereo output with NR enabled, channels are split and denoised independently before rejoining. Output: 24-bit WAV.</p>
 
     <h3>WaxOff <span class="mode-badge mode-waxoff">WaxOff</span></h3>
     <div class="chain">
@@ -378,7 +430,7 @@
         <div class="chain-node optional">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Encode MP3</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--text-muted);">Phase rotation and MP3 encode are optional. Output: 24-bit WAV and/or MP3.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Phase rotation and MP3 encode are optional. Output: 24-bit WAV and/or MP3.</p>
 
   </section>
 
@@ -953,7 +1005,7 @@
     </table>
 
     <hr style="border:none; border-top: 1px solid var(--border); margin: 48px 0 32px;">
-    <p style="font-size:0.85rem; color: var(--text-muted);">
+    <p style="font-size:0.85rem; color: var(--muted);">
       WaxOn/WaxOff is free software licensed under the <a href="https://github.com/sevmorris/WaxOnWaxOff/blob/main/LICENSE">GPL-3.0</a>.
       Built by <a href="https://github.com/sevmorris">Seven Morris</a> with AI collaboration.
     </p>
