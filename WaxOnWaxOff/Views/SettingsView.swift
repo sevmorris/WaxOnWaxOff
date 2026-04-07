@@ -32,6 +32,7 @@ struct SettingsView: View {
                 }
                 .disabled(viewModel.settings.outputChannels == .stereo)
                 .opacity(viewModel.settings.outputChannels == .stereo ? 0.4 : 1)
+                .help(viewModel.settings.outputChannels == .stereo ? "Only applies in Mono output mode" : "")
 
                 Divider().padding(.vertical, 6)
 
@@ -117,6 +118,7 @@ struct SettingsView: View {
                 }
                 .disabled(!viewModel.settings.loudnormEnabled)
                 .opacity(!viewModel.settings.loudnormEnabled ? 0.4 : 1)
+                .help(!viewModel.settings.loudnormEnabled ? "Enable Loudness Norm to adjust" : "")
 
                 Divider().padding(.vertical, 6)
 
@@ -131,6 +133,7 @@ struct SettingsView: View {
                             .lineLimit(2)
                             .truncationMode(.middle)
                             .foregroundStyle(.secondary)
+                            .help(path)
                     } else {
                         Text("Same as source")
                             .font(.system(size: 11))

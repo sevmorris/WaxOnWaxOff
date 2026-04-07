@@ -94,7 +94,8 @@ struct ContentView: View {
                 } label: {
                     Label("Process", systemImage: "play.fill")
                 }
-                .disabled(viewModel.files.isEmpty)
+                .disabled(viewModel.files.isEmpty || viewModel.isAnyFileAnalyzing)
+                .help(viewModel.isAnyFileAnalyzing ? "Waiting for analysis to complete…" : "")
             }
 
             Button {
@@ -150,6 +151,7 @@ struct ContentView: View {
                         .font(.headline)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                        .help(file.url.path)
 
                     WaveformView(waveformData: file.outputWaveform ?? file.waveform)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
