@@ -64,7 +64,7 @@ ok "Tag $TAG is available"
 step "Bumping version to $VERSION"
 CURRENT=$(grep MARKETING_VERSION "$PROJECT/project.pbxproj" | head -1 | grep -o '[0-9][0-9.]*')
 if [[ "$CURRENT" == "$VERSION" ]]; then
-    ok "Already at $VERSION — skipping bump"
+    ok "Already at $VERSION"
 else
     sed -i '' "s/MARKETING_VERSION = ${CURRENT};/MARKETING_VERSION = ${VERSION};/g" \
         "$PROJECT/project.pbxproj"
@@ -133,9 +133,13 @@ sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\">Download v[0-9][0-9.]*|WaxOnWaxOff
 sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\" class=\"nav-cta\">Download|WaxOnWaxOff-${TAG}.dmg\" class=\"nav-cta\">Download|g" "$MANUAL"
 sed -i '' "s|Manual — v[0-9][0-9.]*|Manual — ${TAG}|g" "$MANUAL_IDX"
 sed -i '' "s|\[Download v[0-9][0-9.]* (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v[0-9][0-9.]*.dmg)|\[Download ${TAG} (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-${TAG}.dmg)|g" README.md
-git add "$MANUAL" "$MANUAL_IDX" README.md
-git commit -m "docs: update download link to ${TAG}"
-ok "Manual points to ${TAG}"
+if [[ -n "$(git status --porcelain)" ]]; then
+    git add "$MANUAL" "$MANUAL_IDX" README.md
+    git commit -m "docs: update download link to ${TAG}"
+    ok "Manual points to ${TAG}"
+else
+    ok "Docs already up to date"
+fi
 
 # ── Tag and push ──────────────────────────────────────────────────────────────
 step "Tagging and pushing"
