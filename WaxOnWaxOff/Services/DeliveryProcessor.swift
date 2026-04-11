@@ -37,7 +37,8 @@ actor DeliveryProcessor {
     func process(
         url: URL,
         settings: WaxOffSettings,
-        onPhase: (@Sendable (String) -> Void)? = nil
+        onPhase: (@Sendable (String) -> Void)? = nil,
+        onLog: (@Sendable (String, LogLevel) -> Void)? = nil
     ) async throws -> [URL] {
         let paths = try await FFmpegManager.shared.ensureTools()
         let ffmpeg = paths.ffmpeg
@@ -51,13 +52,26 @@ actor DeliveryProcessor {
 
         let stem = url.deletingPathExtension().lastPathComponent
         let outputStem = "\(stem)-lev-\(lufsString(settings.targetLUFS))LUFS"
+        let lufs = lufsString(settings.targetLUFS)
+        let tp = String(format: "%.1f", settings.truePeak)
+        let lra = String(format: "%.0f", settings.lra)
+
+        onLog?("▶ \(url.lastPathComponent)", .info)
+        onLog?("  target: \(lufs) LUFS  |  TP \(tp) dBTP  |  LRA \(lra) LU", .verbose)
+        if settings.phaseRotationEnabled {
+            onLog?("  phase rotation: 150 Hz", .verbose)
+        }
 
         // Phase 1: Analyze loudness
         onPhase?("Analyzing loudness…")
+        onLog?("  loudnorm: analyzing…", .verbose)
         let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings)
+        onLog?("  measured: \(String(format: "%.1f", measurements.inputI)) LUFS  |  TP \(String(format: "%.1f", measurements.inputTP)) dBTP  |  LRA \(String(format: "%.1f", measurements.inputLRA)) LU", .info)
+        onLog?("  offset: \(String(format: "%.2f", measurements.targetOffset)) dB  |  thresh \(String(format: "%.1f", measurements.inputThresh)) LUFS", .verbose)
 
         // Phase 2: Render WAV
         onPhase?("Normalizing…")
+        onLog?("  loudnorm: normalizing…", .verbose)
         let wavTempURL = outputDir.appendingPathComponent(".\(outputStem).part.\(UUID().uuidString.prefix(8)).wav")
         let wavFinalURL = outputDir.appendingPathComponent("\(outputStem).wav")
 
@@ -79,11 +93,14 @@ actor DeliveryProcessor {
             try? FileManager.default.removeItem(at: wavFinalURL)
             try FileManager.default.moveItem(at: wavTempURL, to: wavFinalURL)
             outputURLs.append(wavFinalURL)
+            onLog?("✓ \(wavFinalURL.lastPathComponent)", .info)
+            onLog?("  → \(wavFinalURL.path)", .verbose)
         }
 
         // Phase 3: Encode MP3 (if needed)
         if settings.outputMode == .mp3 || settings.outputMode == .both {
             onPhase?("Encoding MP3…")
+            onLog?("  mp3: \(settings.mp3Bitrate)k  |  limiter: 2× oversample  |  ceiling -2.0 dBTP", .verbose)
 
             let sourceForMP3 = settings.outputMode == .both ? wavFinalURL : wavTempURL
             let mp3TempURL = outputDir.appendingPathComponent(".\(outputStem).part.\(UUID().uuidString.prefix(8)).mp3")
@@ -110,6 +127,8 @@ actor DeliveryProcessor {
             try? FileManager.default.removeItem(at: mp3FinalURL)
             try FileManager.default.moveItem(at: mp3TempURL, to: mp3FinalURL)
             outputURLs.append(mp3FinalURL)
+            onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
+            onLog?("  → \(mp3FinalURL.path)", .verbose)
         }
 
         return outputURLs
