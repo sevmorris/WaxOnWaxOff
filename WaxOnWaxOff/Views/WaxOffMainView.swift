@@ -4,6 +4,7 @@ struct WaxOffMainView: View {
     @Environment(AppState.self) var appState
     var viewModel: DeliveryViewModel
     @State private var fileListWidth: CGFloat = 250
+    @State private var showConsole = false
     @State private var showSettings = true
 
     private var selectedFile: FileItem? {
@@ -134,9 +135,13 @@ struct WaxOffMainView: View {
 
     @ViewBuilder
     private var waveformSection: some View {
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             Group {
-                if let file = selectedFile {
+                if showConsole {
+                    ConsoleView(log: viewModel.log)
+                        .padding([.top, .leading, .trailing])
+                        .padding(.bottom, 72)
+                } else if let file = selectedFile {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(file.url.lastPathComponent)
                             .font(.headline)
@@ -171,6 +176,19 @@ struct WaxOffMainView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+
+            Button {
+                showConsole.toggle()
+            } label: {
+                Image(systemName: showConsole ? "waveform" : "terminal")
+                    .font(.callout)
+                    .padding(9)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .help(showConsole ? "Show Waveform" : "Show Console")
         }
     }
 

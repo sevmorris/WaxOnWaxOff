@@ -14,6 +14,7 @@ final class DeliveryViewModel {
     var deliveryPhase: String? = nil
     var alertMessage: String?
     var presetStore = WaxOffPresetStore()
+    var log = ProcessingLog()
 
     private var processingTask: Task<Void, Never>?
 
@@ -79,6 +80,7 @@ final class DeliveryViewModel {
         }
 
         isProcessing = true
+        log.clear()
 
         let currentSettings = settings
 
@@ -105,12 +107,18 @@ final class DeliveryViewModel {
                 do {
                     let outputURLs = try await processor.process(
                         url: file.url,
-                        settings: currentSettings
-                    ) { [weak self] phase in
-                        Task { @MainActor [weak self] in
-                            self?.deliveryPhase = phase
+                        settings: currentSettings,
+                        onPhase: { [weak self] phase in
+                            Task { @MainActor [weak self] in
+                                self?.deliveryPhase = phase
+                            }
+                        },
+                        onLog: { [weak self] message, level in
+                            Task { @MainActor [weak self] in
+                                self?.log.append(message, level: level)
+                            }
                         }
-                    }
+                    )
 
                     if let idx = files.firstIndex(where: { $0.id == file.id }),
                        let primaryURL = outputURLs.first {
