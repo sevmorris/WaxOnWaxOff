@@ -2,7 +2,7 @@
 
 WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing: high-pass filtering, noise reduction, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution: EBU R128 loudness normalization, true peak control, and MP3 encoding. For third-party broadcast clips going into your mix, use ClipHack.
 
-**[Download v1.5.7 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.5.7.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/manual/)** · **[Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html)**
+**[Download v1.5.7 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.5.7.dmg)**
 
 > ⚠️ **Important: Read Before First Launch**
 >
@@ -86,7 +86,7 @@ WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg
 
 ## License
 
-Copyright © 2026. This app was designed and directed by [Seven Morris](https://sevmorris.github.io), with code primarily generated through AI collaboration using [OpenClaw](https://openclaw.ai) and Claude (Anthropic).
+Copyright © 2026. This app was designed and directed by Seven Morris, with code primarily generated through AI collaboration using [OpenClaw](https://openclaw.ai) and Claude (Anthropic).
 
 This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License v3.0](LICENSE).
 
