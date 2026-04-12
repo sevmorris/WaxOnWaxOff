@@ -118,12 +118,6 @@ struct HelpView: View {
                     text("All processing uses FFmpeg, bundled inside the app — no separate installation required.")
                 }
 
-                dividerRow
-
-                section("Support") {
-                    text("WaxOn/WaxOff is free.")
-                }
-
                 Spacer()
             }
             .padding(30)
