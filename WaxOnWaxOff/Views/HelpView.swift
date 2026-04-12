@@ -122,13 +122,6 @@ struct HelpView: View {
 
                 section("Support") {
                     text("WaxOn/WaxOff is free.")
-                    Button("sevmorris.github.io →") {
-                        if let url = URL(string: "https://sevmorris.github.io") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(Color.accentColor)
                 }
 
                 Spacer()
