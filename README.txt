@@ -23,4 +23,4 @@ WaxOff — Delivery & Mastering
   Finalizes your edited mix for distribution. EBU R128 loudness
   normalization, true peak control, WAV and/or MP3 output.
 
-Full manual: https://sevmorris.github.io/WaxOnWaxOff/
+Manual: https://sevmorris.github.io/WaxOnWaxOff/manual/
