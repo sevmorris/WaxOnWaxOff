@@ -4,6 +4,8 @@ WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw rec
 
 **[Download v1.5.9 (DMG)](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.5.9.dmg)** · **[Manual](https://sevmorris.github.io/WaxOnWaxOff/manual/)** · **[Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html)**
 
+<img src="docs/images/waxon.png" width="49%" alt="WaxOn mode"> <img src="docs/images/waxoff.png" width="49%" alt="WaxOff mode">
+
 > ⚠️ **Important: Read Before First Launch**
 >
 > macOS will block the app because it is not notarized with Apple. After dragging WaxOn to Applications, **run this command in Terminal:**
