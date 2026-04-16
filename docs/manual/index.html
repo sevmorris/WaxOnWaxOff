@@ -641,6 +641,16 @@
           <td>Downward-only dynamic normalization. Attenuates loud sections toward a target peak; never boosts quiet material or the noise floor. Use for recordings with inconsistent levels. See <a href="theory.html#level-riding">Theory of Operation</a>.</td>
         </tr>
         <tr>
+          <td>Dynamic Leveling</td>
+          <td>On · Off · default Off</td>
+          <td>Bidirectional dynamic normalization. Lifts quiet sections and tames loud ones. Use for panel recordings, live Q&amp;As, or any mix where voices are at very different levels. The Aggressiveness slider controls how quickly and strongly the leveling responds. See <a href="theory.html#dynamic-leveling">Theory of Operation</a>.</td>
+        </tr>
+        <tr>
+          <td>Aggressiveness</td>
+          <td>Gentle · Low · Medium · High · Aggressive · default Medium</td>
+          <td>Controls the frame size and maximum gain of Dynamic Leveling. Gentle uses 750ms frames and up to 8× gain; Aggressive uses 150ms frames and up to 20× gain. Grayed out when Dynamic Leveling is off.</td>
+        </tr>
+        <tr>
           <td>Loudness Norm</td>
           <td>On · Off</td>
           <td>Enables two-pass EBU R128 loudness normalization. When NR is off, the analysis pass applies noise reduction internally to prevent broadband noise from skewing the measurement; the output itself is not affected. Off = filtering and limiting only.</td>
@@ -686,6 +696,12 @@
         <div>
           <strong>Level Riding <span class="tag">Optional</span></strong>
           <span>Downward-only dynamic normalization using FFmpeg's <code>dynaudnorm</code> (p=0.95, m=1.0, g=31). Attenuates sections whose peak exceeds the target; never boosts quiet material. The noise floor and quiet passages are untouched. Use for recordings with wide level swings. See <a href="theory.html#level-riding">Level Riding</a> in the Theory of Operation.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Dynamic Leveling <span class="tag">Optional</span></strong>
+          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet sections and tames loud ones. The Aggressiveness slider controls frame size (750–150ms) and maximum gain (8×–20×), mapped to Gaussian window width accordingly. Use for panel recordings, live Q&amp;As, or any source where voices are at significantly different levels. Runs after Level Riding (if enabled) and before loudness normalization. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
         </div>
       </li>
       <li>

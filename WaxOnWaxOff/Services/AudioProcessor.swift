@@ -170,6 +170,23 @@ actor AudioProcessor {
             postLevelURL = postDsURL
         }
 
+        // Dynamic leveling (optional, dynaudnorm bidirectional)
+        let postDynLevelURL: URL
+        if settings.dynamicLevelingEnabled {
+            let dynLevelURL = work.appendingPathComponent("\(stem)_dynleveled.wav")
+            let filter = dynamicLevelingFilter(amount: settings.dynamicLevelingAmount)
+            onLog?("  dynamic leveling: \(filter)", .verbose)
+            try await runFFmpeg(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", postLevelURL.path, "-af", filter,
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path
+            ])
+            postDynLevelURL = dynLevelURL
+            try Task.checkCancellation()
+        } else {
+            postDynLevelURL = postLevelURL
+        }
+
         // Loudness normalization (optional, two-pass EBU R128)
         let limiterInput: URL
         if settings.loudnormEnabled {
@@ -193,19 +210,19 @@ actor AudioProcessor {
                     ].joined(separator: ";")
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postLevelURL.path, "-filter_complex", nrFc,
+                        "-i", postDynLevelURL.path, "-filter_complex", nrFc,
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 } else {
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postLevelURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-i", postDynLevelURL.path, "-af", "arnndn=m=\(modelURL.path)",
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 }
                 analysisInput = nrTempURL
             } else {
-                analysisInput = postLevelURL
+                analysisInput = postDynLevelURL
             }
 
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
@@ -226,13 +243,13 @@ actor AudioProcessor {
 
             try await runFFmpeg(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", postLevelURL.path, "-af", normAf,
+                "-i", postDynLevelURL.path, "-af", normAf,
                 "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
             ])
 
             limiterInput = normURL
         } else {
-            limiterInput = postLevelURL
+            limiterInput = postDynLevelURL
         }
 
         try Task.checkCancellation()
@@ -444,6 +461,16 @@ actor AudioProcessor {
             s.removeLast()
         }
         return "\(s)dB"
+    }
+
+    // Maps 0.0 (gentle) → 1.0 (aggressive) to dynaudnorm parameters.
+    // Shorter frames and tighter Gaussian smoothing = more responsive leveling.
+    private func dynamicLevelingFilter(amount: Double) -> String {
+        let f = Int(750.0 - amount * 600.0)         // frame ms: 750 → 150
+        let gRaw = Int(31.0 - amount * 24.0)        // gaussian: 31 → 7
+        let g = gRaw % 2 == 0 ? gRaw - 1 : gRaw    // must be odd
+        let m = 8.0 + amount * 12.0                 // max gain factor: 8x → 20x
+        return "dynaudnorm=f=\(f):g=\(g):r=1:p=0.95:m=\(String(format: "%.1f", m)):n=1:b=1"
     }
 
     private func bestOutputDir(for input: URL) -> URL {

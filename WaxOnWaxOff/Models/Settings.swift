@@ -26,6 +26,8 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     var noiseReductionEnabled: Bool = false
     var deEsserEnabled: Bool = false
     var levelRidingEnabled: Bool = false
+    var dynamicLevelingEnabled: Bool = false
+    var dynamicLevelingAmount: Double = 0.5
     var outputDirectoryPath: String? = nil
 
     private static let storageKey = "WaxOnSettings"
