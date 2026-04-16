@@ -379,6 +379,7 @@
   <a href="#noise-floor">Noise Floor Estimation</a>
   <a href="#nr-measurement">NR-for-Measurement</a>
   <a href="#level-riding">Level Riding</a>
+  <a href="#dynamic-leveling">Dynamic Leveling</a>
   <a class="section-head" href="#">Design Decisions</a>
   <a href="#waxon-design">WaxOn Design</a>
   <a href="#waxoff-design">WaxOff Design</a>
@@ -413,6 +414,8 @@
         <div class="chain-node optional">De-esser<br><span style="font-size:0.75rem;font-weight:400;">7.5 kHz</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Level Riding<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm downward-only</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node optional">Dynamic Leveling<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm bidirectional</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
@@ -830,6 +833,35 @@
     <p>Level Riding is off by default. It's appropriate for recordings with genuinely inconsistent levels — an interviewee who speaks at widely varying volumes, a host who leaned into the mic during an emphatic point, or a multi-speaker recording where one participant is noticeably louder than another. For well-recorded content with consistent mic technique, the effect will be minimal and the default pipeline is sufficient.</p>
   </section>
 
+  <!-- Dynamic Leveling -->
+  <section id="dynamic-leveling">
+    <h2>Dynamic Leveling</h2>
+    <p>Dynamic Leveling is an optional WaxOn processing stage that uses FFmpeg's <code>dynaudnorm</code> filter in bidirectional mode to even out level differences across a recording. Unlike Level Riding, it can both attenuate loud sections and boost quiet ones. It runs after Level Riding (if enabled) and before loudness normalization.</p>
+
+    <h3>The Problem It Solves</h3>
+    <p>Level Riding handles recordings where loud outliers need taming. Dynamic Leveling handles recordings where the level variation is fundamental to the source — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. In these cases, downward-only gain riding doesn't help: you need to lift the quiet material, not just suppress the loud material.</p>
+
+    <h3>How It Differs from Level Riding</h3>
+    <p>Both features use <code>dynaudnorm</code>. The critical difference is the <code>m</code> parameter (maximum gain factor) and the <code>b</code> parameter (bidirectional mode):</p>
+    <ul>
+      <li>Level Riding: <code>m=1.0</code> (gain capped at unity — attenuation only) and no <code>b</code> parameter (default unidirectional)</li>
+      <li>Dynamic Leveling: <code>m</code> ranges from 8.0 to 20.0 (can boost frames up to 8×–20× above their original level) and <code>b=1</code> (bidirectional — processes the file forward and backward and combines the result for smoother transitions)</li>
+    </ul>
+    <p>With <code>m</code> greater than 1.0 and bidirectional enabled, quiet sections are actively boosted toward the target peak, not just left alone. This is the right behavior for uneven source material, but it will also boost the noise floor during quiet passages — so it's not the right choice for single-voice recordings where preserving the noise floor is important.</p>
+
+    <h3>The Aggressiveness Slider</h3>
+    <p>The Aggressiveness slider maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
+    <ul>
+      <li><strong>Frame size (<code>f</code>)</strong>: 750ms at Gentle, 150ms at Aggressive. Shorter frames mean the filter can respond to level changes more quickly.</li>
+      <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 7 frames at Aggressive. Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
+      <li><strong>Max gain (<code>m</code>)</strong>: 8× at Gentle, 20× at Aggressive. Controls how much the filter will boost a quiet frame to reach the target peak.</li>
+    </ul>
+    <p>Gentle is the right starting point for most material. Aggressive is appropriate when level differences are extreme and the source already has significant background noise that boosting won't make materially worse.</p>
+
+    <h3>Placement in the Pipeline</h3>
+    <p>Dynamic Leveling runs after Level Riding (if both are enabled) and before loudness normalization. Running it before loudnorm means the loudness analysis sees a more consistent signal — the same rationale that applies to Level Riding. In practice, enabling both Level Riding and Dynamic Leveling on the same file is unusual: Level Riding is for single-voice recordings with level outliers, Dynamic Leveling is for multi-voice recordings with structural level imbalance. They serve different source types.</p>
+  </section>
+
   <!-- WaxOn Design -->
   <section id="waxon-design">
     <h2>WaxOn Design Rationale <span class="mode-badge mode-waxon">WaxOn</span></h2>
@@ -842,7 +874,8 @@
       <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. The loudnorm analysis then also measures the real output signal.</li>
       <li><strong>Phase rotation before normalization</strong>: Reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
       <li><strong>De-esser before level riding and normalization</strong>: Sibilance reduction runs on the pre-normalized signal. Removing harsh high-frequency peaks before the level riding and loudnorm stages means those stages measure a more representative signal and don't over-attenuate or compensate for transient sibilance energy.</li>
-      <li><strong>Level riding before normalization</strong>: Downward-only gain riding runs after de-essing. Taming loud outlier sections before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the recording, not the outliers. This makes the subsequent linear gain more accurate.</li>
+      <li><strong>Level riding before dynamic leveling and normalization</strong>: Downward-only gain riding runs after de-essing. Taming loud outlier sections before subsequent stages means the dynamic leveler and loudnorm analysis see a more consistent signal.</li>
+      <li><strong>Dynamic leveling before normalization</strong>: Bidirectional leveling runs after level riding. Bringing the overall level balance closer to even before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the material rather than being skewed by large quiet sections or loud outliers.</li>
       <li><strong>Limiter last</strong>: After any loudness normalization, with oversampling to catch true peaks.</li>
     </ol>
 
