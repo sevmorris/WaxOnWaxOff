@@ -17,6 +17,7 @@ final class ContentViewModel {
     private var processingTask: Task<Void, Never>?
     private var processingCancelled = false
     private var analysisTasks: [UUID: Task<Void, Never>] = [:]
+    private var analysisInfoTasks: [UUID: Task<Void, Never>] = [:]
 
     private static let validExtensions: Set<String> = [
         "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
@@ -80,7 +81,9 @@ final class ContentViewModel {
     private func cancelAnalysisTasks(for ids: Set<UUID>) {
         for id in ids {
             analysisTasks[id]?.cancel()
+            analysisInfoTasks[id]?.cancel()
             analysisTasks.removeValue(forKey: id)
+            analysisInfoTasks.removeValue(forKey: id)
         }
     }
 
@@ -191,9 +194,9 @@ final class ContentViewModel {
                let idx = files.firstIndex(where: { $0.id == file.id }) {
                 files[idx].fileInfo = info
             }
+            analysisInfoTasks.removeValue(forKey: file.id)
         }
-        // Share the same task slot as analyzeFile so cancellation covers both
-        if analysisTasks[file.id] == nil { analysisTasks[file.id] = task }
+        analysisInfoTasks[file.id] = task
     }
 
     private func analyzeFile(_ file: FileItem) {
@@ -224,7 +227,8 @@ final class ContentViewModel {
                     files[currentIndex].waveform = waveform
                 }
             } catch {
-                // Waveform generation failed silently - not critical
+                // Non-critical — file is still processable without a waveform
+                NSLog("WaxOn: waveform generation failed for %@: %@", file.url.lastPathComponent, error.localizedDescription)
             }
         }
     }
@@ -249,7 +253,7 @@ final class ContentViewModel {
                     files[currentIndex].outputWaveform = waveform
                 }
             } catch {
-                // Output waveform generation failed — non-critical, processed file is unaffected
+                NSLog("WaxOn: output waveform generation failed for %@: %@", url.lastPathComponent, error.localizedDescription)
             }
         }
     }
