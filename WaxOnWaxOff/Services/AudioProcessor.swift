@@ -301,30 +301,36 @@ actor AudioProcessor {
         process.arguments = args
         process.standardInput = FileHandle.nullDevice
 
-        nonisolated(unsafe) var cancelled = false
+        // MEDIUM-3: DataBox avoids nonisolated(unsafe) var across closure boundaries
+        final class DataBox: @unchecked Sendable { var value = Data() }
+
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 let stderrPipe = Pipe()
                 process.standardOutput = FileHandle.nullDevice
                 process.standardError = stderrPipe
 
-                // Read pipe on GCD to avoid blocking the cooperative thread pool
-                nonisolated(unsafe) var stderrData = Data()
+                let box = DataBox()
                 let readGroup = DispatchGroup()
                 readGroup.enter()
                 DispatchQueue.global(qos: .utility).async {
-                    stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    box.value = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                     readGroup.leave()
                 }
 
+                // MEDIUM-5: terminate after 15 minutes to prevent infinite hangs
+                let timeoutItem = DispatchWorkItem { process.terminate() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
+
                 process.terminationHandler = { proc in
+                    timeoutItem.cancel()
                     readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal || cancelled {
+                    if proc.terminationReason == .uncaughtSignal {
                         continuation.resume(throwing: CancellationError())
                         return
                     }
                     let exitCode = proc.terminationStatus
-                    let msg = String(data: stderrData, encoding: .utf8) ?? ""
+                    let msg = String(data: box.value, encoding: .utf8) ?? ""
                     if exitCode == 0 {
                         continuation.resume(returning: ())
                     } else {
@@ -339,7 +345,6 @@ actor AudioProcessor {
                 }
             }
         } onCancel: {
-            cancelled = true
             process.terminate()
         }
     }
@@ -355,30 +360,34 @@ actor AudioProcessor {
         process.arguments = args
         process.standardInput = FileHandle.nullDevice
 
-        nonisolated(unsafe) var cancelled = false
+        final class DataBox: @unchecked Sendable { var value = Data() }
+
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                 let stderrPipe = Pipe()
                 process.standardOutput = FileHandle.nullDevice
                 process.standardError = stderrPipe
 
-                // Read pipe on GCD to avoid blocking the cooperative thread pool
-                nonisolated(unsafe) var stderrData = Data()
+                let box = DataBox()
                 let readGroup = DispatchGroup()
                 readGroup.enter()
                 DispatchQueue.global(qos: .utility).async {
-                    stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    box.value = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                     readGroup.leave()
                 }
 
+                let timeoutItem = DispatchWorkItem { process.terminate() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
+
                 process.terminationHandler = { proc in
+                    timeoutItem.cancel()
                     readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal || cancelled {
+                    if proc.terminationReason == .uncaughtSignal {
                         continuation.resume(throwing: CancellationError())
                         return
                     }
                     let exitCode = proc.terminationStatus
-                    let msg = String(data: stderrData, encoding: .utf8) ?? ""
+                    let msg = String(data: box.value, encoding: .utf8) ?? ""
                     if exitCode == 0 {
                         continuation.resume(returning: msg)
                     } else {
@@ -393,7 +402,6 @@ actor AudioProcessor {
                 }
             }
         } onCancel: {
-            cancelled = true
             process.terminate()
         }
     }
@@ -476,20 +484,22 @@ actor AudioProcessor {
     private func bestOutputDir(for input: URL) -> URL {
         let fm = FileManager.default
 
-        // Use custom output directory if set
         if let customPath = settings.outputDirectoryPath {
             let customURL = URL(fileURLWithPath: customPath, isDirectory: true)
             if fm.isWritableFile(atPath: customURL.path) { return customURL }
+            onLog?("⚠ Custom output directory not writable (\(customPath)), falling back.", .info)
         }
 
         let here = input.deletingLastPathComponent()
         if fm.isWritableFile(atPath: here.path) { return here }
 
+        onLog?("⚠ Source directory not writable, falling back to ~/Music/WaxOnWaxOff.", .info)
         let music = fm.homeDirectoryForCurrentUser.appendingPathComponent("Music/WaxOnWaxOff", isDirectory: true)
         if (try? fm.createDirectory(at: music, withIntermediateDirectories: true)) != nil {
             return music
         }
 
+        onLog?("⚠ ~/Music/WaxOnWaxOff unavailable, falling back to Desktop.", .info)
         return fm.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true)
     }
 }

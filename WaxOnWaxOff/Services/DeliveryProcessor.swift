@@ -64,6 +64,7 @@ actor DeliveryProcessor {
 
         // Phase 1: Analyze loudness
         onPhase?("Analyzing loudness…")
+        try Task.checkCancellation()  // CRITICAL-2
         onLog?("  loudnorm: analyzing…", .verbose)
         let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings)
         onLog?("  measured: \(String(format: "%.1f", measurements.inputI)) LUFS  |  TP \(String(format: "%.1f", measurements.inputTP)) dBTP  |  LRA \(String(format: "%.1f", measurements.inputLRA)) LU", .info)
@@ -71,6 +72,7 @@ actor DeliveryProcessor {
 
         // Phase 2: Render WAV
         onPhase?("Normalizing…")
+        try Task.checkCancellation()  // CRITICAL-2
         onLog?("  loudnorm: normalizing…", .verbose)
         let wavTempURL = outputDir.appendingPathComponent(".\(outputStem).part.\(UUID().uuidString.prefix(8)).wav")
         let wavFinalURL = outputDir.appendingPathComponent("\(outputStem).wav")
@@ -87,11 +89,15 @@ actor DeliveryProcessor {
             throw DeliveryError.outputNotCreated
         }
 
+        // HIGH-3: ensure wavTempURL is cleaned up on any failure path
+        defer { try? FileManager.default.removeItem(at: wavTempURL) }
+
         var outputURLs: [URL] = []
 
         if settings.outputMode == .wav || settings.outputMode == .both {
             try? FileManager.default.removeItem(at: wavFinalURL)
             try FileManager.default.moveItem(at: wavTempURL, to: wavFinalURL)
+            // wavTempURL is now gone (moved); defer removeItem is a no-op for it
             outputURLs.append(wavFinalURL)
             onLog?("✓ \(wavFinalURL.lastPathComponent)", .info)
             onLog?("  → \(wavFinalURL.path)", .verbose)
@@ -100,6 +106,7 @@ actor DeliveryProcessor {
         // Phase 3: Encode MP3 (if needed)
         if settings.outputMode == .mp3 || settings.outputMode == .both {
             onPhase?("Encoding MP3…")
+            try Task.checkCancellation()  // CRITICAL-2
             onLog?("  mp3: \(settings.mp3Bitrate)k  |  limiter: 2× oversample  |  ceiling -2.0 dBTP", .verbose)
 
             let sourceForMP3 = settings.outputMode == .both ? wavFinalURL : wavTempURL
@@ -281,7 +288,10 @@ actor DeliveryProcessor {
     }
 
     private nonisolated func parseLoudnormJSON(from stderr: String) -> LoudnormMeasurements? {
-        guard let braceRange = stderr.range(of: "{", options: .backwards) else { return nil }
+        guard let braceRange = stderr.range(of: "{", options: .backwards) else {
+            NSLog("WaxOff: loudnorm — no JSON block found in FFmpeg output:\n%@", stderr)
+            return nil
+        }
 
         var depth = 0
         var jsonEnd: String.Index?
@@ -295,12 +305,18 @@ actor DeliveryProcessor {
             }
         }
 
-        guard let jsonEnd else { return nil }
+        guard let jsonEnd else {
+            NSLog("WaxOff: loudnorm — unbalanced braces in FFmpeg output:\n%@", stderr)
+            return nil
+        }
 
         let jsonString = String(stderr[braceRange.lowerBound...jsonEnd])
         guard let data = jsonString.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
+        else {
+            NSLog("WaxOff: loudnorm — JSON parse failed for string: %@", jsonString)
+            return nil
+        }
 
         return LoudnormMeasurements(json: json)
     }

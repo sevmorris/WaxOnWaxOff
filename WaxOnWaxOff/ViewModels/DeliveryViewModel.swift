@@ -17,6 +17,9 @@ final class DeliveryViewModel {
     var log = ProcessingLog()
 
     private var processingTask: Task<Void, Never>?
+    // CRITICAL-3: track analysis/waveform tasks so they can be cancelled on removal
+    private var analysisTasks: [UUID: Task<Void, Never>] = [:]
+    private var analysisInfoTasks: [UUID: Task<Void, Never>] = [:]
 
     private static let validExtensions: Set<String> = [
         "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
@@ -49,23 +52,35 @@ final class DeliveryViewModel {
     }
 
     func removeSelected() {
+        cancelAnalysisTasks(for: selectedFileIDs)
         files.removeAll { selectedFileIDs.contains($0.id) }
         selectedFileIDs.removeAll()
     }
 
     func clearAll() {
+        cancelAnalysisTasks(for: Set(files.map { $0.id }))
         files.removeAll()
         selectedFileIDs.removeAll()
     }
 
     func removeFiles(at offsets: IndexSet) {
         let deletedIDs = Set(offsets.map { files[$0].id })
+        cancelAnalysisTasks(for: deletedIDs)
         files.remove(atOffsets: offsets)
         selectedFileIDs.subtract(deletedIDs)
     }
 
     func moveFiles(from source: IndexSet, to destination: Int) {
         files.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func cancelAnalysisTasks(for ids: Set<UUID>) {
+        for id in ids {
+            analysisTasks[id]?.cancel()
+            analysisInfoTasks[id]?.cancel()
+            analysisTasks.removeValue(forKey: id)
+            analysisInfoTasks.removeValue(forKey: id)
+        }
     }
 
     // MARK: - Processing
@@ -94,13 +109,21 @@ final class DeliveryViewModel {
         processingTask = Task {
             let processor = DeliveryProcessor()
 
-            for i in files.indices {
+            // CRITICAL-1: snapshot ready file IDs before any await so index mutations
+            // during async processing don't corrupt the loop or cause out-of-bounds access.
+            let readyFileIDs = files.compactMap { file -> UUID? in
+                guard case .ready = file.status else { return nil }
+                return file.id
+            }
+
+            for fileID in readyFileIDs {
                 guard !Task.isCancelled else { break }
 
-                let file = files[i]
-                guard case .ready = file.status else { continue }
+                // Re-check: file may have been removed while we awaited the previous one
+                guard let file = files.first(where: { $0.id == fileID }),
+                      case .ready = file.status else { continue }
 
-                if let idx = files.firstIndex(where: { $0.id == file.id }) {
+                if let idx = files.firstIndex(where: { $0.id == fileID }) {
                     files[idx].status = .processing
                 }
 
@@ -120,15 +143,15 @@ final class DeliveryViewModel {
                         }
                     )
 
-                    if let idx = files.firstIndex(where: { $0.id == file.id }),
+                    if let idx = files.firstIndex(where: { $0.id == fileID }),
                        let primaryURL = outputURLs.first {
                         files[idx].status = .processed(outputURL: primaryURL)
-                        generateOutputWaveform(id: file.id, url: primaryURL)
+                        generateOutputWaveform(id: fileID, url: primaryURL)
                     }
                 } catch is CancellationError {
                     break
                 } catch {
-                    if let idx = files.firstIndex(where: { $0.id == file.id }) {
+                    if let idx = files.firstIndex(where: { $0.id == fileID }) {
                         files[idx].status = .error(error.localizedDescription)
                     }
                 }
@@ -162,19 +185,21 @@ final class DeliveryViewModel {
     // MARK: - Private
 
     private func analyzeFileInfo(_ file: FileItem) {
-        Task {
+        let task = Task {
             if let info = try? await AudioAnalyzer.info(url: file.url),
                let idx = files.firstIndex(where: { $0.id == file.id }) {
                 files[idx].fileInfo = info
             }
+            analysisInfoTasks.removeValue(forKey: file.id)
         }
+        analysisInfoTasks[file.id] = task
     }
 
     private func analyzeFile(_ file: FileItem) {
         guard let index = files.firstIndex(where: { $0.id == file.id }) else { return }
         files[index].status = .analyzing
 
-        Task {
+        let task = Task {
             do {
                 let stats = try await AudioAnalyzer.analyze(url: file.url)
                 if let idx = files.firstIndex(where: { $0.id == file.id }) {
@@ -185,7 +210,9 @@ final class DeliveryViewModel {
                     files[idx].status = .error(error.localizedDescription)
                 }
             }
+            analysisTasks.removeValue(forKey: file.id)
         }
+        analysisTasks[file.id] = task
     }
 
     private func generateWaveform(_ file: FileItem) {
@@ -196,7 +223,8 @@ final class DeliveryViewModel {
                     files[idx].waveform = waveform
                 }
             } catch {
-                // Waveform generation failed — non-critical, file is still usable
+                // HIGH-4: non-critical but log for debugging
+                NSLog("WaxOff: waveform generation failed for %@: %@", file.url.lastPathComponent, error.localizedDescription)
             }
         }
     }
@@ -209,7 +237,7 @@ final class DeliveryViewModel {
                     files[idx].outputWaveform = waveform
                 }
             } catch {
-                // Output waveform generation failed — non-critical, processed file is unaffected
+                NSLog("WaxOff: output waveform generation failed for %@: %@", url.lastPathComponent, error.localizedDescription)
             }
         }
     }

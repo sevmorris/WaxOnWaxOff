@@ -43,7 +43,10 @@ enum WaveformGenerator {
         var bucketSums = [Float](repeating: 0, count: actualBuckets)
         var bucketPeaks = [Float](repeating: 0, count: actualBuckets)
         var bucketCounts = [Int](repeating: 0, count: actualBuckets)
-        var channelBucketPeaks = [[Float]](repeating: [Float](repeating: 0, count: actualBuckets), count: channels)
+        // LOW-2: only allocate per-channel peaks for multi-channel files
+        var channelBucketPeaks = channels > 1
+            ? [[Float]](repeating: [Float](repeating: 0, count: actualBuckets), count: channels)
+            : [[Float]](repeating: [Float](repeating: 0, count: actualBuckets), count: 1)
 
         // Read in chunks to avoid loading the entire file into RAM
         let chunkSize: AVAudioFrameCount = 32768
