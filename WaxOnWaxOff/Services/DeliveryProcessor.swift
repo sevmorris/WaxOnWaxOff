@@ -295,8 +295,11 @@ actor DeliveryProcessor {
     }
 
     private nonisolated func parseLoudnormJSON(from stderr: String) -> LoudnormMeasurements? {
+        // Local logger avoids MainActor isolation conflict on the file-scope let.
+        let log = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
+
         guard let braceRange = stderr.range(of: "{", options: .backwards) else {
-            logger.debug("loudnorm — no JSON block found in FFmpeg output")
+            log.debug("loudnorm — no JSON block found in FFmpeg output")
             return nil
         }
 
@@ -313,7 +316,7 @@ actor DeliveryProcessor {
         }
 
         guard let jsonEnd else {
-            logger.debug("loudnorm — unbalanced braces in FFmpeg output")
+            log.debug("loudnorm — unbalanced braces in FFmpeg output")
             return nil
         }
 
@@ -321,7 +324,7 @@ actor DeliveryProcessor {
         guard let data = jsonString.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
-            logger.debug("loudnorm — JSON parse failed")
+            log.debug("loudnorm — JSON parse failed")
             return nil
         }
 
