@@ -66,7 +66,12 @@ CURRENT=$(grep MARKETING_VERSION "$PROJECT/project.pbxproj" | head -1 | grep -o 
 if [[ "$CURRENT" == "$VERSION" ]]; then
     ok "Already at $VERSION"
 else
-    sed -i '' "s/MARKETING_VERSION = ${CURRENT};/MARKETING_VERSION = ${VERSION};/g" \
+    # Escape dots (and other regex metacharacters) so pre-release versions like
+    # "1.7.0-rc.1" don't cause sed pattern mismatches.
+    local ESC_CURRENT ESC_VERSION
+    ESC_CURRENT=$(printf '%s' "$CURRENT" | sed 's/[.[\*^$]/\\&/g')
+    ESC_VERSION=$(printf '%s'  "$VERSION" | sed 's/[.[\*^$]/\\&/g')
+    sed -i '' "s/MARKETING_VERSION = ${ESC_CURRENT};/MARKETING_VERSION = ${ESC_VERSION};/g" \
         "$PROJECT/project.pbxproj"
     ok "Bumped $CURRENT → $VERSION"
     git add "$PROJECT/project.pbxproj"

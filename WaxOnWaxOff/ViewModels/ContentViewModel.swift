@@ -1,6 +1,9 @@
 import Foundation
 import Observation
+import OSLog
 import SwiftUI
+
+private let logger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "ContentVM")
 
 @Observable
 @MainActor
@@ -18,6 +21,8 @@ final class ContentViewModel {
     private var processingCancelled = false
     private var analysisTasks: [UUID: Task<Void, Never>] = [:]
     private var analysisInfoTasks: [UUID: Task<Void, Never>] = [:]
+    private var waveformTasks: [UUID: Task<Void, Never>] = [:]
+    private var outputWaveformTasks: [UUID: Task<Void, Never>] = [:]
 
     private static let validExtensions: Set<String> = [
         "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
@@ -82,8 +87,12 @@ final class ContentViewModel {
         for id in ids {
             analysisTasks[id]?.cancel()
             analysisInfoTasks[id]?.cancel()
+            waveformTasks[id]?.cancel()
+            outputWaveformTasks[id]?.cancel()
             analysisTasks.removeValue(forKey: id)
             analysisInfoTasks.removeValue(forKey: id)
+            waveformTasks.removeValue(forKey: id)
+            outputWaveformTasks.removeValue(forKey: id)
         }
     }
 
@@ -99,7 +108,7 @@ final class ContentViewModel {
     }
 
     func saveCurrentAsPreset(name: String) {
-        presetStore.savePreset(name: name, settings: settings)
+        presetStore.savePreset(WaxOnPreset(name: name, settings: settings))
     }
 
     func process() {
@@ -220,7 +229,7 @@ final class ContentViewModel {
     }
 
     private func generateWaveform(_ file: FileItem) {
-        Task {
+        let task = Task {
             do {
                 let waveform = try await WaveformGenerator.generate(url: file.url)
                 if let currentIndex = files.firstIndex(where: { $0.id == file.id }) {
@@ -228,9 +237,11 @@ final class ContentViewModel {
                 }
             } catch {
                 // Non-critical — file is still processable without a waveform
-                NSLog("WaxOn: waveform generation failed for %@: %@", file.url.lastPathComponent, error.localizedDescription)
+                logger.debug("Waveform generation failed for \(file.url.lastPathComponent, privacy: .private): \(error.localizedDescription, privacy: .public)")
             }
+            waveformTasks.removeValue(forKey: file.id)
         }
+        waveformTasks[file.id] = task
     }
 
     private func analyzeOutputFile(id: UUID, url: URL) {
@@ -246,15 +257,17 @@ final class ContentViewModel {
     }
 
     private func generateOutputWaveform(id: UUID, url: URL) {
-        Task {
+        let task = Task {
             do {
                 let waveform = try await WaveformGenerator.generate(url: url)
                 if let currentIndex = files.firstIndex(where: { $0.id == id }) {
                     files[currentIndex].outputWaveform = waveform
                 }
             } catch {
-                NSLog("WaxOn: output waveform generation failed for %@: %@", url.lastPathComponent, error.localizedDescription)
+                logger.debug("Output waveform generation failed for \(url.lastPathComponent, privacy: .private): \(error.localizedDescription, privacy: .public)")
             }
+            outputWaveformTasks.removeValue(forKey: id)
         }
+        outputWaveformTasks[id] = task
     }
 }

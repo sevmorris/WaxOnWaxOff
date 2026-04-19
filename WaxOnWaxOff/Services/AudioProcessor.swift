@@ -104,10 +104,11 @@ actor AudioProcessor {
         if isStereo, let modelURL = nrModelURL {
             // Split → denoise each channel independently → rejoin, then
             // highpass + phase rotation + resample.
+            let escapedModel = ffmpegFilterEscape(modelURL.path)
             let fc = [
                 "[0:a]channelsplit=channel_layout=stereo[L][R]",
-                "[L]arnndn=m=\(modelURL.path)[Lnr]",
-                "[R]arnndn=m=\(modelURL.path)[Rnr]",
+                "[L]arnndn=m=\(escapedModel)[Lnr]",
+                "[R]arnndn=m=\(escapedModel)[Rnr]",
                 "[Lnr][Rnr]join=inputs=2:channel_layout=stereo,",
                 "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
             ].joined(separator: ";")
@@ -120,7 +121,7 @@ actor AudioProcessor {
             // Mono output, or no NR — simple -af chain
             var nrPrefix = ""
             if let modelURL = nrModelURL {
-                nrPrefix = "arnndn=m=\(modelURL.path),"
+                nrPrefix = "arnndn=m=\(ffmpegFilterEscape(modelURL.path)),"
             }
             let step1Af: String
             if isStereo {
@@ -201,11 +202,12 @@ actor AudioProcessor {
                let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
                 let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
                 onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
+                let escapedNrModel = ffmpegFilterEscape(modelURL.path)
                 if isStereo {
                     let nrFc = [
                         "[0:a]channelsplit=channel_layout=stereo[L][R]",
-                        "[L]arnndn=m=\(modelURL.path)[Lnr]",
-                        "[R]arnndn=m=\(modelURL.path)[Rnr]",
+                        "[L]arnndn=m=\(escapedNrModel)[Lnr]",
+                        "[R]arnndn=m=\(escapedNrModel)[Rnr]",
                         "[Lnr][Rnr]join=inputs=2:channel_layout=stereo"
                     ].joined(separator: ";")
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
@@ -216,7 +218,7 @@ actor AudioProcessor {
                 } else {
                     try await runFFmpeg(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postDynLevelURL.path, "-af", "arnndn=m=\(modelURL.path)",
+                        "-i", postDynLevelURL.path, "-af", "arnndn=m=\(escapedNrModel)",
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 }
@@ -461,6 +463,16 @@ actor AudioProcessor {
             throw ProcessingError.tempDirectoryFailed
         }
         return dir
+    }
+
+    /// Escape a string for safe use inside an FFmpeg filtergraph value.
+    /// Handles the five characters the filtergraph parser treats as syntax.
+    private nonisolated func ffmpegFilterEscape(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\")
+         .replacingOccurrences(of: "'",  with: "\\'")
+         .replacingOccurrences(of: ":",  with: "\\:")
+         .replacingOccurrences(of: "[",  with: "\\[")
+         .replacingOccurrences(of: "]",  with: "\\]")
     }
 
     private func formatDbTag(_ db: Double) -> String {

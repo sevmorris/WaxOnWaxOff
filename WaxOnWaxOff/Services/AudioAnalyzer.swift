@@ -16,27 +16,29 @@ enum AudioAnalyzer {
     }
 
     private static func gatherInfo(url: URL) throws -> FileInfo {
-        let file = try AVAudioFile(forReading: url)
-        let fmt = file.fileFormat
-        let sr = fmt.sampleRate
-        let dur = sr > 0 ? Double(file.length) / sr : 0
-        let bitDepth = fmt.settings[AVLinearPCMBitDepthKey] as? Int
-        let ext = url.pathExtension.uppercased()
+        try autoreleasepool {
+            let file = try AVAudioFile(forReading: url)
+            let fmt = file.fileFormat
+            let sr = fmt.sampleRate
+            let dur = sr > 0 ? Double(file.length) / sr : 0
+            let bitDepth = fmt.settings[AVLinearPCMBitDepthKey] as? Int
+            let ext = url.pathExtension.uppercased()
 
-        var bitRate: Double? = nil
-        if let sz = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64),
-           dur > 0 {
-            bitRate = Double(sz * 8) / dur
+            var bitRate: Double? = nil
+            if let sz = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64),
+               dur > 0 {
+                bitRate = Double(sz * 8) / dur
+            }
+
+            return FileInfo(
+                format: ext.isEmpty ? "Audio" : ext,
+                sampleRate: sr,
+                channelCount: Int(fmt.channelCount),
+                bitDepth: bitDepth,
+                duration: dur,
+                bitRate: bitRate
+            )
         }
-
-        return FileInfo(
-            format: ext.isEmpty ? "Audio" : ext,
-            sampleRate: sr,
-            channelCount: Int(fmt.channelCount),
-            bitDepth: bitDepth,
-            duration: dur,
-            bitRate: bitRate
-        )
     }
 
     static func analyze(url: URL) async throws -> AudioStats {
@@ -57,6 +59,9 @@ enum AudioAnalyzer {
             throw ProcessingError.analysisError("File does not exist")
         }
 
+        // autoreleasepool ensures the file descriptor is returned to the OS promptly,
+        // preventing fd exhaustion when many files are analyzed concurrently.
+        return try autoreleasepool {
         let file: AVAudioFile
         do {
             file = try AVAudioFile(forReading: url)
@@ -194,6 +199,7 @@ enum AudioAnalyzer {
         }
 
         return AudioStats(rms: rmsDb, peak: peakDb, crest: crestDb, lufs: lufs, noiseFloor: noiseFloor)
+        } // end autoreleasepool
     }
 
     /// Applies ITU-R BS.1770 absolute + relative gating to block mean-squares.

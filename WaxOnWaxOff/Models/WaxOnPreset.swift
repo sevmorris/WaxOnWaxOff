@@ -1,51 +1,16 @@
 import Foundation
 import Observation
 
-struct WaxOnPreset: Identifiable, Codable, Equatable {
-    let id: UUID
-    var name: String
-    var settings: WaxOnSettings
-
-    init(id: UUID = UUID(), name: String, settings: WaxOnSettings) {
-        self.id = id
-        self.name = name
-        self.settings = settings
+private extension UUID {
+    init(knownValid string: String) {
+        guard let uuid = UUID(uuidString: string) else {
+            preconditionFailure("Invalid built-in UUID constant: \(string)")
+        }
+        self = uuid
     }
-
-    static let builtIn: [WaxOnPreset] = [
-        WaxOnPreset(
-            id: UUID(uuidString: "A0000000-0000-0000-0000-000000000001")!,
-            name: "Defaults",
-            settings: WaxOnSettings()
-        ),
-        WaxOnPreset(
-            id: UUID(uuidString: "A0000000-0000-0000-0000-000000000002")!,
-            name: "Edit Prep",
-            settings: WaxOnSettings(
-                sampleRate: .s44100,
-                outputChannels: .mono,
-                channel: .left,
-                limitDb: -1.0,
-                loudnormEnabled: true,
-                loudnormTarget: -30.0,
-                dcBlockHz: 80
-            )
-        ),
-        WaxOnPreset(
-            id: UUID(uuidString: "A0000000-0000-0000-0000-000000000003")!,
-            name: "Edit Prep EBU",
-            settings: WaxOnSettings(
-                sampleRate: .s44100,
-                outputChannels: .mono,
-                channel: .left,
-                limitDb: -1.0,
-                loudnormEnabled: true,
-                loudnormTarget: -23.0,
-                dcBlockHz: 80
-            )
-        ),
-    ]
 }
+
+// MARK: - WaxOnPresetStore
 
 @Observable
 final class WaxOnPresetStore {
@@ -67,18 +32,15 @@ final class WaxOnPresetStore {
         return allPresets.first { $0.id == id }
     }
 
-    func savePreset(name: String, settings: WaxOnSettings) {
-        let preset = WaxOnPreset(name: name, settings: settings)
+    func savePreset(_ preset: WaxOnPreset) {
         presets.append(preset)
-        saveToUserDefaults()
+        persist()
     }
 
     func deletePreset(_ preset: WaxOnPreset) {
         presets.removeAll { $0.id == preset.id }
-        if selectedPresetID == preset.id {
-            selectedPresetID = nil
-        }
-        saveToUserDefaults()
+        if selectedPresetID == preset.id { selectedPresetID = nil }
+        persist()
     }
 
     func isBuiltIn(_ preset: WaxOnPreset) -> Bool {
@@ -90,8 +52,57 @@ final class WaxOnPresetStore {
         presets = (try? JSONDecoder().decode([WaxOnPreset].self, from: data)) ?? []
     }
 
-    private func saveToUserDefaults() {
+    private func persist() {
         guard let data = try? JSONEncoder().encode(presets) else { return }
         UserDefaults.standard.set(data, forKey: userDefaultsKey)
     }
 }
+
+// MARK: -
+
+struct WaxOnPreset: Identifiable, Codable, Equatable {
+    let id: UUID
+    var name: String
+    var settings: WaxOnSettings
+
+    init(id: UUID = UUID(), name: String, settings: WaxOnSettings) {
+        self.id = id
+        self.name = name
+        self.settings = settings
+    }
+
+    static let builtIn: [WaxOnPreset] = [
+        WaxOnPreset(
+            id: UUID(knownValid: "A0000000-0000-0000-0000-000000000001"),
+            name: "Defaults",
+            settings: WaxOnSettings()
+        ),
+        WaxOnPreset(
+            id: UUID(knownValid: "A0000000-0000-0000-0000-000000000002"),
+            name: "Edit Prep",
+            settings: WaxOnSettings(
+                sampleRate: .s44100,
+                outputChannels: .mono,
+                channel: .left,
+                limitDb: -1.0,
+                loudnormEnabled: true,
+                loudnormTarget: -30.0,
+                dcBlockHz: 80
+            )
+        ),
+        WaxOnPreset(
+            id: UUID(knownValid: "A0000000-0000-0000-0000-000000000003"),
+            name: "Edit Prep EBU",
+            settings: WaxOnSettings(
+                sampleRate: .s44100,
+                outputChannels: .mono,
+                channel: .left,
+                limitDb: -1.0,
+                loudnormEnabled: true,
+                loudnormTarget: -23.0,
+                dcBlockHz: 80
+            )
+        ),
+    ]
+}
+

@@ -1,4 +1,7 @@
 import Foundation
+import OSLog
+
+private let logger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
 
 // MARK: - Loudnorm Measurements
 
@@ -266,7 +269,11 @@ actor DeliveryProcessor {
                     readGroup.leave()
                 }
 
+                let timeoutItem = DispatchWorkItem { process.terminate() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
+
                 process.terminationHandler = { proc in
+                    timeoutItem.cancel()
                     readGroup.wait()
                     if proc.terminationReason == .uncaughtSignal {
                         continuation.resume(throwing: CancellationError())
@@ -289,7 +296,7 @@ actor DeliveryProcessor {
 
     private nonisolated func parseLoudnormJSON(from stderr: String) -> LoudnormMeasurements? {
         guard let braceRange = stderr.range(of: "{", options: .backwards) else {
-            NSLog("WaxOff: loudnorm — no JSON block found in FFmpeg output:\n%@", stderr)
+            logger.debug("loudnorm — no JSON block found in FFmpeg output")
             return nil
         }
 
@@ -306,7 +313,7 @@ actor DeliveryProcessor {
         }
 
         guard let jsonEnd else {
-            NSLog("WaxOff: loudnorm — unbalanced braces in FFmpeg output:\n%@", stderr)
+            logger.debug("loudnorm — unbalanced braces in FFmpeg output")
             return nil
         }
 
@@ -314,7 +321,7 @@ actor DeliveryProcessor {
         guard let data = jsonString.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
-            NSLog("WaxOff: loudnorm — JSON parse failed for string: %@", jsonString)
+            logger.debug("loudnorm — JSON parse failed")
             return nil
         }
 
