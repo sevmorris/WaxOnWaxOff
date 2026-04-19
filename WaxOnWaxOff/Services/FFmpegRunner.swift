@@ -1,4 +1,4 @@
-import Foundation
+@preconcurrency import Foundation
 
 /// Shared ffmpeg process runner used by AudioProcessor and DeliveryProcessor.
 /// Extracted to reduce duplication and make the command-building logic testable.
