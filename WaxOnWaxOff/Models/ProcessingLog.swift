@@ -14,7 +14,7 @@ struct LogEntry: Identifiable {
 
 @Observable
 @MainActor
-final class ProcessingLog: @unchecked Sendable {
+final class ProcessingLog {
     var entries: [LogEntry] = []
 
     func append(_ message: String, level: LogLevel = .info) {

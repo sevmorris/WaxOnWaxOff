@@ -116,7 +116,6 @@ enum FFmpegRunner {
         process.arguments = args
         process.standardInput = FileHandle.nullDevice
 
-        nonisolated(unsafe) var cancelled = false
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Int32, String), Error>) in
                 let stderrPipe = Pipe()
@@ -132,9 +131,15 @@ enum FFmpegRunner {
                     readGroup.leave()
                 }
 
+                let timeoutItem = DispatchWorkItem { process.terminate() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
+
                 process.terminationHandler = { proc in
+                    timeoutItem.cancel()
                     readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal || cancelled {
+                    // SIGTERM from our onCancel handler sets terminationReason to .uncaughtSignal;
+                    // no shared flag needed — eliminates the data race.
+                    if proc.terminationReason == .uncaughtSignal {
                         continuation.resume(throwing: CancellationError())
                         return
                     }
@@ -152,7 +157,6 @@ enum FFmpegRunner {
                 }
             }
         } onCancel: {
-            cancelled = true
             process.terminate()
         }
     }

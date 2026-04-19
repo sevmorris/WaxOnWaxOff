@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        App sandbox is intentionally disabled (ENABLE_APP_SANDBOX = NO in build settings).
+        Reason: the app bundles ffmpeg and ffprobe binaries and launches them via Process().
+        macOS sandbox blocks exec() on non-sandboxed executables, making this incompatible
+        with App Sandbox. This is a deliberate architectural decision — not an oversight.
+
+        Entitlements listed here reflect what the app actually uses.
+    -->
+
+    <!-- Read/write access to files the user explicitly selects via open/save panels or drag-and-drop -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+
+    <!-- Network access for GitHub release update checks (UpdateChecker) -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Explicitly not requested -->
+    <!-- com.apple.security.device.microphone — app processes existing files, no live recording -->
+    <!-- com.apple.security.files.all — not needed; user-selected access is sufficient -->
+</dict>
+</plist>

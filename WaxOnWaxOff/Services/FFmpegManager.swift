@@ -47,8 +47,10 @@ actor FFmpegManager {
 
     private func copyToTemp() throws -> Paths {
         let fm = FileManager.default
+        // Version-key the directory so updated app builds always use fresh binaries.
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
         let tempBase = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("WaxOn/bin", isDirectory: true)
+            .appendingPathComponent("WaxOn-\(appVersion)/bin", isDirectory: true)
 
         try fm.createDirectory(at: tempBase, withIntermediateDirectories: true)
 
