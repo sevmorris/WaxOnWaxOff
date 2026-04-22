@@ -1,10 +1,8 @@
 # WaxOn / WaxOff
-### Two-Mode Audio Engineering Protocol for macOS
+### Two-Mode Audio Engineering Utility for macOS
 
 <p align="center">
-  <img src="docs/icon.png" width="128" height="128" />
-  <br />
-  <strong>Component ID:</strong> Podcast Audio Prep Utility
+  <strong>Podcast Audio Prep Utility</strong>
   <br />
   <strong>Version:</strong> 1.6.2
   <br />
@@ -22,7 +20,7 @@ This tool was built to solve specific signal-to-noise and normalization challeng
 ---
 
 > [!CAUTION]
-> **Authentication Protocol (Unsigned Binary)**
+> **Manual Authorization Required**
 > macOS will block execution because this utility is not notarized. To authorize:
 > 1. Move `WaxOnWaxOff.app` to your `/Applications` folder.
 > 2. Run the following command in Terminal:
