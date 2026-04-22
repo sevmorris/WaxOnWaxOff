@@ -1,110 +1,75 @@
+# WaxOn / WaxOff
+### Two-Mode Audio Engineering Protocol for macOS
+
 <p align="center">
   <img src="docs/icon.png" width="128" height="128" />
   <br />
+  <strong>Component ID:</strong> Podcast Audio Prep Utility
   <br />
-  <strong>Podcast Audio Prep for macOS</strong>
-  <br />
-  <strong>Version: </strong>1.6.2
+  <strong>Version:</strong> 1.6.2
   <br />
   <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.6.2.dmg"><strong>Download</strong></a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/">Manual</a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html">Theory of Operation</a>
-  <br />
-  <br />
 </p>
 
-WaxOn/WaxOff is a two-mode audio tool for podcasters. **WaxOn** prepares raw recordings for editing: high-pass filtering, noise reduction, loudness normalization, phase rotation, and brick-wall limiting. **WaxOff** finalizes your edited mix for distribution: EBU R128 loudness normalization, true peak control, and MP3 encoding. For third-party broadcast clips going into your mix, use ClipHack.
+**WaxOn/WaxOff** is an internal utility designed to enforce signal integrity and loudness standards across a podcast production pipeline. It provides a standardized, two-stage workflow for preparing raw assets and finalizing distribution masters.
 
-> ⚠️ **Important: Read Before First Launch**
->
-> macOS will block the app because it is not notarized with Apple. After dragging WaxOn to Applications, **run this command in Terminal:**
->
-> ```
-> xattr -cr /Applications/WaxOnWaxOff.app
-> ```
->
-> Without this step, macOS will refuse to open the app.
+This tool was built to solve specific signal-to-noise and normalization challenges in freelance audio engineering. While developed for personal use, it is made publicly available for others who require a "zero-fluff" technical solution for voice-forward audio processing.
 
-## WaxOn — Raw Recording Prep
+---
 
-Use WaxOn on raw recordings before editing. Drop your files in, configure what you care about, and get to editing.
+> [!CAUTION]
+> **Authentication Protocol (Unsigned Binary)**
+> macOS will block execution because this utility is not notarized. To authorize:
+> 1. Move `WaxOnWaxOff.app` to your `/Applications` folder.
+> 2. Run the following command in Terminal:
+>    `xattr -cr /Applications/WaxOnWaxOff.app`
 
-- **High-Pass Filter** — configurable cutoff (20–90 Hz, default 80 Hz) removes rumble, HVAC hum, and handling noise; set to 20 Hz for DC Block only
-- **Noise Reduction** — optional RNNoise ML-based background noise suppression (off by default); best for recordings with consistent steady-state background noise. For stereo output, channels are split and denoised independently to ensure balanced processing
-- **Loudness Normalization** — optional two-pass EBU R128 with configurable target (−35 to −16 LUFS); linear gain only, dynamics fully preserved. When NR is off, the analysis pass uses noise reduction internally to prevent broadband noise from skewing the measurement, keeping the output unmodified.
-- **Noise Floor Detection** — estimated noise floor displayed in the stats panel with color-coded warnings; a ⚠️ badge appears on files with high noise floors that may affect loudness accuracy
-- **Brick-Wall Limiting** — 2× oversampled true peak control at the chosen ceiling (−1 to −3 dB)
-- **Phase Rotation** — 200 Hz allpass to reduce peak asymmetry and improve limiter headroom
-- **Mono or Stereo Output** — mono with left/right channel extraction, or stereo with per-channel noise reduction when NR is enabled
-- **Sample Rate Conversion** — 44.1 kHz or 48 kHz output
-- **Presets** — three built-in presets (Defaults, Edit Prep, Edit Prep EBU) plus custom presets saved and deleted from the toolbar menu
-- **Batch Processing** — up to 3 concurrent jobs with per-file progress
+---
 
-**Output:** `{name}-{rate}waxon-{limit}.wav` (24-bit WAV)
+## I. WaxOn — Signal Conditioning (Prep)
+*Use on raw recordings prior to non-destructive editing.*
 
-## WaxOff — Delivery & Mastering
+* **High-Pass Filter:** Configurable cutoff (20–90 Hz) for HVAC/handling noise removal.
+* **Noise Reduction:** Optional RNNoise (ML-based) suppression; best for steady-state background noise.
+* **Loudness Normalization:** Two-pass EBU R128 linear gain (dynamics fully preserved).
+* **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
+* **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
+* **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom.
 
-Use WaxOff on your finished, edited mix. Apply broadcast-standard loudness normalization and deliver as WAV, MP3, or both.
+**Output Logic:** `{name}-{rate}waxon-{limit}.wav` (24-bit)
 
-- **EBU R128 Loudness Normalization** — two-pass analysis + linear gain; no dynamic processing, stereo image and transients are unchanged
-- **True Peak Control** — configurable ceiling (−3.0 to −0.1 dBTP, default −1.0)
-- **WAV + MP3 Output** — 24-bit WAV, CBR MP3 (128/160/192 kbps), or both; MP3 always outputs at 44.1 kHz
-- **Phase Rotation** — optional 150 Hz allpass to reduce crest factor on bass-heavy material
-- **Presets** — three built-in presets (Podcast Standard, Podcast Loud, WAV Only Mastering) plus custom presets
-- **Sample Rate Conversion** — 44.1 kHz or 48 kHz
+## II. WaxOff — Distribution Mastering
+*Use on finished mixes to ensure broadcast compliance.*
 
-**Output:** `{name}-lev-{target}LUFS.wav` / `.mp3`
+* **EBU R128 Normalization:** Two-pass analysis + linear gain; no dynamic compression.
+* **True Peak Management:** Configurable ceiling (−3.0 to −0.1 dBTP).
+* **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
+* **Crest Factor Optimization:** Optional 150 Hz allpass for bass-heavy material.
 
-### Built-In Presets
+**Output Logic:** `{name}-lev-{target}LUFS.[wav/mp3]`
 
-| Preset | Target | True Peak | Output | MP3 | Sample Rate |
-|--------|--------|-----------|--------|-----|-------------|
-| Podcast Standard | −18 LUFS | −1.0 dBTP | WAV + MP3 | 160 kbps | 44.1 kHz |
-| Podcast Loud | −16 LUFS | −1.0 dBTP | WAV + MP3 | 160 kbps | 44.1 kHz |
-| WAV Only (Mastering) | −18 LUFS | −1.0 dBTP | WAV only | — | 48 kHz |
+---
 
-## Shared Features
+## Operational Specifications
+* **Waveform Audit:** Real-time waveform preview with dB scaling.
+* **Metadata Stats:** RMS, Peak, Crest Factor, Integrated LUFS, and Floor estimation.
+* **Concurrency:** 3 simultaneous batch processing threads.
+* **Environment:** macOS 14.0+ (Sonoma); Native Apple Silicon and Intel support.
+* **Dependencies:** Bundled FFmpeg; no external installation required.
 
-- **Waveform Preview** — select a file to view its waveform with dB scale
-- **File Stats** — format, sample rate, channels, bit depth, duration, bit rate, RMS, peak, crest factor, integrated LUFS, and estimated noise floor
-- **Noise Floor Warning** — files with a high noise floor show a ⚠️ badge in the file list and a color-coded FLOOR stat (orange above −50 dBFS, red above −40 dBFS)
-- **Drag & Drop** — drop files anywhere on the window
-- **Resizable Layout** — drag the divider between file list and waveform panel
-- **Custom Output Directory** — optionally set a dedicated output folder
-- **Reveal in Finder** — click to reveal processed files
-- **Delete Key** — press Delete to remove selected files from the queue
-- **Independent File Lists** — each mode keeps its own queue; switching modes doesn't disturb your work
-- **Collapsible Settings Sidebar** — toggle the settings panel with the toolbar button; slides in/out from the right edge
+## Technical Origin
+This utility is the result of a **Human-AI Collaboration**. 
 
-## Workflow
+I am an audio engineer, not a developer; these tools are built using AI-assisted coding to bridge that technical gap. I act as the **Architect and Executive Producer**, defining the audio signal chains and logic, while the code is generated through iterative stress-testing with Large Language Models. 
 
-```
-Raw recordings → WaxOn → Edit in DAW → WaxOff → Distribute
-```
+This is a personal toolset provided "as-is." It is designed for utility and precision, not as a commercial product.
 
-## Beyond Podcasting
+---
 
-WaxOn was designed for podcast audio, but the prep pipeline (high-pass filtering, phase rotation, loudness normalization, and limiting) maps well to any voice-forward production workflow. If you're editing interviews, documentary dialog, or other spoken-word content outside a full DAW environment, it works the same way.
-
-## Supported Formats
-
-WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV. FFmpeg is bundled; no separate installation required.
-
-## System Requirements
-
-- macOS 14.0 (Sonoma) or later
-- Apple Silicon or Intel Mac
-
-## License
-
-Copyright © 2026. This app was designed and directed by Seven Morris, with code primarily generated through AI collaboration using [OpenClaw](https://openclaw.ai) and Claude (Anthropic).
-
-This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License v3.0](LICENSE).
-
-## A Note on AI
-
-I'm a freelance audio engineer, not a software developer. These tools exist because AI made it possible for me to build things I couldn't build alone. These aren't products. I made them for my own use and put them out there because they might be useful to others. 
-
-At the same time I want to acknowledge that AI raises deep questions about labor displacement, resource consumption, surveillance, the concentration of power in a small number of corporations, and the increasingly close relationship between those corporations and governments. It's reshaping culture in ways that are harder to quantify too: authors replacing illustrators with generated images, fabricated photos designed to deceive, political misinformation at scale. These aren't hypothetical risks; they're unfolding now, and the implications for ordinary people are significant.
+### License
+Copyright © 2026 Seven Morris.
+Distributed under the [GNU General Public License v3.0](LICENSE).
