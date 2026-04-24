@@ -486,12 +486,11 @@ actor AudioProcessor {
     // Maps 0.0 (gentle) → 1.0 (aggressive) to dynaudnorm parameters.
     // Shorter frames and tighter Gaussian smoothing = more responsive leveling.
     private func dynamicLevelingFilter(amount: Double) -> String {
-        let f = Int(750.0 - amount * 600.0)         // frame ms: 750 → 150
-        let gRaw = Int(31.0 - amount * 24.0)        // gaussian: 31 → 7
+        let f = Int(500.0 - amount * 350.0)         // frame ms: 500 → 150
+        let gRaw = Int(31.0 - amount * 16.0)        // gaussian: 31 → 15
         let g = gRaw % 2 == 0 ? gRaw - 1 : gRaw    // must be odd
-        let m = 8.0 + amount * 12.0                 // max gain factor: 8x → 20x
-        let s = 1.0 - amount * 0.7                  // min-sdev: 1.0 → 0.3 (prevents boosting near-silence in sparse audio)
-        return "dynaudnorm=f=\(f):g=\(g):r=1:p=0.95:m=\(String(format: "%.1f", m)):s=\(String(format: "%.2f", s)):n=1:b=1"
+        let m = 2.0 + amount * 4.0                  // max gain factor: 2x → 6x (+6 to +15 dB)
+        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m))"
     }
 
     private func bestOutputDir(for input: URL) -> URL {
