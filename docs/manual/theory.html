@@ -842,19 +842,19 @@
     <p>Level Riding handles recordings where loud outliers need taming. Dynamic Leveling handles recordings where the level variation is fundamental to the source — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. In these cases, downward-only gain riding doesn't help: you need to lift the quiet material, not just suppress the loud material.</p>
 
     <h3>How It Differs from Level Riding</h3>
-    <p>Both features use <code>dynaudnorm</code>. The critical difference is the <code>m</code> parameter (maximum gain factor) and the <code>b</code> parameter (bidirectional mode):</p>
+    <p>Both features use <code>dynaudnorm</code>. The critical differences are the <code>m</code> parameter (maximum gain factor) and the silence-threshold <code>t</code>:</p>
     <ul>
-      <li>Level Riding: <code>m=1.0</code> (gain capped at unity — attenuation only) and no <code>b</code> parameter (default unidirectional)</li>
-      <li>Dynamic Leveling: <code>m</code> ranges from 8.0 to 20.0 (can boost frames up to 8×–20× above their original level) and <code>b=1</code> (bidirectional — processes the file forward and backward and combines the result for smoother transitions)</li>
+      <li>Level Riding: <code>m=1.0</code> — gain capped at unity, attenuation only.</li>
+      <li>Dynamic Leveling: <code>m</code> ranges from 2.0 to 6.0 (can boost frames up to 2×–6× above their original level, ≈ +6 to +15.6 dB) plus <code>t=0.05</code>, a peak-magnitude silence threshold (≈ −26 dBFS) that prevents the leveler from amplifying the noise floor between words on sparse voice material.</li>
     </ul>
-    <p>With <code>m</code> greater than 1.0 and bidirectional enabled, quiet sections are actively boosted toward the target peak, not just left alone. This is the right behavior for uneven source material, but it will also boost the noise floor during quiet passages — so it's not the right choice for single-voice recordings where preserving the noise floor is important.</p>
+    <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — given <code>m &gt; 1.0</code> it lifts quiet sections toward the target peak, not just leaves them alone. This is the right behavior for uneven source material, but it will also boost the noise floor during quiet passages where it isn't gated out by <code>t</code>, so it's not the right choice for single-voice recordings where preserving the noise floor is important.</p>
 
     <h3>The Aggressiveness Slider</h3>
-    <p>The Aggressiveness slider maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
+    <p>The Aggressiveness slider is a 0–1 control that maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
     <ul>
-      <li><strong>Frame size (<code>f</code>)</strong>: 750ms at Gentle, 150ms at Aggressive. Shorter frames mean the filter can respond to level changes more quickly.</li>
-      <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 7 frames at Aggressive. Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
-      <li><strong>Max gain (<code>m</code>)</strong>: 8× at Gentle, 20× at Aggressive. Controls how much the filter will boost a quiet frame to reach the target peak.</li>
+      <li><strong>Frame size (<code>f</code>)</strong>: 500 ms at Gentle, 150 ms at Aggressive. Shorter frames mean the filter can respond to level changes more quickly.</li>
+      <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 15 frames at Aggressive (forced odd). Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
+      <li><strong>Max gain (<code>m</code>)</strong>: 2× at Gentle, 6× at Aggressive (≈ +6 dB to +15.6 dB). Controls how much the filter will boost a quiet frame to reach the target peak.</li>
     </ul>
     <p>Gentle is the right starting point for most material. Aggressive is appropriate when level differences are extreme and the source already has significant background noise that boosting won't make materially worse.</p>
 
@@ -905,8 +905,12 @@
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
 
-    <h3>Hardcoded LRA=11</h3>
-    <p>WaxOff hardcodes <code>LRA=11</code> rather than exposing it as a setting. For delivery, some macro-dynamic constraint is appropriate. A podcast episode should have a consistent loudness profile throughout. 11 LU is a reasonable fixed value: it constrains macro-dynamics enough to ensure consistent perceived loudness across the episode without audibly squashing the mix's dynamics.</p>
+    <h3>Optional Pre-Norm Dynamic Leveling</h3>
+    <p>WaxOff's <strong>Dynamic Leveling</strong> toggle prepends a single fixed <code>dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05</code> stage to both the analysis and render filter chains. Unlike WaxOn's Dynamic Leveling — which exposes an Aggressiveness slider and ranges up to 6× max gain — the WaxOff version is intentionally conservative: a single setting, capped at 2× boost (≈ +6 dB), gated by a silence threshold to keep the noise floor untouched.</p>
+    <p>The same filter runs in both passes so loudnorm measures the leveled signal and then normalizes the leveled signal. Skipping it from one pass would create a mismatch between the measured integrated loudness and the actual output level. Off by default — most edited mixes don't need it. Turn it on when a finished mix has noticeable level swings between sections that you'd rather even out at the delivery stage than re-mix.</p>
+
+    <h3>Fixed LRA=11 (with hidden override)</h3>
+    <p>WaxOff sets <code>LRA=11</code> on the loudnorm filter. The value is configurable in code — <code>WaxOffSettings.lra</code>, default 11.0 — but no UI control exposes it, so in normal use it's a fixed value. For delivery, some macro-dynamic constraint is appropriate. A podcast episode should have a consistent loudness profile throughout. 11 LU is a reasonable fixed value: it constrains macro-dynamics enough to ensure consistent perceived loudness across the episode without audibly squashing the mix's dynamics.</p>
     <p>The loudnorm filter with LRA=11 applies gentle, program-level gain changes (not sample-by-sample compression). The effect is less aggressive than any compressor you would have used during editing.</p>
 
     <h3>Delivery Targets</h3>

@@ -636,7 +636,7 @@
         <tr>
           <td>De-esser</td>
           <td>On · Off · default Off</td>
-          <td>Gentle sibilance reduction (<code>adeesser</code>, 7.5 kHz, intensity 0.3). Reduces harshness on voiced content. Check output on heavily sibilant recordings.</td>
+          <td>Gentle sibilance reduction (FFmpeg's <code>deesser</code> filter, <code>i=0.3 f=0.34 s=o</code> — split frequency normalized to ~7.5 kHz at 44.1 kHz / ~8.2 kHz at 48 kHz). Reduces harshness on voiced content. Check output on heavily sibilant recordings.</td>
         </tr>
         <tr>
           <td>Level Riding</td>
@@ -651,7 +651,7 @@
         <tr>
           <td>Aggressiveness</td>
           <td>Gentle · Low · Medium · High · Aggressive · default Medium</td>
-          <td>Controls the frame size and maximum gain of Dynamic Leveling. Gentle uses 750ms frames and up to 8× gain; Aggressive uses 150ms frames and up to 20× gain. Grayed out when Dynamic Leveling is off.</td>
+          <td>Controls Dynamic Leveling responsiveness by mapping a 0–1 slider to three <code>dynaudnorm</code> parameters at once: frame size (<code>f</code>) 500→150 ms, Gaussian window (<code>g</code>) 31→15 frames, and max gain (<code>m</code>) 2×→6× (≈ +6 dB to +15.6 dB). Shorter frames and tighter windows = quicker response; higher max gain = more aggressive boosting of quiet sections. Grayed out when Dynamic Leveling is off.</td>
         </tr>
         <tr>
           <td>Loudness Norm</td>
@@ -686,13 +686,13 @@
       <li>
         <div>
           <strong>Filter, Channel &amp; Resample</strong>
-          <span>High-pass filter at the configured cutoff, a 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 32-bit float WAV at the target sample rate.</span>
+          <span>High-pass filter at the configured cutoff, a 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 24-bit PCM WAV at the target sample rate.</span>
         </div>
       </li>
       <li>
         <div>
           <strong>De-esser <span class="tag">Optional</span></strong>
-          <span>Gentle sibilance reduction using FFmpeg's <code>adeesser</code> filter at 7.5 kHz with intensity 0.3. Reduces harshness on voiced content. Off by default.</span>
+          <span>Gentle sibilance reduction using FFmpeg's <code>deesser</code> filter (<code>i=0.3 f=0.34 s=o</code>). The split frequency is Nyquist-normalized — ~7.5 kHz at 44.1 kHz, ~8.2 kHz at 48 kHz. Reduces harshness on voiced content. Off by default.</span>
         </div>
       </li>
       <li>
@@ -704,7 +704,7 @@
       <li>
         <div>
           <strong>Dynamic Leveling <span class="tag">Optional</span></strong>
-          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet sections and tames loud ones. The Aggressiveness slider controls frame size (750–150ms) and maximum gain (8×–20×), mapped to Gaussian window width accordingly. Use for panel recordings, live Q&amp;As, or any source where voices are at significantly different levels. Runs after Level Riding (if enabled) and before loudness normalization. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
+          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet sections and tames loud ones. The Aggressiveness slider maps to <code>f</code> (500→150 ms frame), <code>g</code> (31→15 frame Gaussian window, forced odd), and <code>m</code> (2×→6× max gain). A silence threshold of <code>t=0.05</code> (≈ −26 dBFS) prevents boosting near-silence on sparse voice tracks. Use for panel recordings, live Q&amp;As, or any source where voices are at significantly different levels. Runs after Level Riding (if enabled) and before loudness normalization. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
         </div>
       </li>
       <li>
@@ -729,8 +729,9 @@
     <h2>WaxOn Output Files <span class="mode-badge mode-waxon">WaxOn</span></h2>
 
     <h3>Individual Files</h3>
-    <pre><code>{original-name}-{rate}waxon-{limit}.wav</code></pre>
-    <p>Examples: <code>episode-01-44kwaxon-1dB.wav</code> &nbsp; <code>guest-48kwaxon-1dB.wav</code></p>
+    <pre><code>{original-name}-{rate}[ds-]waxon-{limit}.wav</code></pre>
+    <p>The <code>ds-</code> tag is inserted when the De-esser is enabled, so processed and unprocessed runs don't overwrite each other.</p>
+    <p>Examples: <code>episode-01-44kwaxon-1dB.wav</code> &nbsp; <code>episode-01-44kds-waxon-1dB.wav</code> &nbsp; <code>guest-48kwaxon-1dB.wav</code></p>
 
     <h3>Location</h3>
     <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code>. Existing files with the same name are overwritten.</p>
@@ -739,8 +740,8 @@
   <!-- WaxOff Mode -->
   <section id="waxoff-overview">
     <h2>WaxOff Mode <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <p>WaxOff finalizes your edited podcast mix for distribution. It applies EBU R128 loudness normalization, optional phase rotation, and delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
-    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment to hit the target loudness: no dynamic processing, no changes to stereo image or transients. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
+    <p>WaxOff finalizes your edited podcast mix for distribution. It applies EBU R128 loudness normalization, optional phase rotation, optional gentle pre-norm leveling, and delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
+    <p>WaxOff assumes your mix is already balanced and edited. With Dynamic Leveling off (the default), it applies a single linear gain adjustment to hit the target loudness — no dynamic processing, no changes to stereo image or transients. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -845,6 +846,11 @@
           <td>Applies a 150 Hz all-pass filter before normalization. Reduces crest factor on bass-heavy material, improving headroom and limiter performance. On by default.</td>
         </tr>
         <tr>
+          <td>Dynamic Leveling</td>
+          <td>On · Off · default Off</td>
+          <td>Optional gentle pre-norm leveling using <code>dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05</code>. Tightens macro-dynamics before loudnorm measures the file. Use when a finished mix has noticeable level swings between sections; leave off for already-balanced masters. Applied to both the analysis and render passes so the measurement reflects what gets normalized.</td>
+        </tr>
+        <tr>
           <td>Output Dir</td>
           <td>Path or empty</td>
           <td>Where output files are saved. Empty = same folder as the source.</td>
@@ -860,6 +866,12 @@
     <ol class="pipeline">
       <li>
         <div>
+          <strong>Pre-Norm Dynamic Leveling <span class="tag">Optional</span></strong>
+          <span>If Dynamic Leveling is enabled, FFmpeg's <code>dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05</code> runs at the head of both the analysis and render filter chains. This is a gentle, capped-gain leveler — max boost is 2× (≈+6 dB) and a silence threshold of <code>t=0.05</code> prevents lifting near-silent passages. Applying it to both passes means loudnorm measures the same signal it normalizes.</span>
+        </div>
+      </li>
+      <li>
+        <div>
           <strong>Analysis Pass</strong>
           <span>FFmpeg's <code>loudnorm</code> filter measures integrated loudness (I), true peak (TP), and loudness range (LRA) for the entire file. If Phase Rotation is enabled, a 150 Hz allpass is applied before measurement so the rotation is accounted for in the measured values. The measured values feed the next pass.</span>
         </div>
@@ -867,7 +879,7 @@
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. This applies a single precise linear gain: no limiting, no dynamic processing, no change to stereo image or transients. Output is always stereo (2-channel) — mono sources are upmixed to dual-mono. Output: 24-bit WAV at the target sample rate.</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. This applies a single precise linear gain: no limiting, no change to stereo image or transients. Output is always stereo (2-channel) — mono sources are upmixed to dual-mono. Output: 24-bit WAV at the target sample rate.</span>
         </div>
       </li>
       <li>

@@ -4,9 +4,9 @@
 <p align="center">
   <strong>Podcast Audio Prep Utility</strong>
   <br />
-  <strong>Version:</strong> 1.6.3
+  <strong>Version:</strong> 1.6.5
   <br />
-  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.6.3.dmg"><strong>Download</strong></a>
+  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.6.5.dmg"><strong>Download</strong></a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/">Manual</a>
   ·
@@ -33,12 +33,15 @@ This tool was built to solve specific signal-to-noise and normalization challeng
 
 * **High-Pass Filter:** Configurable cutoff (20–90 Hz) for HVAC/handling noise removal.
 * **Noise Reduction:** Optional RNNoise (ML-based) suppression; best for steady-state background noise.
+* **De-esser:** Optional gentle sibilance reduction.
+* **Level Riding:** Optional downward-only `dynaudnorm` to tame loud outliers without lifting the noise floor.
+* **Dynamic Leveling:** Optional bidirectional `dynaudnorm` for panel/multi-voice sources, with a Gentle→Aggressive responsiveness control.
 * **Loudness Normalization:** Two-pass EBU R128 linear gain (dynamics fully preserved).
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
 * **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom.
 
-**Output Logic:** `{name}-{rate}waxon-{limit}.wav` (24-bit)
+**Output Logic:** `{name}-{rate}[ds-]waxon-{limit}.wav` (24-bit; `ds-` inserted when De-esser is on)
 
 ## II. WaxOff — Distribution Mastering
 *Use on finished mixes to ensure broadcast compliance.*
@@ -47,6 +50,7 @@ This tool was built to solve specific signal-to-noise and normalization challeng
 * **True Peak Management:** Configurable ceiling (−3.0 to −0.1 dBTP).
 * **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
 * **Crest Factor Optimization:** Optional 150 Hz allpass for bass-heavy material.
+* **Optional Pre-Norm Leveling:** Gentle `dynaudnorm` step before loudnorm for delivery sources whose macro-dynamics need tightening.
 
 **Output Logic:** `{name}-lev-{target}LUFS.[wav/mp3]`
 
