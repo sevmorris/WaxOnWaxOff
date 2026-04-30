@@ -28,7 +28,6 @@ APP_PATH="$DERIVED_DATA/Build/Products/Release/WaxOnWaxOff.app"
 STAGING="/tmp/waxon_dmg_${VERSION}"
 DMG="/tmp/WaxOnWaxOff-${TAG}.dmg"
 MOUNT="/tmp/waxon_verify_${VERSION}"
-MANUAL="$PROJECT_DIR/docs/index.html"
 MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -132,16 +131,32 @@ hdiutil detach "$MOUNT" -quiet
     fail "DMG version mismatch: expected $VERSION, got $DMG_VERSION"
 ok "DMG contains $DMG_VERSION"
 
-# ── Update manual download link and version badge ─────────────────────────────
-step "Updating manual download link"
-sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\">Download v[0-9][0-9.]*|WaxOnWaxOff-${TAG}.dmg\">Download ${TAG}|g" "$MANUAL" "$MANUAL_IDX"
-sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg\" class=\"nav-cta\">Download|WaxOnWaxOff-${TAG}.dmg\" class=\"nav-cta\">Download|g" "$MANUAL"
+# ── Update docs (README + manual) to point at the new version ────────────────
+# Per project convention: rewrite unconditionally and let `git status --porcelain`
+# decide whether anything actually changed before committing.
+step "Updating docs to ${TAG}"
+
+# Manual: download button + sidebar version badge.
+sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg|WaxOnWaxOff-${TAG}.dmg|g" "$MANUAL_IDX"
+sed -i '' "s|>Download v[0-9][0-9.]*<|>Download ${TAG}<|g" "$MANUAL_IDX"
 sed -i '' "s|Manual — v[0-9][0-9.]*|Manual — ${TAG}|g" "$MANUAL_IDX"
-sed -i '' "s|\[Download v[0-9][0-9.]* (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v[0-9][0-9.]*.dmg)|\[Download ${TAG} (DMG)\](https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-${TAG}.dmg)|g" README.md
+
+# README.md: HTML hyperlink, plain "**Version:**" label, and any markdown form.
+sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg|WaxOnWaxOff-${TAG}.dmg|g" "$PROJECT_DIR/README.md"
+sed -i '' "s|<strong>Version:</strong> [0-9][0-9.]*|<strong>Version:</strong> ${VERSION}|g" "$PROJECT_DIR/README.md"
+sed -i '' "s|\*\*Version:\*\* [0-9][0-9.]*|**Version:** ${VERSION}|g" "$PROJECT_DIR/README.md"
+sed -i '' "s|\[Download v[0-9][0-9.]* (DMG)\]|[Download ${TAG} (DMG)]|g" "$PROJECT_DIR/README.md"
+
+# Sanity-check: nothing should still reference the old version.
+if grep -E "WaxOnWaxOff-v[0-9]+\.[0-9]+\.[0-9]+\.dmg" "$MANUAL_IDX" "$PROJECT_DIR/README.md" \
+        | grep -v "${TAG}\.dmg" >/dev/null; then
+    fail "Stale version references remain after rewrite — check sed patterns"
+fi
+
 if [[ -n "$(git status --porcelain)" ]]; then
-    git add "$MANUAL" "$MANUAL_IDX" README.md
+    git add "$MANUAL_IDX" "$PROJECT_DIR/README.md"
     git commit -m "docs: update download link to ${TAG}"
-    ok "Manual points to ${TAG}"
+    ok "Docs point to ${TAG}"
 else
     ok "Docs already up to date"
 fi
