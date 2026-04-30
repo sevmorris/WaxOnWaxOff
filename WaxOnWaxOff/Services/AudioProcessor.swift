@@ -490,7 +490,10 @@ actor AudioProcessor {
         let gRaw = Int(31.0 - amount * 16.0)        // gaussian: 31 → 15
         let g = gRaw % 2 == 0 ? gRaw - 1 : gRaw    // must be odd
         let m = 2.0 + amount * 4.0                  // max gain factor: 2x → 6x (+6 to +15 dB)
-        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m))"
+        // t=0.05: silence threshold (~-26 dBFS). Frames below this peak magnitude
+        // are not amplified — prevents boosting the noise floor between words on
+        // sparse voice tracks. Note: dynaudnorm's `s` is compress, not threshold.
+        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m)):t=0.05"
     }
 
     private func bestOutputDir(for input: URL) -> URL {
