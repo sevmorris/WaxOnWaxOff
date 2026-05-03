@@ -629,6 +629,11 @@
           <td>High-pass filter cutoff. 80 Hz removes most rumble and handling noise without thinning the voice. Lower for sources with significant bass content.</td>
         </tr>
         <tr>
+          <td>Phase Rotation</td>
+          <td>On · Off · default On</td>
+          <td>200 Hz allpass filter that reduces peak asymmetry on bass-heavy voice recordings, recovering 1–4 dB of headroom before the limiter. The effect on audio character is inaudible. Leave on unless you have a specific reason to disable. See <a href="theory.html#phase-rotation">Theory of Operation</a>.</td>
+        </tr>
+        <tr>
           <td>Noise Reduction</td>
           <td>On · Off · default Off</td>
           <td>Applies RNNoise, a recurrent neural network trained on mono speech, before the high-pass filter. Suppresses consistent background noise (HVAC, room tone, hum) with minimal voice coloration. For stereo output, channels are split and denoised independently to ensure balanced processing. Check output before editing; artifacts are possible on heavy noise. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</td>
@@ -686,7 +691,7 @@
       <li>
         <div>
           <strong>Filter, Channel &amp; Resample</strong>
-          <span>High-pass filter at the configured cutoff, a 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 24-bit PCM WAV at the target sample rate.</span>
+          <span>High-pass filter at the configured cutoff, an optional 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom — on by default), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 24-bit PCM WAV at the target sample rate.</span>
         </div>
       </li>
       <li>
@@ -994,8 +999,8 @@
     <h3>WaxOn: Mono vs. Stereo for Podcasts</h3>
     <p>Most podcast editing workflows prefer mono tracks per speaker, which are easier to pan, balance, and process individually. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface captures both mics on a single stereo file, set Output to Stereo and process before bringing into your DAW.</p>
 
-    <h3>WaxOff: Phase Rotation</h3>
-    <p>Leave Phase Rotation on unless you have a specific reason to turn it off. The 150 Hz allpass filter reduces the crest factor of bass-heavy material, giving the loudness normalizer and limiter more headroom. The effect on audio character is inaudible.</p>
+    <h3>Phase Rotation (WaxOn and WaxOff)</h3>
+    <p>Leave Phase Rotation on unless you have a specific reason to turn it off. The allpass filter (200 Hz in WaxOn, 150 Hz in WaxOff) reduces the crest factor of bass-heavy material, giving the loudness normalizer and limiter more headroom. The effect on audio character is inaudible.</p>
 
     <hr style="border:none; border-top: 1px solid var(--border); margin: 48px 0 32px;">
     <p style="font-size:0.85rem; color: var(--muted);">
