@@ -56,54 +56,6 @@ enum FFmpegRunner {
         return dict
     }
 
-    // MARK: - Filter Chain Builder
-
-    /// Build the WaxOn prep filter chain string from settings.
-    static func waxOnFilterChain(
-        dcBlockHz: Int,
-        phaseRotation: Bool = true,
-        noiseReductionModel: URL? = nil,
-        stereo: Bool,
-        channel: String = "left",
-        sampleRate: Int
-    ) -> String {
-        var parts: [String] = []
-
-        if let modelURL = noiseReductionModel {
-            parts.append("arnndn=m=\(modelURL.path)")
-        }
-
-        parts.append("highpass=f=\(dcBlockHz)")
-
-        if !stereo {
-            let pan = channel == "left" ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
-            parts.append(pan)
-        }
-
-        if phaseRotation {
-            parts.append("allpass=f=200:t=q:w=0.707")
-        }
-
-        parts.append("aresample=\(sampleRate)")
-
-        return parts.joined(separator: ",")
-    }
-
-    /// Build the WaxOn brick-wall limiter filter chain string.
-    static func limiterFilterChain(
-        limitAmp: Double,
-        sampleRate: Int,
-        attack: Int = 5,
-        release: Int = 50
-    ) -> String {
-        let oversampleSr = sampleRate * 2
-        return [
-            "aresample=\(oversampleSr)",
-            "alimiter=limit=\(limitAmp):attack=\(attack):release=\(release):level=disabled",
-            "aresample=\(sampleRate)"
-        ].joined(separator: ",")
-    }
-
     // MARK: - Private
 
     private static func launch(exe: String, args: [String]) async throws -> (Int32, String) {
