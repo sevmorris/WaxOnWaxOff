@@ -233,7 +233,9 @@
     .callout-history { border-left-color: #b59cd1; }
     .callout-history > strong, .callout-history > summary { color: #b59cd1; }
 
-    /* Collapsible callouts */
+    /* Collapsible callouts. Note: do NOT set display:flex/grid on <summary>;
+       Safari and older Firefox break <details> semantics and render the
+       element fully expanded. Use inline layout instead. */
     details.callout > summary {
       cursor: pointer;
       list-style: none;
@@ -242,10 +244,6 @@
       font-size: 0.95rem;
       font-weight: 700;
       letter-spacing: 0.04em;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 4px 8px;
     }
     details.callout > summary::-webkit-details-marker { display: none; }
     details.callout > summary::before {
@@ -254,6 +252,7 @@
       font-size: 0.85em;
       color: var(--muted);
       display: inline-block;
+      margin-right: 8px;
       transition: transform 0.12s;
     }
     details.callout[open] > summary::before { transform: rotate(90deg); }
@@ -263,6 +262,9 @@
       border-bottom: 1px solid var(--border);
     }
     details.callout > *:last-child { margin-bottom: 0; }
+    /* Belt-and-suspenders: ensure non-summary children are hidden when closed,
+       in case a UA stylesheet edge case lets them through. */
+    details.callout:not([open]) > *:not(summary) { display: none; }
 
     /* ── Hero ── */
     .hero { margin-bottom: 56px; }
@@ -452,7 +454,7 @@
   <section id="signal-chain">
     <h2>Signal Chains at a Glance</h2>
 
-    <h3>WaxOn <span class="mode-badge mode-waxon">WaxOn</span></h3>
+    <h3>WaxOn</h3>
     <div class="chain">
       <div class="chain-row">
         <div class="chain-node optional">RNNoise<br><span style="font-size:0.75rem;font-weight:400;">ML noise reduction<br>(stereo: per-channel split)</span></div>
@@ -478,7 +480,7 @@
     </div>
     <p style="font-size:0.85rem;color:var(--muted);">Dashed border = optional stage. For stereo output with NR enabled, channels are split and denoised independently before rejoining. Output: 24-bit WAV.</p>
 
-    <h3>WaxOff <span class="mode-badge mode-waxoff">WaxOff</span></h3>
+    <h3>WaxOff</h3>
     <div class="chain">
       <div class="chain-row">
         <div class="chain-node optional">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">150 Hz allpass</span></div>
