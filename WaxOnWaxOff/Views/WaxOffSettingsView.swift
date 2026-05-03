@@ -7,7 +7,7 @@ struct WaxOffSettingsView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                row("Sample Rate") {
+                row(nil) {
                     VStack(alignment: .leading, spacing: 4) {
                         Picker("", selection: $viewModel.settings.sampleRate) {
                             Text("44.1 kHz").tag(44100)
@@ -22,7 +22,7 @@ struct WaxOffSettingsView: View {
                     }
                 }
 
-                row("Output") {
+                row(nil) {
                     VStack(alignment: .leading, spacing: 4) {
                         Picker("", selection: $viewModel.settings.outputMode) {
                             Text("WAV").tag(OutputMode.wav)
@@ -132,12 +132,14 @@ struct WaxOffSettingsView: View {
     }
 
     @ViewBuilder
-    private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+    private func row<Content: View>(_ label: String?, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .kerning(0.4)
+            if let label {
+                Text(label.uppercased())
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .kerning(0.4)
+            }
             content()
         }
         .padding(.vertical, 6)
