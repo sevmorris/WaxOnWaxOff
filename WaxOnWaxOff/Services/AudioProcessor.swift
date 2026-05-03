@@ -144,7 +144,7 @@ actor AudioProcessor {
         let postDsURL: URL
         if settings.deEsserEnabled {
             let dsURL = work.appendingPathComponent("\(stem)_ds.wav")
-            onLog?("  de-esser: deesser 7.5 kHz", .verbose)
+            onLog?("  de-esser: deesser ~\(String(format: "%.1f", (0.34 * Double(sr)) / 2000.0)) kHz", .verbose)
             try await runFFmpeg(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                 "-i", midURL.path, "-af", "deesser=i=0.3:f=0.34:s=o",
