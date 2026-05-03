@@ -23,6 +23,7 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     var loudnormEnabled: Bool = false
     var loudnormTarget: Double = -30.0
     var dcBlockHz: Int = 80
+    var phaseRotationEnabled: Bool = true
     var noiseReductionEnabled: Bool = false
     var deEsserEnabled: Bool = false
     var levelRidingEnabled: Bool = false

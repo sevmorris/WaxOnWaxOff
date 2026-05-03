@@ -7,7 +7,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                row("Sample Rate") {
+                row(nil) {
                     Picker("", selection: $viewModel.settings.sampleRate) {
                         Text("44.1 kHz").tag(WaxOnSettings.SampleRate.s44100)
                         Text("48 kHz").tag(WaxOnSettings.SampleRate.s48000)
@@ -15,7 +15,7 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                row("Output") {
+                row(nil) {
                     Picker("", selection: $viewModel.settings.outputChannels) {
                         Text("Mono").tag(WaxOnSettings.OutputChannels.mono)
                         Text("Stereo").tag(WaxOnSettings.OutputChannels.stereo)
@@ -23,7 +23,7 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                row("Channel") {
+                row(nil) {
                     Picker("", selection: $viewModel.settings.channel) {
                         Text("Left").tag(WaxOnSettings.MonoChannel.left)
                         Text("Right").tag(WaxOnSettings.MonoChannel.right)
@@ -61,19 +61,23 @@ struct SettingsView: View {
                     }
                 }
 
+                row("Phase Rotation", caption: "Allpass at 200 Hz — recovers headroom on asymmetric voice waveforms") {
+                    HStack(spacing: 8) {
+                        Toggle("", isOn: $viewModel.settings.phaseRotationEnabled)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        Text("200 Hz allpass")
+                    }
+                }
+
                 Divider().padding(.vertical, 6)
 
-                row("Noise Reduction") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Toggle("", isOn: $viewModel.settings.noiseReductionEnabled)
-                                .toggleStyle(.switch)
-                                .labelsHidden()
-                            Text("RNNoise (ML)")
-                        }
-                        Text("Check output before editing — artifacts are possible on heavy noise")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                row("Noise Reduction", caption: "Artifacts are possible on heavy noise") {
+                    HStack(spacing: 8) {
+                        Toggle("", isOn: $viewModel.settings.noiseReductionEnabled)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        Text("RNNoise (ML)")
                     }
                 }
 
@@ -128,7 +132,7 @@ struct SettingsView: View {
 
                 Divider().padding(.vertical, 6)
 
-                row("Loudness Norm") {
+                row("Loudness Norm", caption: "Two-pass EBU R128 normalization to a target loudness") {
                     Toggle("", isOn: $viewModel.settings.loudnormEnabled)
                         .toggleStyle(.switch)
                         .labelsHidden()
@@ -203,13 +207,24 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+    private func row<Content: View>(
+        _ label: String?,
+        caption: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .kerning(0.4)
+            if let label {
+                Text(label.uppercased())
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .kerning(0.4)
+            }
             content()
+            if let caption {
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 2)

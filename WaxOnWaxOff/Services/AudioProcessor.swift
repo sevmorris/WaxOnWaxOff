@@ -87,7 +87,7 @@ actor AudioProcessor {
         let channelSuffix = isStereo ? "stereo" : "mono"
         let midURL = work.appendingPathComponent("\(stem)_\(rateTag)24_\(channelSuffix).wav")
 
-        let phaseFilter = "allpass=f=200:t=q:w=0.707,"
+        let phaseFilter = settings.phaseRotationEnabled ? "allpass=f=200:t=q:w=0.707," : ""
 
         let nrEnabled = settings.noiseReductionEnabled
         let nrModelURL = nrEnabled
@@ -99,7 +99,8 @@ actor AudioProcessor {
         onLog?("▶ \(filename)", .info)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
         let nrDesc = nrEnabled ? "  |  RNNoise" : ""
-        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz  |  phase rotation: 200 Hz\(nrDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
+        let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
+        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz\(phaseDesc)\(nrDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
 
         if isStereo, let modelURL = nrModelURL {
             // Split → denoise each channel independently → rejoin, then
