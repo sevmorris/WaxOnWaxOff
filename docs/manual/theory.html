@@ -523,10 +523,10 @@
       <li><strong>Pre-filter (head-related high-shelf)</strong>: A second-order shelf boost with a design frequency of approximately 1682 Hz and a gain of approximately +4 dB. This models the acoustic effect of the human head, which increases high-frequency energy at the ear canals relative to a free-field measurement. The boost rises gradually above the shelf frequency and reaches its full value by roughly 5 kHz, where it remains constant through the upper spectrum. The effect is that sibilance, consonant detail, and broadband hiss in the 2–10 kHz range are weighted more heavily in the loudness measurement, matching the ear's increased sensitivity in this region.</li>
       <li><strong>RLB weighting (high-pass)</strong>: A second-order high-pass filter with a design frequency of approximately 38 Hz. This reduces the contribution of sub-bass energy to the loudness measurement. Sub-bass content below about 50 Hz contributes little to perceived loudness under normal listening conditions (particularly on the earbuds and laptop speakers that dominate podcast consumption), and leaving it in the measurement would skew the result for files with DC offset, rumble, or proximity-effect bass buildup.</li>
     </ol>
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> Filter coefficient computation</strong>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> Filter coefficient computation</summary>
       <p>The ITU specification defines the filter coefficients for a reference sample rate of 48 kHz. WaxOn/WaxOff's analyzer computes the coefficients from first principles using the bilinear transform, so the filters are accurate at any sample rate the source file uses (44.1 kHz, 48 kHz, 96 kHz, etc.). The pre-filter uses the shelf design parameters <code>f₀ = 1681.97 Hz, gain = 3.9998 dB</code>; the high-pass uses <code>f₀ = 38.14 Hz, Q = 0.5003</code>. These values are taken from the ITU reference implementation and match the pyloudnorm reference used widely in audio research.</p>
-    </div>
+    </details>
 
     <h3>Gating</h3>
     <p>Loudness is computed over overlapping 400 ms blocks. Adjacent blocks overlap by 75%, producing one new block every 100 ms. The 400 ms window was chosen because it corresponds closely to human short-term loudness perception. Psychoacoustic research by Zwicker and Fastl established that temporal integration of loudness occurs over approximately 200–400 ms, with 400 ms representing the time window over which the ear integrates energy to form a stable loudness impression. Shorter windows would capture transient fluctuations that don't correspond to perceived loudness; longer windows would smooth over meaningful changes in program level.</p>
@@ -537,14 +537,14 @@
     </ol>
     <p>The final integrated loudness is the mean of the blocks that survive both gates. For podcast speech, this means the measurement reflects the loudness of the spoken content, not the silence between sentences.</p>
 
-    <div class="callout callout-math">
-      <strong><span class="callout-cat">The Math</span> The Offset Constant: −0.691</strong>
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> The Offset Constant: −0.691</summary>
       <p>The integrated loudness formula includes a constant offset of −0.691 dB:</p>
       <div class="formula">
         Integrated Loudness (LUFS) = −0.691 + 10 · log₁₀(Σ Gᵢ · zᵢ)
       </div>
       <p>where <code>Gᵢ</code> is the channel weight (1.0 for front channels, 1.41 for surround) and <code>zᵢ</code> is the gated mean-square of channel <code>i</code> after K-weighting. The −0.691 dB offset calibrates the scale so that a 1 kHz sine wave at 0 dBFS reads exactly 0 LUFS after K-weighting. Without this offset, the K-weighting pre-filter's boost at 1 kHz (~+3.3 dB at the reference frequency) would cause the same sine wave to read approximately +3.3 LUFS. The offset brings the scale back into alignment with the traditional dBFS reference. For mono and stereo speech content, the channel weights are both 1.0, so the formula simplifies to the mean-square of all channels after K-weighting and gating.</p>
-    </div>
+    </details>
 
     <h3>True Peak (TP)</h3>
     <p>True peak is the maximum reconstructed level when the digital signal is converted to analog. It differs from sample peak because the analog waveform between samples can exceed any individual sample value; these are <em>inter-sample peaks</em>. See the <a href="#true-peak">True Peak & Oversampling</a> section for detail.</p>
@@ -601,20 +601,20 @@
     </ul>
     <p>A file with a sample peak of −1 dBFS can easily have a true peak above 0 dBFS, causing clipping that no sample-level meter would detect.</p>
 
-    <div class="callout callout-math">
-      <strong><span class="callout-cat">The Math</span> The Mathematics of Reconstruction</strong>
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> The Mathematics of Reconstruction</summary>
       <p>The Nyquist-Shannon sampling theorem guarantees that a band-limited signal sampled at twice its maximum frequency can be perfectly reconstructed. The reconstruction uses a sinc interpolation kernel:</p>
       <div class="formula">
         x(t) = Σ x[n] · sinc((t − nT) / T)
       </div>
       <p>where <code>x[n]</code> are the sample values, <code>T</code> is the sample period, and <code>sinc(x) = sin(πx) / (πx)</code>. The key insight is that the sinc kernel oscillates. When adjacent samples have high energy and the right phase relationship, the interpolated waveform between them sums constructively and overshoots both sample values. This is not an artifact or an error; it is the mathematically correct reconstruction of the continuous signal. The samples were never the waveform; they are the minimum information needed to reconstruct it.</p>
       <p>The worst case for inter-sample peaks occurs when consecutive samples approach full scale with alternating signs at frequencies near Nyquist (half the sample rate). At 44.1 kHz, high-frequency content near 22 kHz is especially prone. In practice, ISPs on real-world audio material are typically 0.5–3 dB above sample peak, though extreme cases can reach higher.</p>
-    </div>
+    </details>
 
-    <div class="callout">
-      <strong>The Streaming Ingest Trap</strong>
-      When you upload audio to Spotify, the platform transcodes your file to Ogg/Vorbis or AAC for streaming delivery. If your uploaded file has true peaks near 0 dBFS, the transcode itself can clip: the decoded streaming copy is distorted before a listener ever plays it, and no subsequent gain adjustment will fix it. Spotify's own artist documentation warns: "Really loud modern masters can easily register True Peak levels of +1 or +2 dBTP, and often as much as +3 or +4 dBTP. These are virtually guaranteed to cause encoder clipping if processed as-is." Research measuring 128 kbps MP3 encoding has documented decoded true peaks rising by +1.7 dBTP above the source, and pathological cases as high as +10 dBTP. This is why the −1.0 dBTP true peak ceiling is a hard requirement, not a polite suggestion.
-    </div>
+    <details class="callout callout-history">
+      <summary><span class="callout-cat">History &amp; Context</span> The Streaming Ingest Trap</summary>
+      <p>When you upload audio to Spotify, the platform transcodes your file to Ogg/Vorbis or AAC for streaming delivery. If your uploaded file has true peaks near 0 dBFS, the transcode itself can clip: the decoded streaming copy is distorted before a listener ever plays it, and no subsequent gain adjustment will fix it. Spotify's own artist documentation warns: "Really loud modern masters can easily register True Peak levels of +1 or +2 dBTP, and often as much as +3 or +4 dBTP. These are virtually guaranteed to cause encoder clipping if processed as-is." Research measuring 128 kbps MP3 encoding has documented decoded true peaks rising by +1.7 dBTP above the source, and pathological cases as high as +10 dBTP. This is why the −1.0 dBTP true peak ceiling is a hard requirement, not a polite suggestion.</p>
+    </details>
 
     <h3>How Oversampled Limiting Solves This</h3>
     <p>True peak limiting works by upsampling the signal before the limiter so that inter-sample peaks become visible as actual samples, then limiting those samples, then downsampling back.</p>
@@ -622,14 +622,14 @@
       Input (44.1 kHz) → Upsample 2× (88.2 kHz) → alimiter → Downsample (44.1 kHz) → Output
     </div>
     <p>At 2× the sample rate, new samples are interpolated midway between each original pair. These interpolated values approximate the continuous waveform reconstruction and capture most inter-sample peaks. The limiter can see and attenuate them. When downsampled back, the true peaks of the resulting file are controlled.</p>
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> Why 2× and not 4×</strong>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> Why 2× and not 4×</summary>
       <p>2× oversampling catches the vast majority of inter-sample peaks in practice. The ITU-R BS.1770-4 true peak measurement algorithm itself uses 4× oversampling for maximum accuracy, but for a limiter (which only needs to prevent peaks from exceeding a threshold), 2× provides sufficient control. 4× oversampling is used in some mastering workflows to catch pathological edge cases, but the returns diminish quickly: the additional ISPs caught between 2× and 4× are typically less than 0.2 dB on real-world program material. For voice content with limited high-frequency energy near Nyquist, 2× is more than adequate.</p>
-    </div>
+    </details>
 
     <h3>WaxOn Limiter Settings</h3>
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> alimiter parameters</strong>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> alimiter parameters</summary>
       <p>WaxOn's alimiter is configured for transparent peak control:</p>
       <ul>
         <li><strong>limit</strong>: linear amplitude equivalent of the configured ceiling (e.g., −1.0 dB → 0.891251)</li>
@@ -637,25 +637,25 @@
         <li><strong>release=50 ms</strong>: gain recovers in 50 ms after the peak passes. On typical voice material, this is fast enough to be inaudible as pumping while still recovering promptly between words. For comparison, the typical gap between words in conversational speech is 150–300 ms, so a 50 ms release completes well before the next word begins.</li>
         <li><strong>level=disabled</strong>: prevents the limiter from applying makeup gain. Without this, <code>alimiter</code> compensates for gain reduction, undoing the ceiling control. With it disabled, the limiter only attenuates, never amplifies.</li>
       </ul>
-    </div>
+    </details>
 
     <h3>WaxOff Pre-Encode Limiter</h3>
     <p>WaxOff's loudnorm filter targets true peak via its <code>TP</code> parameter, but this is a soft target. The filter's internal gain calculation accounts for it, but it does not guarantee a hard ceiling. In practice, the loudnorm output can exceed the TP target by up to ~0.5–1.0 dB in edge cases.</p>
     <p>For WAV-only output this is acceptable: the file plays back through a DAC and any overshoot is minor. For MP3 output it is a real problem. The encoding process adds its own inter-sample peaks (typically +0.1–1.5 dB), so a file already approaching the ceiling will clip after decode.</p>
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> Pre-encode limiter parameters</strong>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> Pre-encode limiter parameters</summary>
       <p>WaxOff solves this with a dedicated pre-encode limiter applied only when producing MP3:</p>
       <ul>
         <li><strong>Ceiling: −2.0 dBTP</strong>: 1 dB of headroom below the intended −1.0 dBTP loudnorm target. This comfortably absorbs both loudnorm overshoot and typical MP3 codec-induced peaks, resulting in decoded MP3 files that land at or below −1.0 dBTP.</li>
         <li><strong>attack=1 ms, release=20 ms</strong>: faster than WaxOn's limiter because this stage has no creative role. It is pure safety. At these speeds on voice material, the limiting is completely transparent.</li>
         <li>Same 2× oversampling approach as WaxOn for true peak accuracy.</li>
       </ul>
-    </div>
+    </details>
 
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> Why −2 dBTP and not −1 dBTP?</strong>
-      The loudnorm filter targets −1.0 dBTP but can overshoot by up to ~1 dB. The MP3 codec can then add another 0.1–1.5 dB of inter-sample peaks. A hard limiter at −2.0 dBTP provides 1 dB of margin that reliably keeps the decoded MP3 below −1.0 dBTP under virtually all real-world conditions.
-    </div>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> Why −2 dBTP and not −1 dBTP?</summary>
+      <p>The loudnorm filter targets −1.0 dBTP but can overshoot by up to ~1 dB. The MP3 codec can then add another 0.1–1.5 dB of inter-sample peaks. A hard limiter at −2.0 dBTP provides 1 dB of margin that reliably keeps the decoded MP3 below −1.0 dBTP under virtually all real-world conditions.</p>
+    </details>
   </section>
 
   <!-- Phase Rotation -->
@@ -672,14 +672,14 @@
 
     <h3>How Allpass Filtering Reduces Crest Factor</h3>
     <p>A first-order allpass filter passes all frequencies at equal amplitude but shifts the phase of different frequencies by different amounts. It doesn't alter the frequency response; it only changes <em>when</em> different frequency components arrive relative to each other.</p>
-    <div class="callout callout-math">
-      <strong><span class="callout-cat">The Math</span> First-order allpass transfer function</strong>
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> First-order allpass transfer function</summary>
       <p>The transfer function of a first-order allpass is:</p>
       <div class="formula">
         H(z) = (a₁ + z⁻¹) / (1 + a₁z⁻¹)
       </div>
       <p>where <code>a₁</code> is computed from the design frequency and sample rate. The magnitude response |H(z)| = 1 at all frequencies (unity gain). The phase response varies continuously from 0° at DC to −180° at Nyquist, with −90° at the design frequency. This means frequencies below the design frequency are shifted slightly; frequencies above it are shifted more. The relative timing of low-frequency and high-frequency components in the waveform changes, but their amplitudes do not.</p>
-    </div>
+    </details>
     <p>Much of the peak asymmetry in voice audio comes from low-frequency content: proximity effect from cardioid microphones, low-frequency resonances in recording spaces, and bass-heavy content in finished mixes. This energy tends to create asymmetric waveforms where one polarity consistently peaks higher than the other.</p>
 
     <p>Proximity effect is worth understanding in detail because it affects nearly every podcast recording. Directional microphones (cardioids, supercardioids, figure-8 patterns) exhibit increasing bass boost as the sound source moves closer, beginning around 12 inches and growing progressively stronger below approximately 100–200 Hz. The boost can reach +20 dB at very close distances. Omnidirectional microphones do not exhibit proximity effect, but the cardioid pattern dominates consumer and prosumer podcast microphones (Shure SM7B, Audio-Technica ATR2100, most USB microphones), making this a near-universal issue. Podcasters without broadcast training tend to position themselves very close to their microphones to minimize room noise, an instinct that unfortunately triggers the strongest proximity effect and produces the most bass-heavy, asymmetric waveforms. The result lands squarely in the 150–250 Hz range that phase rotation is designed to address.</p>
@@ -772,24 +772,24 @@
     <h3>The Mathematical Fix: TPDF Dither</h3>
     <p>The solution is counterintuitive: add noise to the signal <em>before</em> truncating it to a lower bit depth. This noise (dither) must be added at a specific amplitude and with a specific probability distribution to be effective.</p>
     <p>The mathematical foundation was established by Stanley Lipshitz, Robert Wannamaker, and John Vanderkooy at the University of Waterloo in a series of papers beginning in the late 1980s. Their central result: adding <strong>Triangular Probability Density Function (TPDF)</strong> noise (noise whose amplitude is distributed as a triangle between −1 and +1 LSB of the target word length) completely decorrelates the quantization error from the input signal. The quantization error becomes spectrally white and statistically independent of the audio. Harmonic distortion is eliminated; what remains is signal-independent white noise.</p>
-    <div class="callout callout-math">
-      <strong><span class="callout-cat">The Math</span> TPDF generation, variance, and subtractive dither</strong>
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> TPDF generation, variance, and subtractive dither</summary>
       <p>TPDF noise is generated by summing two independent rectangular (uniform) noise samples. The resulting amplitude distribution is triangular, hence the name. Its variance is exactly 1/6 LSB², which is the minimum required to whiten quantization error under the conditions relevant to audio. Subtractive dither (where the same dither signal is subtracted after truncation) can achieve perfect cancellation of quantization error in theory; non-subtractive TPDF (the practical, deployable form) achieves statistical decorrelation, which is sufficient for all real-world applications.</p>
-    </div>
+    </details>
     <p>The practical consequence: a properly TPDF-dithered 16-bit file has a smooth, analog-like noise floor rather than correlated quantization distortion. The fade-to-black test produces a clean descent into white noise. The artifact is gone.</p>
 
-    <div class="callout callout-math">
-      <strong><span class="callout-cat">The Math</span> The dithering theorem in one sentence</strong>
-      Adding TPDF noise of variance 1/6 LSB² before truncation makes the quantization error a white, signal-independent noise process: the best possible outcome for a word-length reduction.
-    </div>
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> The dithering theorem in one sentence</summary>
+      <p>Adding TPDF noise of variance 1/6 LSB² before truncation makes the quantization error a white, signal-independent noise process: the best possible outcome for a word-length reduction.</p>
+    </details>
 
     <h3>Noise Shaping</h3>
     <p>TPDF dithering trades correlated distortion for uncorrelated white noise. For archival files and intermediate stems, that trade is unconditionally correct. But the resulting noise floor sits at approximately −96 dBFS spread uniformly across the audio spectrum. Human hearing is not equally sensitive at all frequencies. Sensitivity peaks around 2–4 kHz and falls off substantially above ~15 kHz. Noise shaping exploits this asymmetry.</p>
     <p>A noise-shaping filter feeds quantization error back into the system through a filter designed around a psychoacoustic model of human hearing. The filter pushes noise energy out of the 2–4 kHz sensitivity peak and into the 15–20 kHz region where hearing is least sensitive. Total noise energy is conserved (or slightly increased), but <em>perceptually weighted</em> noise (the noise you can actually hear) is reduced. A well-designed noise-shaped dither algorithm can achieve the perceived noise floor of a 20-bit system from a 16-bit word.</p>
-    <div class="callout callout-history">
-      <strong><span class="callout-cat">History &amp; Context</span> UV22HR and POW-r</strong>
+    <details class="callout callout-history">
+      <summary><span class="callout-cat">History &amp; Context</span> UV22HR and POW-r</summary>
       <p><strong>Apogee's UV22HR</strong> dithering, developed in the 1990s and built into Apogee converters and later into Logic Pro's Bounce dialog, uses an ultrasonic noise curve that concentrates dither energy above 20 kHz, technically increasing broadband noise while keeping in-band noise below the threshold of audibility. <strong>POW-r</strong> (Psychoacoustically Optimized Wordlength Reduction), developed by a consortium that included Waves and Prism Sound, offers three progressively aggressive noise-shaping modes. POW-r Type 3 is widely used in mastering for 16-bit delivery. Bob Katz has written about using POW-r in preference to flat TPDF for final 16-bit masters, on the basis that the psychoacoustic optimization is audible on critical material at moderate listening levels.</p>
-    </div>
+    </details>
 
     <details class="callout callout-history">
       <summary><span class="callout-cat">History &amp; Context</span> The Early CD Era</summary>
@@ -823,11 +823,11 @@
       <p>For each 10 ms frame of audio, the network computes a set of spectral gains (one per band) between 0 and 1. A gain of 1.0 means that band is passed through unmodified. A gain of 0 means it is fully suppressed. Intermediate values attenuate partially. The gains are applied multiplicatively to the band energies, and the modified spectrum is reconstructed back to a waveform. The network never synthesizes audio; it only decides how much of each perceptual band to suppress in each frame.</p>
     </details>
 
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> Training and the Model File</strong>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> Training and the Model File</summary>
       <p>The bundled model (<code>bd.rnnn</code> from the <a href="https://github.com/GregorR/rnnoise-models">rnnoise-models repository</a>) was trained on a large corpus of speech (multiple speakers, multiple languages, multiple recording conditions) mixed with a wide variety of noise types: HVAC, traffic, crowd noise, fan hum, electrical interference, and broadband pink and white noise. The model learns to identify which spectral components correspond to voice and which correspond to noise, using temporal context (the GRU's hidden state) to distinguish steady-state noise from transient speech components.</p>
       <p>Training required both clean speech recordings and noise-only recordings, which were artificially mixed at various signal-to-noise ratios. The network learned the difference between speech-shaped energy and noise-shaped energy across thousands of examples. Because the training data was multilingual and broad-spectrum, the resulting model generalizes well across different speakers, accents, and recording conditions without any per-speaker adaptation.</p>
-    </div>
+    </details>
 
     <h3>What It Suppresses Well, and Poorly</h3>
     <p>RNNoise excels at <strong>steady-state, spectrally diffuse noise</strong>: HVAC hum, room tone, computer fan noise, broadband electrical hiss, and low-level crowd ambience. These share a characteristic spectral profile that is relatively stable over time and distributes energy broadly, making them easy for the network to distinguish from voice. On clean recordings with consistent low-level background noise, suppression is typically very effective and inaudible.</p>
@@ -861,25 +861,25 @@
     <p>RNNoise was designed and trained exclusively on <strong>mono 48 kHz speech</strong>. When FFmpeg's <code>arnndn</code> filter receives a stereo input, it creates separate denoiser instances per channel and processes them independently. In practice, this can produce unpredictable results: the per-channel recurrent states diverge, and one channel (typically the second) may be over-gated or heavily attenuated, even when both channels carry similar content and noise levels.</p>
     <p>The root cause is that the model's internal gain computation is frame-by-frame and depends on its recurrent hidden state. With stereo input, slight differences between channels (different mic angles, room reflections, or even minor level offsets from recording) can cause the model to classify one channel as "more noisy" than the other and gate it more aggressively. The model has no concept of channel correlation or stereo coherence.</p>
     <p>WaxOn solves this by <strong>splitting stereo audio into independent mono channels before applying RNNoise</strong>, then rejoining the denoised channels back into stereo.</p>
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> filter_complex graph</strong>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> filter_complex graph</summary>
       <p>This uses FFmpeg's <code>filter_complex</code> graph:</p>
       <pre><code>[0:a]channelsplit=channel_layout=stereo[L][R];
 [L]arnndn=m=/path/to/model[Lnr];
 [R]arnndn=m=/path/to/model[Rnr];
 [Lnr][Rnr]join=inputs=2:channel_layout=stereo</code></pre>
-    </div>
+    </details>
     <p>Each channel receives its own fully independent denoiser instance with its own recurrent state, initialized cleanly. The model processes each as a standard mono stream — the format it was trained on — and the results are predictable and balanced. The remaining filter chain (high-pass, phase rotation, resample) runs on the rejoined stereo signal.</p>
     <p>For <strong>mono output</strong>, the issue does not arise. When the user selects mono, a single channel is extracted via <code>pan</code> before (or at the same stage as) noise reduction, so <code>arnndn</code> always receives a mono signal. The simple <code>-af</code> chain is used in this case.</p>
     <p>The same per-channel split is applied wherever <code>arnndn</code> touches stereo audio, including the <a href="#nr-measurement">NR-for-measurement</a> analysis paths.</p>
 
-    <div class="callout callout-impl">
-      <strong><span class="callout-cat">Under the Hood</span> FFmpeg Implementation</strong>
+    <details class="callout callout-impl">
+      <summary><span class="callout-cat">Under the Hood</span> FFmpeg Implementation</summary>
       <p>The <code>arnndn</code> filter in FFmpeg wraps the RNNoise library. It requires an external model file provided via the <code>m=</code> parameter:</p>
       <pre><code>arnndn=m=/path/to/model</code></pre>
       <p>The model file is bundled in the app's resources directory. WaxOn locates it at runtime using <code>Bundle.main.url(forResource:withExtension:)</code> and passes the resolved path to FFmpeg. For mono output, the filter is prepended to the <code>-af</code> chain. For stereo output, WaxOn switches to a <code>-filter_complex</code> graph that splits, denoises, and rejoins the channels as described above. When Noise Reduction is off, the chain begins with the high-pass filter as usual.</p>
       <p>Processing latency for <code>arnndn</code> is negligible for batch processing purposes. The network processes audio in 10 ms frames. For a 60-minute recording, the total added processing time is a few seconds on Apple Silicon.</p>
-    </div>
+    </details>
   </section>
 
   <!-- Noise Floor Estimation -->
