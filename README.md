@@ -68,7 +68,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
 ## Technical Origin
-The signal chains are correct: two-pass loudnorm is implemented per the FFmpeg specification and validated against ITU-R BS.1770, K-weighting coefficients match the reference, and stereo RNNoise processing handles channel independence the right way. I designed the DSP logic and parameters. The Swift implementation was built with AI assistance.
+I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and per-channel RNNoise for stereo independence — reflects deliberate choices, not defaults.
 
 ---
 
