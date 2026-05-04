@@ -2,10 +2,516 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=./manual/">
-  <title>WaxOnWaxOff</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WaxOn/WaxOff — Podcast Audio Prep for macOS</title>
+  <meta name="description" content="Two-mode podcast audio utility for macOS. WaxOn prepares raw recordings for editing. WaxOff delivers your finished mix to broadcast spec.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:     #0e0e0e;
+      --dark:      #1a1816;
+      --mid:       #242018;
+      --light:     #f2ead8;
+      --cream:     #e8dfc8;
+      --muted:     #9c8a6a;
+      --orange:    #d4520a;
+      --orange-lt: #e8641c;
+      --border:    rgba(156,138,106,0.2);
+      --font-disp: 'Bebas Neue', 'Arial Narrow', sans-serif;
+      --font-ui:   'Barlow Condensed', 'Arial Narrow', sans-serif;
+      --font-body: 'Barlow', Arial, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--dark);
+      color: var(--light);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      background-size: 180px 180px;
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    a { color: var(--orange); text-decoration: none; }
+    a:hover { color: var(--orange-lt); }
+
+    /* ── Layout ── */
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* ── Top bar ── */
+
+    .topbar {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+    }
+
+    .topbar-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .topbar-brand {
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: 0.06em;
+      color: var(--light);
+    }
+
+    .topbar-links {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .topbar-links a {
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: color 0.15s;
+    }
+
+    .topbar-links a:hover { color: var(--orange-lt); }
+
+    /* ── Hero ── */
+
+    .hero {
+      padding: 80px 0 72px;
+      text-align: center;
+    }
+
+    .hero-icon {
+      width: 120px;
+      height: 120px;
+      border-radius: 26px;
+      margin-bottom: 28px;
+    }
+
+    .hero h1 {
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: clamp(2.8rem, 6vw, 5rem);
+      letter-spacing: 0.02em;
+      line-height: 1;
+      color: var(--light);
+      margin-bottom: 16px;
+    }
+
+    .hero-tagline {
+      font-size: 1.2rem;
+      color: var(--cream);
+      max-width: 520px;
+      margin: 0 auto 32px;
+      line-height: 1.5;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .hero-meta {
+      margin-top: 20px;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── Buttons ── */
+
+    .btn {
+      display: inline-block;
+      padding: 11px 24px;
+      font-family: var(--font-ui);
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover { text-decoration: none; }
+
+    .btn-primary {
+      background: var(--orange);
+      color: var(--black);
+    }
+    .btn-primary:hover { background: var(--orange-lt); color: var(--black); }
+
+    .btn-secondary {
+      background: var(--mid);
+      color: var(--light);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--orange); color: var(--orange); }
+
+    /* ── Pinstripe divider ── */
+
+    .pinstripe {
+      border: none;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border) 20%, var(--border) 80%, transparent);
+    }
+
+    /* ── Mode cards ── */
+
+    .modes {
+      padding: 64px 0;
+    }
+
+    .modes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .mode-card {
+      background: var(--mid);
+      padding: 36px 32px;
+    }
+
+    .mode-card + .mode-card {
+      border-left: 1px solid var(--border);
+    }
+
+    .mode-label {
+      display: inline-block;
+      font-family: var(--font-ui);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      margin-bottom: 16px;
+    }
+
+    .mode-label-on  { background: var(--orange); color: var(--black); }
+    .mode-label-off { border: 1px solid var(--orange); color: var(--orange); }
+
+    .mode-card h2 {
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: 1.5rem;
+      letter-spacing: 0.02em;
+      color: var(--light);
+      margin-bottom: 8px;
+    }
+
+    .mode-card .mode-when {
+      font-size: 0.85rem;
+      font-family: var(--font-ui);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .mode-card p {
+      font-size: 0.95rem;
+      color: var(--cream);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .mode-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .mode-card ul li {
+      font-size: 0.88rem;
+      color: var(--muted);
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .mode-card ul li:last-child { border-bottom: none; }
+
+    .mode-card ul li::before {
+      content: '→';
+      color: var(--orange);
+      font-family: var(--font-ui);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── Screenshots ── */
+
+    .screenshots {
+      padding: 64px 0 72px;
+    }
+
+    .screenshots h2 {
+      font-family: var(--font-disp);
+      font-size: clamp(1.4rem, 2.5vw, 2rem);
+      letter-spacing: 0.06em;
+      color: var(--light);
+      margin-bottom: 24px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .screenshot-placeholder {
+      background: var(--black);
+      border: 1px dashed var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 380px;
+      color: var(--muted);
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── Specs strip ── */
+
+    .specs {
+      padding: 48px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 64px;
+    }
+
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 32px;
+      text-align: center;
+    }
+
+    .spec-item .spec-value {
+      font-family: var(--font-ui);
+      font-weight: 700;
+      font-size: 1.4rem;
+      color: var(--orange);
+      display: block;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .spec-item .spec-label {
+      font-family: var(--font-ui);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── Footer ── */
+
+    footer {
+      background: var(--black);
+      border-top: 1px solid var(--border);
+      padding: 36px 0;
+    }
+
+    .footer-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .footer-copy {
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .footer-links a {
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover { color: var(--orange-lt); }
+
+    /* ── Responsive ── */
+
+    @media (max-width: 640px) {
+      .page { padding: 0 20px; }
+      .topbar-inner { padding: 0 20px; }
+      .footer-inner { padding: 0 20px; }
+      .hero { padding: 56px 0 52px; }
+      .hero h1 { font-size: 2.6rem; }
+      .modes-grid { grid-template-columns: 1fr; }
+      .mode-card + .mode-card { border-left: none; border-top: 1px solid var(--border); }
+      .specs-grid { grid-template-columns: repeat(2, 1fr); }
+      .topbar-links { gap: 14px; }
+      .footer-inner { flex-direction: column; align-items: flex-start; gap: 16px; }
+    }
+  </style>
 </head>
 <body>
-  <p><a href="./manual/">Redirecting to manual…</a></p>
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="topbar-brand">WaxOn / WaxOff</span>
+      <nav class="topbar-links">
+        <a href="manual/">Manual</a>
+        <a href="manual/theory.html">Theory</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff">GitHub</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.9.1.dmg" class="btn btn-primary" style="padding: 6px 16px; font-size: 0.78rem;">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <div class="page">
+    <section class="hero">
+      <img src="icon.png" alt="WaxOn/WaxOff" class="hero-icon">
+      <h1>WaxOn / WaxOff</h1>
+      <p class="hero-tagline">Podcast audio prep for macOS. From raw recording to finished delivery — two modes, one app.</p>
+      <div class="hero-actions">
+        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.9.1.dmg" class="btn btn-primary">Download v1.9.1</a>
+        <a href="manual/" class="btn btn-secondary">Manual</a>
+        <a href="manual/theory.html" class="btn btn-secondary">Theory of Operation</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff" class="btn btn-secondary">GitHub</a>
+      </div>
+      <p class="hero-meta">macOS 14+ &nbsp;·&nbsp; Apple Silicon &amp; Intel &nbsp;·&nbsp; Free</p>
+    </section>
+
+    <hr class="pinstripe">
+
+    <!-- Mode cards -->
+    <section class="modes">
+      <div class="modes-grid">
+        <div class="mode-card">
+          <span class="mode-label mode-label-on">WaxOn</span>
+          <h2>Raw Recording Prep</h2>
+          <p class="mode-when">Use before you edit</p>
+          <p>Conditions guest recordings and raw captures for editing. Cleans the signal and outputs a normalized 24-bit WAV ready for your DAW.</p>
+          <ul>
+            <li>High-pass filter (configurable 20–90 Hz)</li>
+            <li>RNNoise ML noise reduction</li>
+            <li>De-esser (sample-rate adaptive)</li>
+            <li>Level riding — downward-only gain control</li>
+            <li>Dynamic leveling for panel &amp; multi-voice</li>
+            <li>Two-pass EBU R128 loudness normalization</li>
+            <li>2× oversampled true peak limiting</li>
+          </ul>
+        </div>
+        <div class="mode-card">
+          <span class="mode-label mode-label-off">WaxOff</span>
+          <h2>Delivery &amp; Mastering</h2>
+          <p class="mode-when">Use after you mix</p>
+          <p>Takes your finished mix to broadcast-compliant delivery. EBU R128 normalization, true peak control, and MP3 encoding in one step.</p>
+          <ul>
+            <li>Two-pass EBU R128 — linear gain, no compression</li>
+            <li>Configurable true peak ceiling (−3.0 to −0.1 dBTP)</li>
+            <li>24-bit WAV, CBR MP3, or both simultaneously</li>
+            <li>Built-in presets: Podcast Standard, Loud, WAV Only</li>
+            <li>Custom preset save &amp; recall</li>
+            <li>Phase rotation for bass-heavy material</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <hr class="pinstripe">
+
+    <!-- Screenshots -->
+    <section class="screenshots">
+      <h2>Screenshots</h2>
+      <div class="screenshot-placeholder">Screenshots coming soon</div>
+    </section>
+
+    <!-- Specs strip -->
+    <section class="specs">
+      <div class="specs-grid">
+        <div class="spec-item">
+          <span class="spec-value">macOS 14+</span>
+          <span class="spec-label">Sonoma &amp; Sequoia</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-value">24-bit WAV</span>
+          <span class="spec-label">Output Format</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-value">Bundled</span>
+          <span class="spec-label">FFmpeg — no install</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-value">Free</span>
+          <span class="spec-label">GPL v3 open source</span>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /.page -->
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <span class="footer-copy">© 2026 Seven Morris &nbsp;·&nbsp; GPL v3</span>
+      <nav class="footer-links">
+        <a href="https://ko-fi.com/sevmo">☕ Buy me a coffee</a>
+        <a href="manual/">Manual</a>
+        <a href="manual/theory.html">Theory</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+
 </body>
 </html>
