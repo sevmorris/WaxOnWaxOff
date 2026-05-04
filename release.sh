@@ -29,6 +29,7 @@ STAGING="/tmp/waxon_dmg_${VERSION}"
 DMG="/tmp/WaxOnWaxOff-${TAG}.dmg"
 MOUNT="/tmp/waxon_verify_${VERSION}"
 MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
+LANDING_IDX="$PROJECT_DIR/docs/index.html"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step()  { echo "\n▶ $*"; }
@@ -168,14 +169,18 @@ sed -i '' "s|<strong>Version:</strong> [0-9][0-9.]*|<strong>Version:</strong> ${
 sed -i '' "s|\*\*Version:\*\* [0-9][0-9.]*|**Version:** ${VERSION}|g" "$PROJECT_DIR/README.md"
 sed -i '' "s|\[Download v[0-9][0-9.]* (DMG)\]|[Download ${TAG} (DMG)]|g" "$PROJECT_DIR/README.md"
 
+# Landing page: download button URLs and button text.
+sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg|WaxOnWaxOff-${TAG}.dmg|g" "$LANDING_IDX"
+sed -i '' "s|>Download v[0-9][0-9.]*<|>Download ${TAG}<|g" "$LANDING_IDX"
+
 # Sanity-check: nothing should still reference the old version.
-if grep -E "WaxOnWaxOff-v[0-9]+\.[0-9]+\.[0-9]+\.dmg" "$MANUAL_IDX" "$PROJECT_DIR/README.md" \
+if grep -E "WaxOnWaxOff-v[0-9]+\.[0-9]+\.[0-9]+\.dmg" "$MANUAL_IDX" "$LANDING_IDX" "$PROJECT_DIR/README.md" \
         | grep -v "${TAG}\.dmg" >/dev/null; then
     fail "Stale version references remain after rewrite — check sed patterns"
 fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
-    git add "$MANUAL_IDX" "$PROJECT_DIR/README.md"
+    git add "$MANUAL_IDX" "$LANDING_IDX" "$PROJECT_DIR/README.md"
     git commit -m "docs: update download link to ${TAG}"
     ok "Docs point to ${TAG}"
 else
