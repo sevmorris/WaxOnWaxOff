@@ -41,7 +41,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Loudness Normalization:** Two-pass EBU R128 linear gain (dynamics fully preserved).
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
-* **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom.
+* **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom. Alters waveform phase — use with care on stereo music sources.
 
 **Output Logic:** `{name}-{rate}waxon{ceiling}.wav` (24-bit; ceiling is e.g. `-1dB`)
 
@@ -51,8 +51,6 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **EBU R128 Normalization:** Two-pass analysis + linear gain; no dynamic compression.
 * **True Peak Management:** Configurable ceiling (−3.0 to −0.1 dBTP).
 * **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
-* **Crest Factor Optimization:** Optional 150 Hz allpass for bass-heavy material.
-
 **Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
 
 ---
@@ -60,7 +58,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 ## Operational Specifications
 * **Waveform Audit:** Real-time waveform preview with dB scaling.
 * **Metadata Stats:** RMS, Peak, Crest Factor, Integrated LUFS, and Floor estimation.
-* **Concurrency:** 3 simultaneous batch processing threads.
+* **Concurrency:** Adaptive batch processing — scales with available CPU cores.
 * **Environment:** macOS 14.0+ (Sonoma); Native Apple Silicon and Intel support.
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
