@@ -22,7 +22,7 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     var limitDb: Double = -1.0
     var loudnormEnabled: Bool = false
     var loudnormTarget: Double = -30.0
-    var dcBlockHz: Int = 80
+    var highPassHz: Int = 80
     var phaseRotationEnabled: Bool = true
     var levelRidingEnabled: Bool = false
     var dynamicLevelingEnabled: Bool = false

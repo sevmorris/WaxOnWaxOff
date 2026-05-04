@@ -171,8 +171,9 @@ final class DeliveryViewModel {
                 } catch is CancellationError {
                     break
                 } catch {
+                    log.append("✗ \(error.localizedDescription)", level: .info)
                     if let idx = files.firstIndex(where: { $0.id == fileID }) {
-                        files[idx].status = .error(error.localizedDescription)
+                        files[idx].status = .error("Processing failed — see Console")
                     }
                 }
             }

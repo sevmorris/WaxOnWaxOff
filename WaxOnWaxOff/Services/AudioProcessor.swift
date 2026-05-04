@@ -87,14 +87,15 @@ actor AudioProcessor {
         onLog?("▶ \(filename)", .info)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
         let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
-        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz\(phaseDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
+        let hpFreq = max(settings.highPassHz, 20)
+        onLog?("  filter: highpass=\(hpFreq) Hz\(phaseDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
 
         let step1Af: String
         if isStereo {
-            step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
+            step1Af = "highpass=f=\(hpFreq),\(phaseFilter)aresample=\(sr)"
         } else {
             let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
-            step1Af = "highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
+            step1Af = "highpass=f=\(hpFreq),\(pan),\(phaseFilter)aresample=\(sr)"
         }
         try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",

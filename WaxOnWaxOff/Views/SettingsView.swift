@@ -14,7 +14,7 @@ struct SettingsView: View {
                     .padding(.top, 6)
                     .padding(.horizontal, 2)
 
-                row(nil) {
+                row("Sample Rate") {
                     Picker("", selection: $viewModel.settings.sampleRate) {
                         Text("44.1 kHz").tag(WaxOnSettings.SampleRate.s44100)
                         Text("48 kHz").tag(WaxOnSettings.SampleRate.s48000)
@@ -22,7 +22,7 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                row(nil) {
+                row("Channels") {
                     Picker("", selection: $viewModel.settings.outputChannels) {
                         Text("Mono").tag(WaxOnSettings.OutputChannels.mono)
                         Text("Stereo").tag(WaxOnSettings.OutputChannels.stereo)
@@ -30,7 +30,7 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                row(nil) {
+                row("Channel") {
                     Picker("", selection: $viewModel.settings.channel) {
                         Text("Left").tag(WaxOnSettings.MonoChannel.left)
                         Text("Right").tag(WaxOnSettings.MonoChannel.right)
@@ -52,17 +52,17 @@ struct SettingsView: View {
                     }
                 }
 
-                row("High Pass") {
+                row("High Pass", caption: "DC offset is always removed regardless of this setting.") {
                     HStack(spacing: 6) {
                         Slider(
                             value: Binding(
-                                get: { Double(viewModel.settings.dcBlockHz) },
-                                set: { viewModel.settings.dcBlockHz = Int($0) }
+                                get: { Double(viewModel.settings.highPassHz) },
+                                set: { viewModel.settings.highPassHz = Int($0) }
                             ),
-                            in: 20...90,
+                            in: 0...90,
                             step: 5
                         )
-                        Text(viewModel.settings.dcBlockHz == 20 ? "DC Block" : "\(viewModel.settings.dcBlockHz) Hz")
+                        Text(viewModel.settings.highPassHz == 0 ? "Off" : "\(viewModel.settings.highPassHz) Hz")
                             .font(.system(size: 11).monospaced())
                             .frame(width: 55, alignment: .trailing)
                     }
@@ -130,7 +130,7 @@ struct SettingsView: View {
                     }
                 }
 
-                row("Aggressiveness") {
+                row("Aggressiveness", caption: "Max gain: Gentle +6 dB · Aggressive +15 dB. Audition output before editing.") {
                     HStack(spacing: 6) {
                         Slider(value: $viewModel.settings.dynamicLevelingAmount, in: 0 ... 1)
                         Text(aggressivenessLabel(viewModel.settings.dynamicLevelingAmount))
