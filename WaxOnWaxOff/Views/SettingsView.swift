@@ -85,7 +85,7 @@ struct SettingsView: View {
                             Toggle("", isOn: $viewModel.settings.levelRidingEnabled)
                                 .toggleStyle(.switch)
                                 .labelsHidden()
-                            Text("Tame wild swings")
+                            Text("Tame loud peaks")
                         }
                         Text("Attenuates loud sections only — never boosts quiet ones")
                             .font(.caption2)
