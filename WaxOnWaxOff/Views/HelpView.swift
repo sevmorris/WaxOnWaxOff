@@ -37,7 +37,7 @@ struct HelpView: View {
                     ])
                 }
                 section("WaxOn — Output Naming") {
-                    code("{original-name}-{samplerate}{ds-}waxon-{limit}dB.wav")
+                    code("{original-name}-{samplerate}{ds-}waxon{ceiling}.wav")
                     text("Examples: interview-44kwaxon-1dB.wav / interview-44kds-waxon-1dB.wav")
                 }
                 section("WaxOn — Processing Pipeline") {
@@ -58,7 +58,8 @@ struct HelpView: View {
                     definition("Output", "Mono or Stereo. Mono extracts a single channel; Stereo passes both channels through unchanged.")
                     definition("Channel", "Left or Right — which channel to extract in Mono mode.")
                     definition("Ceiling", "Brick-wall limiter ceiling: −3, −2, or −1 dB. Controls the maximum true peak of the output.")
-                    definition("High Pass", "High-pass filter cutoff frequency. Default 80 Hz, range 40–90 Hz.")
+                    definition("High Pass", "High-pass filter cutoff frequency. Default 80 Hz, range 20–90 Hz. At 20 Hz the filter acts as a DC blocker only — use for sources with significant bass content that a higher cutoff would thin.")
+                    definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. Uses 200 Hz (vs. 150 Hz in WaxOff) to target the proximity-effect range common in close-miked voice sources. On by default.")
                     definition("Noise Reduction", "Enables RNNoise neural network noise reduction (arnndn). Check output before editing — artifacts are possible on heavy noise.")
                     definition("De-esser", "Enables gentle sibilance reduction (deesser, ~7.5 kHz at 44.1 kHz / 8.2 kHz at 48 kHz, intensity 0.3). Reduces harshness on voiced content.")
                     definition("Level Riding", "Enables downward-only dynamic normalization (dynaudnorm). Attenuates sections that exceed a target peak level; quiet material — including the noise floor — is never boosted. Use for recordings with wide level swings, e.g. an inconsistent speaker or a loud guest.")

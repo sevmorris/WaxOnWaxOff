@@ -103,6 +103,9 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .disabled(viewModel.settings.dynamicLevelingEnabled)
+                .opacity(viewModel.settings.dynamicLevelingEnabled ? 0.4 : 1)
+                .help(viewModel.settings.dynamicLevelingEnabled ? "Unavailable when Dynamic Leveling is on — it already handles gain control in both directions" : "")
 
                 Divider().padding(.vertical, 6)
 
@@ -121,9 +124,15 @@ struct SettingsView: View {
                 row("Dynamic Leveling") {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
-                            Toggle("", isOn: $viewModel.settings.dynamicLevelingEnabled)
-                                .toggleStyle(.switch)
-                                .labelsHidden()
+                            Toggle("", isOn: Binding(
+                                get: { viewModel.settings.dynamicLevelingEnabled },
+                                set: { newValue in
+                                    viewModel.settings.dynamicLevelingEnabled = newValue
+                                    if newValue { viewModel.settings.levelRidingEnabled = false }
+                                }
+                            ))
+                            .toggleStyle(.switch)
+                            .labelsHidden()
                             Text("dynaudnorm")
                         }
                         Text("Lifts quiet voices, tames loud ones — panel shows, live Q&As. Can cause pumping on solo voice with natural pauses.")

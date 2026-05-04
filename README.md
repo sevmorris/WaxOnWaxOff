@@ -45,7 +45,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
 * **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom.
 
-**Output Logic:** `{name}-{rate}[ds-]waxon-{limit}.wav` (24-bit; `ds-` inserted when De-esser is on)
+**Output Logic:** `{name}-{rate}[ds-]waxon{ceiling}.wav` (24-bit; `ds-` inserted when De-esser is on; ceiling is e.g. `-1dB`)
 
 ## II. WaxOff — Distribution Mastering
 *Use on finished mixes to ensure broadcast compliance.*
@@ -56,7 +56,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Crest Factor Optimization:** Optional 150 Hz allpass for bass-heavy material.
 * **Optional Pre-Norm Leveling:** Gentle `dynaudnorm` step before loudnorm for delivery sources whose macro-dynamics need tightening.
 
-**Output Logic:** `{name}-lev-{target}LUFS.[wav/mp3]`
+**Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
 
 ---
 

@@ -76,7 +76,7 @@ actor AudioProcessor {
         let limitTag = formatDbTag(settings.limitDb)
         let outDir = bestOutputDir(for: input)
         let dsTag = settings.deEsserEnabled ? "ds-" : ""
-        let outName = "\(stem)-\(rateTag)\(dsTag)waxon-\(limitTag).wav"
+        let outName = "\(stem)-\(rateTag)\(dsTag)waxon\(limitTag).wav"
         let finalURL = outDir.appendingPathComponent(outName)
         let tmpURL = outDir.appendingPathComponent(".\(outName).tmp")
 
