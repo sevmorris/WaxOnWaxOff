@@ -40,6 +40,12 @@ struct WaxOnWaxOffApp: App {
                     Task { await checkForUpdates() }
                 }
 
+                Button("Support WaxOn/WaxOff…") {
+                    if let url = URL(string: "https://ko-fi.com/sevmo") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+
                 Divider()
 
                 Button("Send Feedback…") {

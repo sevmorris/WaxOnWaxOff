@@ -120,6 +120,15 @@ struct HelpView: View {
                     text("All processing uses FFmpeg, bundled inside the app — no separate installation required.")
                 }
 
+                dividerRow
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("If WaxOn/WaxOff saves you time, consider buying me a coffee.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Link("ko-fi.com/sevmo", destination: URL(string: "https://ko-fi.com/sevmo")!)
+                        .font(.body)
+                }
+
                 Spacer()
             }
             .padding(30)

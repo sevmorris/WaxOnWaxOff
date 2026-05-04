@@ -8,6 +8,8 @@
   <br />
   <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.9.1.dmg"><strong>Download</strong></a>
   ·
+  <a href="https://sevmorris.github.io/WaxOnWaxOff/">App Page</a>
+  ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/">Manual</a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html">Theory of Operation</a>
@@ -69,6 +71,9 @@ The app runs in two stages that map onto the two moments in podcast production w
 The signal chains are correct: two-pass loudnorm is implemented per the FFmpeg specification and validated against ITU-R BS.1770, K-weighting coefficients match the reference, and stereo RNNoise processing handles channel independence the right way. I designed the DSP logic and parameters. The Swift implementation was built with AI assistance.
 
 ---
+
+### Support
+If WaxOn/WaxOff saves you time, [buy me a coffee](https://ko-fi.com/sevmo). Free forever either way.
 
 ### License
 Copyright © 2026 Seven Morris.
