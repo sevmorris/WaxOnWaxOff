@@ -81,8 +81,7 @@ struct WaxOffPreset: Identifiable, Codable, Equatable {
                 lra: 11.0,
                 outputMode: .both,
                 mp3Bitrate: 160,
-                sampleRate: 44100,
-                phaseRotationEnabled: true
+                sampleRate: 44100
             )
         ),
         WaxOffPreset(
@@ -94,8 +93,7 @@ struct WaxOffPreset: Identifiable, Codable, Equatable {
                 lra: 11.0,
                 outputMode: .both,
                 mp3Bitrate: 160,
-                sampleRate: 44100,
-                phaseRotationEnabled: true
+                sampleRate: 44100
             )
         ),
         WaxOffPreset(
@@ -107,8 +105,7 @@ struct WaxOffPreset: Identifiable, Codable, Equatable {
                 lra: 11.0,
                 outputMode: .wav,
                 mp3Bitrate: 160,
-                sampleRate: 48000,
-                phaseRotationEnabled: true
+                sampleRate: 48000
             )
         )
     ]

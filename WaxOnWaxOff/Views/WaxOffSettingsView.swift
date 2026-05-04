@@ -81,18 +81,6 @@ struct WaxOffSettingsView: View {
 
                 Divider().padding(.vertical, 6)
 
-                row("Phase Rotation") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Toggle("150 Hz allpass", isOn: $viewModel.settings.phaseRotationEnabled)
-                            .toggleStyle(.switch)
-                        Text("Recovers headroom on asymmetric waveforms. Alters waveform phase; avoid on stereo music.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Divider().padding(.vertical, 6)
-
                 VStack(alignment: .leading, spacing: 5) {
                     Text("OUTPUT DIR")
                         .font(.system(size: 9, weight: .semibold))

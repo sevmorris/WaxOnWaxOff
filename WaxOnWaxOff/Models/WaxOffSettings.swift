@@ -13,7 +13,6 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
     var outputMode: OutputMode = .both
     var mp3Bitrate: Int = 160
     var sampleRate: Int = 44100
-    var phaseRotationEnabled: Bool = true
     var outputDirectoryPath: String? = nil
 
     static let `default` = WaxOffSettings()
