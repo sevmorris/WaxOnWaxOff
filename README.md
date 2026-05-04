@@ -19,15 +19,6 @@ This tool was built to solve specific signal-to-noise and normalization challeng
 
 ---
 
-> [!CAUTION]
-> **Manual Authorization Required**
-> macOS will block execution because this utility is not notarized. To authorize:
-> 1. Move `WaxOnWaxOff.app` to your `/Applications` folder.
-> 2. Run the following command in Terminal:
->    `xattr -cr /Applications/WaxOnWaxOff.app`
-
----
-
 ## I. WaxOn — Signal Conditioning (Prep)
 *Use on raw recordings prior to non-destructive editing.*
 

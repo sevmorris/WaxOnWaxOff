@@ -42,7 +42,7 @@ cleanup() {
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 step "Preflight checks"
-for cmd in xcodebuild hdiutil gh git; do
+for cmd in xcodebuild hdiutil gh git codesign xcrun; do
     command -v $cmd &>/dev/null || fail "'$cmd' not found in PATH"
 done
 ok "Tools present"
@@ -92,6 +92,20 @@ xcodebuild \
     -quiet
 ok "Build complete"
 
+# ── Sign ──────────────────────────────────────────────────────────────────────
+step "Codesigning binaries and app"
+IDENTITY="Developer ID Application: Seven Morris (T9RLNAXPWU)"
+ENTITLEMENTS="$PROJECT_DIR/WaxOnWaxOff/WaxOnWaxOff.entitlements"
+
+# Sign bundled binaries with Hardened Runtime
+codesign --force --options runtime --sign "$IDENTITY" "$APP_PATH/Contents/Resources/ffmpeg"
+codesign --force --options runtime --sign "$IDENTITY" "$APP_PATH/Contents/Resources/ffprobe"
+# Note: rnnoise is a model file (text), no signing needed.
+
+# Sign the app bundle
+codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_PATH"
+ok "Codesigning complete"
+
 # ── Verify app version ────────────────────────────────────────────────────────
 step "Verifying built app version"
 BUILT_VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersionString)
@@ -119,6 +133,14 @@ hdiutil create \
     -o "$DMG" \
     -quiet
 ok "Created $(du -sh $DMG | cut -f1) DMG"
+
+# ── Notarize ──────────────────────────────────────────────────────────────────
+step "Notarizing DMG"
+# Assumes a profile named 'WoWoNotary' exists.
+# Setup: xcrun notarytool store-credentials WoWoNotary --apple-id <email> --team-id T9RLNAXPWU
+xcrun notarytool submit "$DMG" --wait --keychain-profile "WoWoNotary"
+xcrun stapler staple "$DMG"
+ok "Notarization complete"
 
 # ── Verify DMG ────────────────────────────────────────────────────────────────
 step "Verifying DMG contents"
