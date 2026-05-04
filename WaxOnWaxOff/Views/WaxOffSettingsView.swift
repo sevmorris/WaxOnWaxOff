@@ -7,6 +7,13 @@ struct WaxOffSettingsView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                Text("OUTPUT FORMAT")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .kerning(0.4)
+                    .padding(.top, 6)
+                    .padding(.horizontal, 2)
+
                 row(nil) {
                     VStack(alignment: .leading, spacing: 4) {
                         Picker("", selection: $viewModel.settings.sampleRate) {
@@ -21,6 +28,9 @@ struct WaxOffSettingsView: View {
                         }
                     }
                 }
+                .disabled(viewModel.settings.outputMode == .mp3)
+                .opacity(viewModel.settings.outputMode == .mp3 ? 0.4 : 1)
+                .help(viewModel.settings.outputMode == .mp3 ? "MP3 always outputs at 44.1 kHz" : "")
 
                 row(nil) {
                     VStack(alignment: .leading, spacing: 4) {
