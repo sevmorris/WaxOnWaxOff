@@ -75,8 +75,7 @@ actor AudioProcessor {
         let limitAmp = pow(10.0, settings.limitDb / 20.0)
         let limitTag = formatDbTag(settings.limitDb)
         let outDir = bestOutputDir(for: input)
-        let dsTag = settings.deEsserEnabled ? "ds-" : ""
-        let outName = "\(stem)-\(rateTag)\(dsTag)waxon\(limitTag).wav"
+        let outName = "\(stem)-\(rateTag)waxon\(limitTag).wav"
         let finalURL = outDir.appendingPathComponent(outName)
         let tmpURL = outDir.appendingPathComponent(".\(outName).tmp")
 
@@ -88,80 +87,34 @@ actor AudioProcessor {
         let midURL = work.appendingPathComponent("\(stem)_\(rateTag)24_\(channelSuffix).wav")
 
         let phaseFilter = settings.phaseRotationEnabled ? "allpass=f=200:t=q:w=0.707," : ""
-
-        let nrEnabled = settings.noiseReductionEnabled
-        let nrModelURL = nrEnabled
-            ? Bundle.main.url(forResource: "rnnoise", withExtension: nil)
-            : nil
-
         let outputChannelCount: String = isStereo ? "2" : "1"
 
         onLog?("▶ \(filename)", .info)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
-        let nrDesc = nrEnabled ? "  |  RNNoise" : ""
         let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
-        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz\(phaseDesc)\(nrDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
+        onLog?("  filter: highpass=\(settings.dcBlockHz) Hz\(phaseDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
 
-        if isStereo, let modelURL = nrModelURL {
-            // Split → denoise each channel independently → rejoin, then
-            // highpass + phase rotation + resample.
-            let escapedModel = ffmpegFilterEscape(modelURL.path)
-            let fc = [
-                "[0:a]channelsplit=channel_layout=stereo[L][R]",
-                "[L]arnndn=m=\(escapedModel)[Lnr]",
-                "[R]arnndn=m=\(escapedModel)[Rnr]",
-                "[Lnr][Rnr]join=inputs=2:channel_layout=stereo,",
-                "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
-            ].joined(separator: ";")
-            try await runFFmpeg(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", input.path, "-filter_complex", fc,
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
-            ])
+        let step1Af: String
+        if isStereo {
+            step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
         } else {
-            // Mono output, or no NR — simple -af chain
-            var nrPrefix = ""
-            if let modelURL = nrModelURL {
-                nrPrefix = "arnndn=m=\(ffmpegFilterEscape(modelURL.path)),"
-            }
-            let step1Af: String
-            if isStereo {
-                step1Af = "highpass=f=\(settings.dcBlockHz),\(phaseFilter)aresample=\(sr)"
-            } else {
-                let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
-                step1Af = "\(nrPrefix)highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
-            }
-            try await runFFmpeg(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", input.path, "-af", step1Af,
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
-            ])
+            let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
+            step1Af = "highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
         }
+        try await runFFmpeg(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", input.path, "-af", step1Af,
+            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
+        ])
 
         try Task.checkCancellation()
-
-        // De-esser (optional)
-        let postDsURL: URL
-        if settings.deEsserEnabled {
-            let dsURL = work.appendingPathComponent("\(stem)_ds.wav")
-            onLog?("  de-esser: deesser ~\(String(format: "%.1f", (0.34 * Double(sr)) / 2000.0)) kHz", .verbose)
-            try await runFFmpeg(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", midURL.path, "-af", "deesser=i=0.3:f=0.34:s=o",
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dsURL.path
-            ])
-            postDsURL = dsURL
-            try Task.checkCancellation()
-        } else {
-            postDsURL = midURL
-        }
 
         // dynaudnorm boundary fix: the Gaussian window looks back into prior loud frames
         // when computing gain for the tail, causing the voice to fade. Padding the input
         // with silence pushes the artifact into the padding; -t trims it from the output.
         var dynaudnormDuration: Double? = nil
         if settings.levelRidingEnabled || settings.dynamicLevelingEnabled {
-            if let d = try? await getAudioDuration(exe: tools.ffprobe, url: postDsURL) {
+            if let d = try? await getAudioDuration(exe: tools.ffprobe, url: midURL) {
                 dynaudnormDuration = d
             } else {
                 onLog?("⚠ Could not determine file duration; dynaudnorm tail-fade fix skipped.", .info)
@@ -174,7 +127,7 @@ actor AudioProcessor {
             let levelURL = work.appendingPathComponent("\(stem)_leveled.wav")
             onLog?("  level riding: dynaudnorm (downward only, no boost)", .verbose)
             var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postDsURL.path,
+                        "-i", midURL.path,
                         "-af", "apad=pad_dur=16,dynaudnorm=p=0.95:m=1.0:g=31"]
             if let d = dynaudnormDuration { args += ["-t", String(format: "%.6f", d)] }
             args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, levelURL.path]
@@ -182,7 +135,7 @@ actor AudioProcessor {
             postLevelURL = levelURL
             try Task.checkCancellation()
         } else {
-            postLevelURL = postDsURL
+            postLevelURL = midURL
         }
 
         // Dynamic leveling (optional, dynaudnorm bidirectional)
@@ -209,12 +162,11 @@ actor AudioProcessor {
             let target = settings.loudnormTarget
             let tp = settings.limitDb
 
-            // When NR is off, run RNNoise on a temp copy for the analysis pass only.
+            // Run RNNoise on a temp copy for the analysis pass only.
             // This prevents broadband noise from inflating the loudness measurement,
             // ensuring speech hits the target LUFS more accurately.
             let analysisInput: URL
-            if !settings.noiseReductionEnabled,
-               let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
+            if let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
                 let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
                 onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
                 let escapedNrModel = ffmpegFilterEscape(modelURL.path)

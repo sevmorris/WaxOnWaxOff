@@ -531,8 +531,8 @@
   <!-- WaxOn Mode -->
   <section id="waxon-overview">
     <h2>WaxOn Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, optional noise reduction, optional de-essing, optional level riding, loudness normalization, phase rotation, and brick-wall limiting, outputting 24-bit WAV files ready to drop into Logic Pro, Reaper, or any other editor.</p>
-    <p>WaxOn is a first-step ingest processor: get your raw recordings into a consistent, workable format before editing. It does not do spectral repair or multiband restoration. For recordings with serious noise problems, dedicated tools like iZotope RX are the right choice; WaxOn's built-in noise reduction handles light to moderate steady-state background noise.</p>
+    <p>WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, optional level riding, loudness normalization, phase rotation, and brick-wall limiting, outputting 24-bit WAV files ready to drop into Logic Pro, Reaper, or any other editor.</p>
+    <p>WaxOn is a first-step ingest processor: get your raw recordings into a consistent, workable format before editing. It does not do spectral repair, noise reduction, or multiband restoration. For recordings with noise problems, de-essing needs, or other surgical work, dedicated tools like iZotope RX are the right choice.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -637,16 +637,6 @@
           <td>200 Hz allpass filter that reduces peak asymmetry on bass-heavy voice recordings, recovering 1–4 dB of headroom before the limiter. The effect on audio character is inaudible. Leave on unless you have a specific reason to disable. See <a href="theory.html#phase-rotation">Theory of Operation</a>.</td>
         </tr>
         <tr>
-          <td>Noise Reduction</td>
-          <td>On · Off · default Off</td>
-          <td>Applies RNNoise, a recurrent neural network trained on mono speech, before the high-pass filter. Suppresses consistent background noise (HVAC, room tone, hum) with minimal voice coloration. For stereo output, channels are split and denoised independently to ensure balanced processing. Check output before editing; artifacts are possible on heavy noise. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</td>
-        </tr>
-        <tr>
-          <td>De-esser</td>
-          <td>On · Off · default Off</td>
-          <td>Gentle sibilance reduction (FFmpeg's <code>deesser</code> filter, <code>i=0.3 f=0.34 s=o</code> — split frequency normalized to ~7.5 kHz at 44.1 kHz / ~8.2 kHz at 48 kHz). Reduces harshness on voiced content. Check output on heavily sibilant recordings.</td>
-        </tr>
-        <tr>
           <td>Level Riding</td>
           <td>On · Off · default Off</td>
           <td>Downward-only dynamic normalization. Attenuates loud sections toward a target peak; never boosts quiet material or the noise floor. Use for recordings with inconsistent levels. See <a href="theory.html#level-riding">Theory of Operation</a>.</td>
@@ -664,7 +654,7 @@
         <tr>
           <td>Loudness Norm</td>
           <td>On · Off</td>
-          <td>Enables two-pass EBU R128 loudness normalization. When NR is off, the analysis pass applies noise reduction internally to prevent broadband noise from skewing the measurement; the output itself is not affected. Off = filtering and limiting only.</td>
+          <td>Enables two-pass EBU R128 loudness normalization. The analysis pass applies RNNoise internally on a temp copy to prevent broadband noise from skewing the loudness measurement; the output signal is not affected. Off = filtering and limiting only.</td>
         </tr>
         <tr>
           <td>Target</td>
@@ -687,20 +677,8 @@
     <ol class="pipeline">
       <li>
         <div>
-          <strong>Noise Reduction <span class="tag">Optional</span></strong>
-          <span>When enabled, RNNoise (<code>arnndn</code>) runs first on the raw signal before any other processing. A recurrent neural network trained on speech suppresses consistent background noise (HVAC hum, room tone, light broadband noise) with minimal effect on voice. For stereo output, each channel is split and denoised independently before rejoining — RNNoise is a mono model and requires per-channel processing for balanced stereo results. Runs before the high-pass filter so the network sees the unaltered signal. See <a href="theory.html#rnnoise">Theory of Operation</a> for technical detail.</span>
-        </div>
-      </li>
-      <li>
-        <div>
           <strong>Filter, Channel &amp; Resample</strong>
           <span>High-pass filter at the configured cutoff, an optional 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom — on by default), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 24-bit PCM WAV at the target sample rate.</span>
-        </div>
-      </li>
-      <li>
-        <div>
-          <strong>De-esser <span class="tag">Optional</span></strong>
-          <span>Gentle sibilance reduction using FFmpeg's <code>deesser</code> filter (<code>i=0.3 f=0.34 s=o</code>). The split frequency is Nyquist-normalized — ~7.5 kHz at 44.1 kHz, ~8.2 kHz at 48 kHz. Reduces harshness on voiced content. Off by default.</span>
         </div>
       </li>
       <li>
@@ -718,7 +696,7 @@
       <li>
         <div>
           <strong>Loudness Normalization <span class="tag">Optional</span></strong>
-          <span>Two-pass EBU R128. First pass measures integrated loudness, true peak, LRA, and threshold. Second pass applies linear gain to hit the configured target. Linear mode preserves the natural dynamic shape of the recording: no compression, no transient changes. When Noise Reduction is off, the analysis pass runs RNNoise on a temporary copy for measurement accuracy; the output pipeline is unaffected. See <a href="theory.html#nr-measurement">NR-for-Measurement</a> in the Theory of Operation.</span>
+          <span>Two-pass EBU R128. First pass measures integrated loudness, true peak, LRA, and threshold. Second pass applies linear gain to hit the configured target. Linear mode preserves the natural dynamic shape of the recording: no compression, no transient changes. The analysis pass runs RNNoise on a temporary copy for measurement accuracy — preventing broadband noise from inflating the LUFS reading; the output pipeline is unaffected. See <a href="theory.html#nr-measurement">Theory of Operation</a>.</span>
         </div>
       </li>
       <li>
@@ -737,9 +715,8 @@
     <h2>WaxOn Output Files <span class="mode-badge mode-waxon">WaxOn</span></h2>
 
     <h3>Individual Files</h3>
-    <pre><code>{original-name}-{rate}[ds-]waxon{ceiling}.wav</code></pre>
-    <p>The <code>ds-</code> tag is inserted when the De-esser is enabled, so processed and unprocessed runs don't overwrite each other.</p>
-    <p>Examples: <code>episode-01-44kwaxon-1dB.wav</code> &nbsp; <code>episode-01-44kds-waxon-1dB.wav</code> &nbsp; <code>guest-48kwaxon-1dB.wav</code></p>
+    <pre><code>{original-name}-{rate}waxon{ceiling}.wav</code></pre>
+    <p>Examples: <code>episode-01-44kwaxon-1dB.wav</code> &nbsp; <code>guest-48kwaxon-1dB.wav</code></p>
 
     <h3>Location</h3>
     <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code>. Existing files with the same name are overwritten.</p>

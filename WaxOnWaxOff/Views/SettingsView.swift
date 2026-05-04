@@ -72,24 +72,6 @@ struct SettingsView: View {
 
                 Divider().padding(.vertical, 6)
 
-                row("Noise Reduction", caption: "Artifacts are possible on heavy noise") {
-                    HStack(spacing: 8) {
-                        Toggle("", isOn: $viewModel.settings.noiseReductionEnabled)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        Text("RNNoise (ML)")
-                    }
-                }
-
-                row("De-esser") {
-                    HStack(spacing: 8) {
-                        Toggle("", isOn: $viewModel.settings.deEsserEnabled)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        Text("Gentle (\(String(format: "%.1f", (0.34 * Double(viewModel.settings.sampleRate.rawValue)) / 2000.0)) kHz)")
-                    }
-                }
-
                 row("Level Riding") {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {

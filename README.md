@@ -21,7 +21,7 @@
 
 The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
 
-- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional noise reduction and de-essing, EBU R128 normalization with dynamics fully preserved. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder without collision (e.g., `interview-44kwaxon-1dB.wav`).
+- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, EBU R128 normalization with dynamics fully preserved. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder without collision (e.g., `interview-44kwaxon-1dB.wav`).
 - **WaxOff** runs after you bounce. It takes your finished mix to broadcast-compliant delivery — EBU R128 to target LUFS, true peak ceiling, WAV and/or MP3 output.
 
 **vs. Auphonic:** Runs locally. No subscription, no upload, no audio leaving your machine, transparent signal chain.
@@ -36,8 +36,6 @@ The app runs in two stages that map onto the two moments in podcast production w
 *Use on raw recordings prior to non-destructive editing.*
 
 * **High-Pass Filter:** Configurable cutoff (20–90 Hz) for HVAC/handling noise removal.
-* **Noise Reduction:** Optional RNNoise (ML-based) suppression; best for steady-state background noise.
-* **De-esser:** Optional gentle sibilance reduction.
 * **Level Riding:** Optional downward-only `dynaudnorm` to tame loud outliers without lifting the noise floor.
 * **Dynamic Leveling:** Optional bidirectional `dynaudnorm` for panel/multi-voice sources, with a Gentle→Aggressive responsiveness control.
 * **Loudness Normalization:** Two-pass EBU R128 linear gain (dynamics fully preserved).
@@ -45,7 +43,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
 * **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom.
 
-**Output Logic:** `{name}-{rate}[ds-]waxon{ceiling}.wav` (24-bit; `ds-` inserted when De-esser is on; ceiling is e.g. `-1dB`)
+**Output Logic:** `{name}-{rate}waxon{ceiling}.wav` (24-bit; ceiling is e.g. `-1dB`)
 
 ## II. WaxOff — Distribution Mastering
 *Use on finished mixes to ensure broadcast compliance.*
@@ -68,7 +66,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
 ## Technical Origin
-I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and per-channel RNNoise for stereo independence — reflects deliberate choices, not defaults.
+I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and internal per-channel RNNoise on the analysis pass for measurement accuracy on noisy recordings — reflects deliberate choices, not defaults.
 
 ---
 
