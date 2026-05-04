@@ -13,9 +13,11 @@ struct WaxOnWaxOffApp: App {
     @Environment(\.openWindow) private var openWindow
 
     init() {
-        Task {
-            await checkForUpdates(silent: true)
-        }
+        // Purge orphaned temp files left by any previous crash or force-quit.
+        let appTemp = FileManager.waxonTempDirectory
+        try? FileManager.default.removeItem(at: appTemp)
+
+        Task { await checkForUpdates(silent: true) }
     }
 
     var body: some Scene {

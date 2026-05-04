@@ -37,9 +37,9 @@ final class DeliveryViewModel {
     // MARK: - File Management
 
     func addFiles(_ urls: [URL]) {
-        let audioURLs = urls.filter { $0.isFileURL }
-        let valid = audioURLs.filter { Self.validExtensions.contains($0.pathExtension.lowercased()) }
-        let rejected = audioURLs.count - valid.count
+        let expanded = urls.flatMap { expandFolder($0) }
+        let valid = expanded.filter { Self.validExtensions.contains($0.pathExtension.lowercased()) }
+        let rejected = expanded.count - valid.count
 
         if rejected > 0 {
             alertMessage = "\(rejected) file\(rejected == 1 ? "" : "s") skipped — unsupported format."
@@ -52,6 +52,18 @@ final class DeliveryViewModel {
             analyzeFile(file)
             generateWaveform(file)
             analyzeFileInfo(file)
+        }
+    }
+
+    private func expandFolder(_ url: URL) -> [URL] {
+        guard url.hasDirectoryPath else { return [url] }
+        guard let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return [] }
+        return enumerator.compactMap { $0 as? URL }.filter {
+            (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
         }
     }
 

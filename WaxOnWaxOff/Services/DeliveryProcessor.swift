@@ -73,7 +73,7 @@ actor DeliveryProcessor {
         onPhase?("Normalizing…")
         try Task.checkCancellation()  // CRITICAL-2
         onLog?("  loudnorm: normalizing…", .verbose)
-        let wavTempURL = outputDir.appendingPathComponent(".\(outputStem).part.\(UUID().uuidString.prefix(8)).wav")
+        let wavTempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).wav")
         let wavFinalURL = outputDir.appendingPathComponent("\(outputStem).wav")
 
         try await renderWAV(
@@ -109,7 +109,7 @@ actor DeliveryProcessor {
             onLog?("  mp3: \(settings.mp3Bitrate)k  |  limiter: 2× oversample  |  ceiling -2.0 dBTP", .verbose)
 
             let sourceForMP3 = settings.outputMode == .both ? wavFinalURL : wavTempURL
-            let mp3TempURL = outputDir.appendingPathComponent(".\(outputStem).part.\(UUID().uuidString.prefix(8)).mp3")
+            let mp3TempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).mp3")
             let mp3FinalURL = outputDir.appendingPathComponent("\(outputStem).mp3")
 
             defer {

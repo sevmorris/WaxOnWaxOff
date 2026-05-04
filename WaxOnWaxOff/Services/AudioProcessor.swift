@@ -69,10 +69,13 @@ actor AudioProcessor {
         let outDir = bestOutputDir(for: input)
         let outName = "\(stem)-\(rateTag)waxon\(limitTag).wav"
         let finalURL = outDir.appendingPathComponent(outName)
-        let tmpURL = outDir.appendingPathComponent(".\(outName).tmp")
 
         let work = try makeTemp(prefix: "waxon_\(rateTag)_")
         defer { try? fm.removeItem(at: work) }
+
+        // Stage inside work so the existing defer cleans it on crash/cancel,
+        // and the startup purge handles any orphan from a force-quit.
+        let tmpURL = work.appendingPathComponent(outName)
 
         let isStereo = settings.outputChannels == .stereo
         let channelSuffix = isStereo ? "stereo" : "mono"
@@ -259,8 +262,8 @@ actor AudioProcessor {
     }
 
     private func makeTemp(prefix: String) throws -> URL {
-        let base = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        let dir = base.appendingPathComponent(prefix + UUID().uuidString, isDirectory: true)
+        let dir = FileManager.waxonTempDirectory
+            .appendingPathComponent(prefix + UUID().uuidString.prefix(8), isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         } catch {

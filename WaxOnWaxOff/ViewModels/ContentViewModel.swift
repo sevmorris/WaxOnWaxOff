@@ -40,20 +40,12 @@ final class ContentViewModel {
     }
 
     func addFiles(_ urls: [URL]) {
-        let fileURLs = urls.filter { $0.isFileURL && !$0.hasDirectoryPath }
-        let valid = fileURLs.filter { Self.validExtensions.contains($0.pathExtension.lowercased()) }
-        let folders = urls.filter { $0.hasDirectoryPath }.count
-        let badFormat = fileURLs.count - valid.count
+        let expanded = urls.flatMap { expandFolder($0) }
+        let valid = expanded.filter { Self.validExtensions.contains($0.pathExtension.lowercased()) }
+        let badFormat = expanded.count - valid.count
 
-        var notices: [String] = []
-        if folders > 0 {
-            notices.append("\(folders) folder\(folders == 1 ? "" : "s") skipped — folders are not supported.")
-        }
         if badFormat > 0 {
-            notices.append("\(badFormat) file\(badFormat == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, ogg, opus, caf, wma, aac, mp4, mov.")
-        }
-        if !notices.isEmpty {
-            alertMessage = notices.joined(separator: "\n\n")
+            alertMessage = "\(badFormat) file\(badFormat == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, ogg, opus, caf, wma, aac, mp4, mov."
         }
 
         if valid.contains(where: { $0.lastPathComponent.localizedCaseInsensitiveContains("-waxon") }) {
@@ -63,6 +55,18 @@ final class ContentViewModel {
         }
 
         commitFiles(valid)
+    }
+
+    private func expandFolder(_ url: URL) -> [URL] {
+        guard url.hasDirectoryPath else { return [url] }
+        guard let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return [] }
+        return enumerator.compactMap { $0 as? URL }.filter {
+            (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
     }
 
     func confirmWaxonWarning() {
