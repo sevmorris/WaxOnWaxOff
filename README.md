@@ -13,9 +13,20 @@
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html">Theory of Operation</a>
 </p>
 
-**WaxOn/WaxOff** is an internal utility designed to enforce signal integrity and loudness standards across a podcast production pipeline. It provides a standardized, two-stage workflow for preparing raw assets and finalizing distribution masters.
+**WaxOn/WaxOff** solves a specific problem: you receive a guest recording that's quiet, uneven, or sitting in a bed of room noise, and you need a clean, normalized WAV before you open your session. No import-normalize-export dance. No sending audio to a cloud service.
 
-This tool was built to solve specific signal-to-noise and normalization challenges in freelance audio engineering. While developed for personal use, it is made publicly available for others who require a "zero-fluff" technical solution for voice-forward audio processing.
+[SCREENSHOT NEEDED — alt: WaxOn processing a batch of guest recordings]
+
+The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
+
+- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional noise reduction and de-essing, EBU R128 normalization with dynamics fully preserved. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder without collision (e.g., `interview-44kwaxon-1dB.wav`).
+- **WaxOff** runs after you bounce. It takes your finished mix to broadcast-compliant delivery — EBU R128 to target LUFS, true peak ceiling, WAV and/or MP3 output.
+
+**vs. Auphonic:** Runs locally. No subscription, no upload, no audio leaving your machine, transparent signal chain.
+
+**vs. iZotope RX:** Not a replacement for surgical repair — plosives, deep clicks, and spectral cleanup are still RX's job. But for the repetitive normalize → EQ → bounce work on clean-enough files, RX is overkill. WaxOn handles that stage in a single drop.
+
+**vs. a bash script:** The two-stage model and the preset system. WaxOn presets encode your processing decisions so batches are repeatable. WaxOff presets capture your delivery spec per platform.
 
 ---
 
@@ -55,9 +66,7 @@ This tool was built to solve specific signal-to-noise and normalization challeng
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
 ## Technical Origin
-WaxOn/WaxOff is an expert-driven signal chain built on FFmpeg. I designed the DSP logic and parameters based on professional podcasting standards, and used AI assistance to implement the Swift UI and process orchestration. 
-
-This is a personal toolset provided "as-is." It is designed for utility and precision, not as a commercial product.
+The signal chains are correct: two-pass loudnorm is implemented per the FFmpeg specification and validated against ITU-R BS.1770, K-weighting coefficients match the reference, and stereo RNNoise processing handles channel independence the right way. I designed the DSP logic and parameters. The Swift implementation was built with AI assistance.
 
 ---
 

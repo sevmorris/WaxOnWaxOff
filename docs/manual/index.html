@@ -645,7 +645,7 @@
         <tr>
           <td>Dynamic Leveling</td>
           <td>On · Off · default Off</td>
-          <td>Bidirectional dynamic normalization. Lifts quiet sections and tames loud ones. Use for panel recordings, live Q&amp;As, or any mix where voices are at very different levels. The Aggressiveness slider controls how quickly and strongly the leveling responds. See <a href="theory.html#dynamic-leveling">Theory of Operation</a>.</td>
+          <td>Bidirectional dynamic normalization. Best for panel recordings, live Q&amp;As, and multi-guest sources where voices are at inconsistent levels. Not recommended for regular solo voice use — can cause pumping artifacts on recordings with natural pauses. The Aggressiveness slider controls how quickly and strongly the leveling responds. See <a href="theory.html#dynamic-leveling">Theory of Operation</a>.</td>
         </tr>
         <tr>
           <td>Aggressiveness</td>
@@ -703,7 +703,7 @@
       <li>
         <div>
           <strong>Dynamic Leveling <span class="tag">Optional</span></strong>
-          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet sections and tames loud ones. The Aggressiveness slider maps to <code>f</code> (500→150 ms frame), <code>g</code> (31→15 frame Gaussian window, forced odd), and <code>m</code> (2×→6× max gain). A silence threshold of <code>t=0.05</code> (≈ −26 dBFS) prevents boosting near-silence on sparse voice tracks. Use for panel recordings, live Q&amp;As, or any source where voices are at significantly different levels. Runs after Level Riding (if enabled) and before loudness normalization. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
+          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet sections and tames loud ones. The Aggressiveness slider maps to <code>f</code> (500→150 ms frame), <code>g</code> (31→15 frame Gaussian window, forced odd), and <code>m</code> (2×→6× max gain). A silence threshold of <code>t=0.05</code> (≈ −26 dBFS) prevents boosting near-silence on sparse voice tracks. Best for panel recordings, live Q&amp;As, and multi-voice sources with inconsistent levels. Not recommended for solo voice — can cause pumping on recordings with natural pauses. Runs after Level Riding (if enabled) and before loudness normalization. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
         </div>
       </li>
       <li>
@@ -901,7 +901,7 @@
     <h3>Naming</h3>
     <pre><code>{original-name}-lev-{target}LUFS.wav
 {original-name}-lev-{target}LUFS.mp3</code></pre>
-    <p>Examples: <code>episode-42-final-lev--18LUFS.wav</code> &nbsp; <code>episode-42-final-lev--18LUFS.mp3</code></p>
+    <p>Examples: <code>episode-42-final-lev-18LUFS.wav</code> &nbsp; <code>episode-42-final-lev-18LUFS.mp3</code></p>
 
     <h3>Channels</h3>
     <p>WaxOff always outputs stereo (2-channel). If the source is mono, FFmpeg upmixes it to dual-mono — identical left and right channels, centered as expected. There is no channel setting in WaxOff.</p>

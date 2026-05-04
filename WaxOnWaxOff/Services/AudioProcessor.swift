@@ -156,16 +156,29 @@ actor AudioProcessor {
             postDsURL = midURL
         }
 
+        // dynaudnorm boundary fix: the Gaussian window looks back into prior loud frames
+        // when computing gain for the tail, causing the voice to fade. Padding the input
+        // with silence pushes the artifact into the padding; -t trims it from the output.
+        var dynaudnormDuration: Double? = nil
+        if settings.levelRidingEnabled || settings.dynamicLevelingEnabled {
+            if let d = try? await getAudioDuration(exe: tools.ffprobe, url: postDsURL) {
+                dynaudnormDuration = d
+            } else {
+                onLog?("⚠ Could not determine file duration; dynaudnorm tail-fade fix skipped.", .info)
+            }
+        }
+
         // Level riding (optional, dynaudnorm downward-only)
         let postLevelURL: URL
         if settings.levelRidingEnabled {
             let levelURL = work.appendingPathComponent("\(stem)_leveled.wav")
             onLog?("  level riding: dynaudnorm (downward only, no boost)", .verbose)
-            try await runFFmpeg(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", postDsURL.path, "-af", "dynaudnorm=p=0.95:m=1.0:g=31",
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, levelURL.path
-            ])
+            var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", postDsURL.path,
+                        "-af", "apad=pad_dur=16,dynaudnorm=p=0.95:m=1.0:g=31"]
+            if let d = dynaudnormDuration { args += ["-t", String(format: "%.6f", d)] }
+            args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, levelURL.path]
+            try await runFFmpeg(exe: tools.ffmpeg, args: args)
             postLevelURL = levelURL
             try Task.checkCancellation()
         } else {
@@ -176,13 +189,14 @@ actor AudioProcessor {
         let postDynLevelURL: URL
         if settings.dynamicLevelingEnabled {
             let dynLevelURL = work.appendingPathComponent("\(stem)_dynleveled.wav")
-            let filter = dynamicLevelingFilter(amount: settings.dynamicLevelingAmount)
-            onLog?("  dynamic leveling: \(filter)", .verbose)
-            try await runFFmpeg(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", postLevelURL.path, "-af", filter,
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path
-            ])
+            let dynFilter = dynamicLevelingFilter(amount: settings.dynamicLevelingAmount)
+            onLog?("  dynamic leveling: \(dynFilter)", .verbose)
+            var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", postLevelURL.path,
+                        "-af", "apad=pad_dur=16,\(dynFilter)"]
+            if let d = dynaudnormDuration { args += ["-t", String(format: "%.6f", d)] }
+            args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
+            try await runFFmpeg(exe: tools.ffmpeg, args: args)
             postDynLevelURL = dynLevelURL
             try Task.checkCancellation()
         } else {
@@ -495,6 +509,72 @@ actor AudioProcessor {
         // are not amplified — prevents boosting the noise floor between words on
         // sparse voice tracks. Note: dynaudnorm's `s` is compress, not threshold.
         return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m)):t=0.05"
+    }
+
+    private nonisolated func getAudioDuration(exe: String, url: URL) async throws -> Double {
+        let output = try await runFFprobeCapture(exe: exe, args: [
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            url.path
+        ])
+        let str = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let d = Double(str) else {
+            throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse audio duration")
+        }
+        return d
+    }
+
+    private nonisolated func runFFprobeCapture(exe: String, args: [String]) async throws -> String {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: exe) else {
+            throw ProcessingError.ffmpegNotFound
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: exe)
+        process.arguments = args
+        process.standardInput = FileHandle.nullDevice
+
+        final class DataBox: @unchecked Sendable { var value = Data() }
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                let stdoutPipe = Pipe()
+                process.standardOutput = stdoutPipe
+                process.standardError = FileHandle.nullDevice
+
+                let box = DataBox()
+                let readGroup = DispatchGroup()
+                readGroup.enter()
+                DispatchQueue.global(qos: .utility).async {
+                    box.value = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                    readGroup.leave()
+                }
+
+                let timeoutItem = DispatchWorkItem { process.terminate() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 30, execute: timeoutItem)
+
+                process.terminationHandler = { proc in
+                    timeoutItem.cancel()
+                    readGroup.wait()
+                    if proc.terminationReason == .uncaughtSignal {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    let msg = String(data: box.value, encoding: .utf8) ?? ""
+                    continuation.resume(returning: msg)
+                }
+
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
+                }
+            }
+        } onCancel: {
+            process.terminate()
+        }
     }
 
     private func bestOutputDir(for input: URL) -> URL {

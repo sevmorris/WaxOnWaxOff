@@ -921,6 +921,10 @@
 
     <h3>When to Use It</h3>
     <p>Level Riding is off by default. It's appropriate for recordings with genuinely inconsistent levels — an interviewee who speaks at widely varying volumes, a host who leaned into the mic during an emphatic point, or a multi-speaker recording where one participant is noticeably louder than another. For well-recorded content with consistent mic technique, the effect will be minimal and the default pipeline is sufficient.</p>
+
+    <h3>Tail Artifact Mitigation</h3>
+    <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces a boundary artifact at the end of a file: because the look-ahead window extends past the last audio frame into silence (or into the absence of data), the local RMS estimate drops sharply near the end of the file. With Level Riding's large <code>g=31</code> window (15.5 seconds of context at the default 500 ms frame size), this can cause the filter to over-attenuate or miscompute gain for the last several seconds of speech — manifesting as a slow fade on the tail of the recording.</p>
+    <p>WaxOn mitigates this by prepending 16 seconds of silence to the input before each <code>dynaudnorm</code> pass and using FFmpeg's <code>-t</code> output flag to trim the result back to the original duration. The padding ensures the Gaussian window always has silence ahead of it, even at the true end of the speech content, so the gain curve computed for the real audio is not distorted by the file boundary. The silence padding is processed and then discarded; the output file has the same duration as the input.</p>
   </section>
 
   <!-- Dynamic Leveling -->
@@ -937,7 +941,7 @@
       <li>Level Riding: <code>m=1.0</code> — gain capped at unity, attenuation only.</li>
       <li>Dynamic Leveling: <code>m</code> ranges from 2.0 to 6.0 (can boost frames up to 2×–6× above their original level, ≈ +6 to +15.6 dB) plus <code>t=0.05</code>, a peak-magnitude silence threshold (≈ −26 dBFS) that prevents the leveler from amplifying the noise floor between words on sparse voice material.</li>
     </ul>
-    <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — given <code>m &gt; 1.0</code> it lifts quiet sections toward the target peak, not just leaves them alone. This is the right behavior for uneven source material, but it will also boost the noise floor during quiet passages where it isn't gated out by <code>t</code>, so it's not the right choice for single-voice recordings where preserving the noise floor is important.</p>
+    <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — given <code>m &gt; 1.0</code> it lifts quiet sections toward the target peak, not just leaves them alone. This is the right behavior for uneven source material, but it produces audible pumping on solo voice recordings with natural pauses: as the filter adjusts gain across the silence between sentences, the noise floor breathes in and out in a way that's clearly unnatural. The silence threshold (<code>t=0.05</code>) reduces the worst of this by preventing gain increases in near-silent frames, but it does not eliminate the ramp transitions around threshold-crossing content. Dynamic Leveling is a specialty tool for multi-voice sources, not a general-purpose enhancement for solo recordings.</p>
 
     <h3>The Aggressiveness Slider</h3>
     <p>The Aggressiveness slider is a 0–1 control that maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
@@ -950,6 +954,9 @@
 
     <h3>Placement in the Pipeline</h3>
     <p>Dynamic Leveling runs after Level Riding (if both are enabled) and before loudness normalization. Running it before loudnorm means the loudness analysis sees a more consistent signal — the same rationale that applies to Level Riding. In practice, enabling both Level Riding and Dynamic Leveling on the same file is unusual: Level Riding is for single-voice recordings with level outliers, Dynamic Leveling is for multi-voice recordings with structural level imbalance. They serve different source types.</p>
+
+    <h3>Tail Artifact Mitigation</h3>
+    <p>Dynamic Leveling is subject to the same Gaussian window boundary artifact as Level Riding, and WaxOn applies the same fix: 16 seconds of silence padding before each pass, trimmed back to the original duration on output. See <a href="#level-riding">Level Riding → Tail Artifact Mitigation</a> for the full explanation. The only difference is that with bidirectional gain (m &gt; 1.0), an uncorrected boundary can produce either over-attenuation or over-amplification at the tail, depending on the signal level near the end of the file.</p>
   </section>
 
   <!-- WaxOn Design -->

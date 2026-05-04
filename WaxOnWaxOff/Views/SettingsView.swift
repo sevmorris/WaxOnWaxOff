@@ -104,6 +104,20 @@ struct SettingsView: View {
                     }
                 }
 
+                Divider().padding(.vertical, 6)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("PANEL / MULTI-VOICE")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .kerning(0.4)
+                    Text("For recordings with multiple voices at inconsistent levels.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 2)
+
                 row("Dynamic Leveling") {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
@@ -112,7 +126,7 @@ struct SettingsView: View {
                                 .labelsHidden()
                             Text("dynaudnorm")
                         }
-                        Text("Bidirectional — lifts quiet sections and tames loud ones")
+                        Text("Lifts quiet voices, tames loud ones — panel shows, live Q&As. Can cause pumping on solo voice with natural pauses.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
