@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="docs/images/waxon-waveform.png" width="49%" alt="WaxOn processing — waveform view" />
-  <img src="docs/images/waxon-console.png" width="49%" alt="WaxOn processing — console view" />
+  <img src="docs/images/waxoff-complete.png" width="49%" alt="WaxOff — completed delivery" />
 </p>
 
 The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
@@ -27,7 +27,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 - **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, EBU R128 normalization with dynamics fully preserved. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder without collision (e.g., `interview-44kwaxon-1dB.wav`).
 - **WaxOff** runs after you bounce. It takes your finished mix to broadcast-compliant delivery — EBU R128 to target LUFS, true peak ceiling, WAV and/or MP3 output.
 
-**vs. Auphonic:** Runs locally. No subscription, no upload, no audio leaving your machine, transparent signal chain.
+**Local processing:** No upload, no subscription, no audio leaving your machine. Transparent, inspectable signal chain.
 
 **vs. iZotope RX:** Not a replacement for surgical repair — plosives, deep clicks, and spectral cleanup are still RX's job. But for the repetitive normalize → EQ → bounce work on clean-enough files, RX is overkill. WaxOn handles that stage in a single drop.
 
