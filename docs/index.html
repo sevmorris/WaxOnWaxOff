@@ -291,19 +291,40 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .screenshot-placeholder {
-      background: var(--black);
-      border: 1px dashed var(--border);
+    .screenshot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .screenshot-item {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 380px;
-      color: var(--muted);
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .screenshot-item img {
+      width: 100%;
+      border: 1px solid var(--border);
+      display: block;
+    }
+
+    .screenshot-caption {
       font-family: var(--font-ui);
-      font-size: 0.85rem;
+      font-size: 0.78rem;
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .screenshot-caption .mode-tag {
+      color: var(--orange);
+      margin-right: 6px;
+    }
+
+    @media (max-width: 640px) {
+      .screenshot-grid { grid-template-columns: 1fr; }
     }
 
     /* ── Specs strip ── */
@@ -411,7 +432,7 @@
         <a href="manual/">Manual</a>
         <a href="manual/theory.html">Theory</a>
         <a href="https://github.com/sevmorris/WaxOnWaxOff">GitHub</a>
-        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.9.1.dmg" class="btn btn-primary" style="padding: 6px 16px; font-size: 0.78rem;">Download</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.10.5.dmg" class="btn btn-primary" style="padding: 6px 16px; font-size: 0.78rem;">Download</a>
       </nav>
     </div>
   </header>
@@ -423,7 +444,7 @@
       <h1>WaxOn / WaxOff</h1>
       <p class="hero-tagline">Podcast audio prep for macOS. From raw recording to finished delivery — two modes, one app.</p>
       <div class="hero-actions">
-        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.9.1.dmg" class="btn btn-primary">Download v1.9.1</a>
+        <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.10.5.dmg" class="btn btn-primary">Download v1.10.5</a>
         <a href="manual/" class="btn btn-secondary">Manual</a>
         <a href="manual/theory.html" class="btn btn-secondary">Theory of Operation</a>
         <a href="https://github.com/sevmorris/WaxOnWaxOff" class="btn btn-secondary">GitHub</a>
@@ -471,7 +492,16 @@
     <!-- Screenshots -->
     <section class="screenshots">
       <h2>Screenshots</h2>
-      <div class="screenshot-placeholder">Screenshots coming soon</div>
+      <div class="screenshot-grid">
+        <div class="screenshot-item">
+          <img src="images/waxon-after.png" alt="WaxOn — processed recording with output waveform">
+          <span class="screenshot-caption"><span class="mode-tag">WaxOn</span>After processing — prep-ready 24-bit WAV</span>
+        </div>
+        <div class="screenshot-item">
+          <img src="images/waxoff-after.png" alt="WaxOff — delivery mastering with before/after waveforms">
+          <span class="screenshot-caption"><span class="mode-tag">WaxOff</span>After delivery — EBU R128 broadcast output</span>
+        </div>
+      </div>
     </section>
 
     <!-- Specs strip -->
