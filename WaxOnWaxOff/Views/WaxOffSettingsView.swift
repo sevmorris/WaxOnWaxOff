@@ -86,16 +86,6 @@ struct WaxOffSettingsView: View {
                         .toggleStyle(.switch)
                 }
 
-                row("Dynamic Leveling") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Toggle("Gentle dynaudnorm", isOn: $viewModel.settings.dynaudnormEnabled)
-                            .toggleStyle(.switch)
-                        Text("Pre-norm leveling — tightens dynamics before loudnorm")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
                 Divider().padding(.vertical, 6)
 
                 VStack(alignment: .leading, spacing: 5) {

@@ -458,8 +458,8 @@
     <h1>Theory of Operation</h1>
     <p>WaxOn and WaxOff address opposite ends of the podcast production workflow.</p>
     <p style="margin-top: 12px;"><strong>WaxOn</strong> is an ingest preprocessor. It takes raw recordings — directly from a microphone or recording interface — and prepares them for editing: high-pass filtering, phase rotation, optional leveling, loudness normalization, and true-peak limiting. The goal is recordings that arrive in your DAW at consistent, manageable levels with their dynamic character intact. WaxOn is not a mastering tool; it is a staging tool.</p>
-    <p style="margin-top: 12px;"><strong>WaxOff</strong> is a delivery mastering tool. It takes a finished, edited mix and prepares it for distribution: loudness normalization to a delivery target, true-peak ceiling enforcement for safe streaming ingest, and optional phase rotation and light dynamic leveling. The goal is a delivery file that passes platform normalization cleanly and sounds consistent across episodes.</p>
-    <p style="margin-top: 12px;">Both modes are built on the same core DSP stages — EBU R128 loudness measurement, two-pass linear normalization, and oversampled true-peak limiting — combined with mode-specific tools: dynamic normalization (dynaudnorm) and a dedicated pre-encode limiter for WaxOff's MP3 path. WaxOn also uses RNNoise internally during the loudnorm analysis pass to improve measurement accuracy on noisy recordings — not as a user-facing stage, but as an implementation detail of the two-pass normalization. Every stage is deliberately ordered. The algorithms interact, and the ordering decisions are not arbitrary.</p>
+    <p style="margin-top: 12px;"><strong>WaxOff</strong> is a delivery mastering tool. It takes a finished, edited mix and prepares it for distribution: loudness normalization to a delivery target, true-peak ceiling enforcement for safe streaming ingest, and optional phase rotation. The goal is a delivery file that passes platform normalization cleanly and sounds consistent across episodes.</p>
+    <p style="margin-top: 12px;">Both modes are built on the same core DSP stages — EBU R128 loudness measurement, two-pass linear normalization, and oversampled true-peak limiting — combined with mode-specific tools: dynamic normalization (dynaudnorm, WaxOn only) and a dedicated pre-encode limiter for WaxOff's MP3 path. WaxOn also uses RNNoise internally during the loudnorm analysis pass to improve measurement accuracy on noisy recordings — not as a user-facing stage, but as an implementation detail of the two-pass normalization. Every stage is deliberately ordered. The algorithms interact, and the ordering decisions are not arbitrary.</p>
     <p style="margin-top: 12px;">This document explains each stage: what it does, how it works, and why it is placed where it is. The Signal Chains section gives the processing order at a glance. The following sections cover each algorithm in depth — the shared normalization and limiting concepts first, then the WaxOn processing stages in signal-chain order, then the design rationale for each mode, and finally the output format decisions.</p>
     <p style="margin-top: 12px; color: var(--muted); font-size: 0.9rem;">This document assumes familiarity with basic audio concepts (dBFS, sample rate, dynamic range). It is written for audio engineers, developers, and technically curious users who want to understand the <em>why</em>, not just the <em>what</em>.</p>
   </div>
@@ -493,8 +493,6 @@
     <h3>WaxOff</h3>
     <div class="chain">
       <div class="chain-row">
-        <div class="chain-node optional">Dynamic Leveling<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm</span></div>
-        <div class="chain-arrow">→</div>
         <div class="chain-node optional">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">150 Hz allpass</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
@@ -982,10 +980,6 @@
 
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
-
-    <h3>Optional Pre-Norm Dynamic Leveling</h3>
-    <p>WaxOff's <strong>Dynamic Leveling</strong> toggle prepends a single fixed <code>dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05</code> stage to both the analysis and render filter chains. Unlike WaxOn's Dynamic Leveling — which exposes an Aggressiveness slider and ranges up to 6× max gain — the WaxOff version is intentionally conservative: a single setting, capped at 2× boost (≈ +6 dB), gated by a silence threshold to keep the noise floor untouched.</p>
-    <p>The same filter runs in both passes so loudnorm measures the leveled signal and then normalizes the leveled signal. Skipping it from one pass would create a mismatch between the measured integrated loudness and the actual output level. Off by default — most edited mixes don't need it. Turn it on when a finished mix has noticeable level swings between sections that you'd rather even out at the delivery stage than re-mix.</p>
 
     <h3>Fixed LRA=11 (with hidden override)</h3>
     <p>WaxOff sets <code>LRA=11</code> on the loudnorm filter. The value is configurable in code — <code>WaxOffSettings.lra</code>, default 11.0 — but no UI control exposes it, so in normal use it's a fixed value. For delivery, some macro-dynamic constraint is appropriate. A podcast episode should have a consistent loudness profile throughout. 11 LU is a reasonable fixed value: it constrains macro-dynamics enough to ensure consistent perceived loudness across the episode without audibly squashing the mix's dynamics.</p>

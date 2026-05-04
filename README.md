@@ -52,7 +52,6 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **True Peak Management:** Configurable ceiling (−3.0 to −0.1 dBTP).
 * **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
 * **Crest Factor Optimization:** Optional 150 Hz allpass for bass-heavy material.
-* **Optional Pre-Norm Leveling:** Gentle `dynaudnorm` step before loudnorm for delivery sources whose macro-dynamics need tightening.
 
 **Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
 

@@ -14,7 +14,6 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
     var mp3Bitrate: Int = 160
     var sampleRate: Int = 44100
     var phaseRotationEnabled: Bool = true
-    var dynaudnormEnabled: Bool = false
     var outputDirectoryPath: String? = nil
 
     static let `default` = WaxOffSettings()

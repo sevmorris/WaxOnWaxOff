@@ -725,8 +725,8 @@
   <!-- WaxOff Mode -->
   <section id="waxoff-overview">
     <h2>WaxOff Mode <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <p>WaxOff finalizes your edited podcast mix for distribution. It applies EBU R128 loudness normalization, optional phase rotation, optional gentle pre-norm leveling, and delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
-    <p>WaxOff assumes your mix is already balanced and edited. With Dynamic Leveling off (the default), it applies a single linear gain adjustment to hit the target loudness — no dynamic processing, no changes to stereo image or transients. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
+    <p>WaxOff finalizes your edited podcast mix for distribution. It applies EBU R128 loudness normalization, optional phase rotation, and delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
+    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment to hit the target loudness — no dynamic processing, no changes to stereo image or transients. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -831,11 +831,6 @@
           <td>Applies a 150 Hz all-pass filter before normalization. Reduces crest factor on bass-heavy material, improving headroom and limiter performance. On by default.</td>
         </tr>
         <tr>
-          <td>Dynamic Leveling</td>
-          <td>On · Off · default Off</td>
-          <td>Optional gentle pre-norm leveling using <code>dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05</code>. Tightens macro-dynamics before loudnorm measures the file. Use when a finished mix has noticeable level swings between sections; leave off for already-balanced masters. Applied to both the analysis and render passes so the measurement reflects what gets normalized.</td>
-        </tr>
-        <tr>
           <td>Output Dir</td>
           <td>Path or empty</td>
           <td>Where output files are saved. Empty = same folder as the source.</td>
@@ -849,12 +844,6 @@
     <p>WaxOff uses FFmpeg's <code>loudnorm</code> filter in a two-pass pipeline, the only correct way to apply EBU R128 linear normalization.</p>
 
     <ol class="pipeline">
-      <li>
-        <div>
-          <strong>Pre-Norm Dynamic Leveling <span class="tag">Optional</span></strong>
-          <span>If Dynamic Leveling is enabled, FFmpeg's <code>dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05</code> runs at the head of both the analysis and render filter chains. This is a gentle, capped-gain leveler — max boost is 2× (≈+6 dB) and a silence threshold of <code>t=0.05</code> prevents lifting near-silent passages. Applying it to both passes means loudnorm measures the same signal it normalizes.</span>
-        </div>
-      </li>
       <li>
         <div>
           <strong>Analysis Pass</strong>

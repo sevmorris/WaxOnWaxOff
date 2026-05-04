@@ -64,10 +64,6 @@ actor DeliveryProcessor {
         if settings.phaseRotationEnabled {
             onLog?("  phase rotation: 150 Hz", .verbose)
         }
-        if settings.dynaudnormEnabled {
-            onLog?("  dynaudnorm: gentle pre-norm leveling (f=500 g=51 m=2.0 t=0.05)", .verbose)
-        }
-
         // Phase 1: Analyze loudness
         onPhase?("Analyzing loudness…")
         try Task.checkCancellation()  // CRITICAL-2
@@ -161,8 +157,7 @@ actor DeliveryProcessor {
         let lufs = lufsString(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
         let lra  = String(format: "%.0f", settings.lra)
-        var filterChain = settings.dynaudnormEnabled ? "dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05," : ""
-        filterChain += settings.phaseRotationEnabled ? "allpass=f=150," : ""
+        var filterChain = settings.phaseRotationEnabled ? "allpass=f=150," : ""
         filterChain += "loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
 
         let args = [
@@ -190,8 +185,7 @@ actor DeliveryProcessor {
         let lufs = lufsString(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
         let lra  = String(format: "%.0f", settings.lra)
-        var filterChain = settings.dynaudnormEnabled ? "dynaudnorm=f=500:g=51:p=0.95:m=2.0:t=0.05," : ""
-        filterChain += settings.phaseRotationEnabled ? "allpass=f=150," : ""
+        var filterChain = settings.phaseRotationEnabled ? "allpass=f=150," : ""
         filterChain += "loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra)"
         filterChain += ":measured_I=\(measurements.inputI)"
         filterChain += ":measured_TP=\(measurements.inputTP)"
