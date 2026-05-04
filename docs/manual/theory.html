@@ -428,18 +428,18 @@
   <a href="#ebu-r128">EBU R128 Loudness</a>
   <a href="#two-pass">Two-Pass Normalization</a>
   <a href="#true-peak">True Peak &amp; Oversampling</a>
-  <a href="#phase-rotation">Phase Rotation</a>
-  <a href="#dithering">Dithering</a>
   <a href="#rnnoise">RNNoise</a>
   <a class="sub" href="#rnnoise-stereo">Stereo Handling</a>
   <a href="#noise-floor">Noise Floor Estimation</a>
   <a href="#nr-measurement">NR-for-Measurement</a>
+  <a href="#phase-rotation">Phase Rotation</a>
   <a href="#level-riding">Level Riding</a>
   <a href="#dynamic-leveling">Dynamic Leveling</a>
   <a class="section-head" href="#">Design Decisions</a>
   <a href="#waxon-design">WaxOn Design</a>
   <a href="#waxoff-design">WaxOff Design</a>
   <a href="#formats">Output Formats</a>
+  <a href="#dithering">Dithering</a>
   <a href="#summary">Summary</a>
 </nav>
 
@@ -448,8 +448,12 @@
   <!-- Hero -->
   <div class="hero" id="intro">
     <h1>Theory of Operation</h1>
-    <p>A technical deep-dive into the audio processing logic of WaxOn/WaxOff: the signal chain, the engineering rationale, and the decisions behind each stage.</p>
-    <p style="margin-top: 12px;">This document assumes familiarity with basic audio concepts (dBFS, sample rate, dynamic range). It's written for audio engineers, curious users, and anyone who wants to understand <em>why</em> the app does what it does.</p>
+    <p>WaxOn and WaxOff address opposite ends of the podcast production workflow.</p>
+    <p style="margin-top: 12px;"><strong>WaxOn</strong> is an ingest preprocessor. It takes raw recordings — directly from a microphone or recording interface — and prepares them for editing: noise reduction, high-pass filtering, phase rotation, optional leveling, loudness normalization, and true-peak limiting. The goal is recordings that arrive in your DAW at consistent, manageable levels with their dynamic character intact. WaxOn is not a mastering tool; it is a staging tool.</p>
+    <p style="margin-top: 12px;"><strong>WaxOff</strong> is a delivery mastering tool. It takes a finished, edited mix and prepares it for distribution: loudness normalization to a delivery target, true-peak ceiling enforcement for safe streaming ingest, and optional phase rotation and light dynamic leveling. The goal is a delivery file that passes platform normalization cleanly and sounds consistent across episodes.</p>
+    <p style="margin-top: 12px;">Both modes are built on the same core DSP stages — EBU R128 loudness measurement, two-pass linear normalization, and oversampled true-peak limiting — combined with mode-specific tools: ML noise reduction (RNNoise), dynamic normalization (dynaudnorm), and a dedicated pre-encode limiter for WaxOff's MP3 path. Every stage is deliberately ordered. The algorithms interact, and the ordering decisions are not arbitrary.</p>
+    <p style="margin-top: 12px;">This document explains each stage: what it does, how it works, and why it is placed where it is. The Signal Chains section gives the processing order at a glance. The following sections cover each algorithm in depth — the shared normalization and limiting concepts first, then the WaxOn processing stages in signal-chain order, then the design rationale for each mode, and finally the output format decisions.</p>
+    <p style="margin-top: 12px; color: var(--muted); font-size: 0.9rem;">This document assumes familiarity with basic audio concepts (dBFS, sample rate, dynamic range). It is written for audio engineers, developers, and technically curious users who want to understand the <em>why</em>, not just the <em>what</em>.</p>
   </div>
 
   <!-- Signal Chains -->
@@ -663,153 +667,7 @@
     </details>
   </section>
 
-  <!-- Phase Rotation -->
-  <section id="phase-rotation">
-    <h2>Phase Rotation and Crest Factor</h2>
 
-    <h3>Crest Factor</h3>
-    <p>Crest factor is the ratio of a signal's peak level to its RMS level, expressed in dB:</p>
-    <div class="formula">
-      Crest Factor (dB) = Peak (dBFS) − RMS (dBFS)
-    </div>
-    <p>Typical unprocessed speech has a crest factor of 18–25 dB, with 20–23 dB most commonly cited in speech processing literature. High crest factor has a practical consequence for loudness normalization: to reach a loudness target without exceeding the ceiling, the limiter must apply more gain reduction (limiting). More limiting means more audible artifacts: transient softening, pumping, coloration.</p>
-    <p>Reducing crest factor before normalization means the same LUFS target can be reached with less limiting and more transparency.</p>
-
-    <h3>How Allpass Filtering Reduces Crest Factor</h3>
-    <p>A first-order allpass filter passes all frequencies at equal amplitude but shifts the phase of different frequencies by different amounts. It doesn't alter the frequency response; it only changes <em>when</em> different frequency components arrive relative to each other.</p>
-    <details class="callout callout-math">
-      <summary><span class="callout-cat">The Math</span> First-order allpass transfer function</summary>
-      <p>The transfer function of a first-order allpass is:</p>
-      <div class="formula">
-        H(z) = (a₁ + z⁻¹) / (1 + a₁z⁻¹)
-      </div>
-      <p>where <code>a₁</code> is computed from the design frequency and sample rate. The magnitude response |H(z)| = 1 at all frequencies (unity gain). The phase response varies continuously from 0° at DC to −180° at Nyquist, with −90° at the design frequency. This means frequencies below the design frequency are shifted slightly; frequencies above it are shifted more. The relative timing of low-frequency and high-frequency components in the waveform changes, but their amplitudes do not.</p>
-    </details>
-    <p>Much of the peak asymmetry in voice audio comes from low-frequency content: proximity effect from cardioid microphones, low-frequency resonances in recording spaces, and bass-heavy content in finished mixes. This energy tends to create asymmetric waveforms where one polarity consistently peaks higher than the other.</p>
-
-    <p>Proximity effect is worth understanding in detail because it affects nearly every podcast recording. Directional microphones (cardioids, supercardioids, figure-8 patterns) exhibit increasing bass boost as the sound source moves closer, beginning around 12 inches and growing progressively stronger below approximately 100–200 Hz. For cardioids at typical close-mic distances, proximity effect typically adds 6–12 dB of bass boost; figure-8 patterns can reach 20 dB or more at the same distances due to their stronger gradient response. Omnidirectional microphones do not exhibit proximity effect, but the cardioid pattern dominates consumer and prosumer podcast microphones (Shure SM7B, Audio-Technica ATR2100, most USB microphones), making this a near-universal issue. Podcasters without broadcast training tend to position themselves very close to their microphones to minimize room noise, an instinct that unfortunately triggers the strongest proximity effect and produces the most bass-heavy, asymmetric waveforms. The result lands squarely in the 150–250 Hz range that phase rotation is designed to address.</p>
-    <p>An allpass filter in the low-frequency range redistributes the phase relationships between bass components and midrange components, making peaks more symmetric. The result is a lower crest factor (peaks are shorter relative to average level) without any change to the frequency response or audible character of the audio.</p>
-    <p>The effect is genuinely inaudible. Human hearing is largely insensitive to absolute phase at audio frequencies. The cochlea performs a frequency decomposition that discards phase information. This is why polarity inversion (flipping the sign of every sample) and allpass filtering (frequency-dependent phase shift) are both perceptually transparent, despite being mathematically significant transformations of the waveform.</p>
-
-    <h3>WaxOn vs. WaxOff Frequencies</h3>
-    <table class="compare-table">
-      <thead>
-        <tr>
-          <th>Parameter</th>
-          <th>WaxOn</th>
-          <th>WaxOff</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Frequency</td>
-          <td>200 Hz</td>
-          <td>150 Hz</td>
-        </tr>
-        <tr>
-          <td>Q</td>
-          <td>0.707 (Butterworth)</td>
-          <td>default</td>
-        </tr>
-        <tr>
-          <td>Rationale</td>
-          <td>Raw recordings often have proximity effect and mic combination issues in the 150–250 Hz range. 200 Hz targets the low-mid region where these artifacts cause most of the crest factor problem.</td>
-          <td>Finished mixes are already edited and processed. The remaining crest factor issue is typically pure bass energy. 150 Hz targets this lower.</td>
-        </tr>
-        <tr>
-          <td>Default</td>
-          <td>On (user can disable)</td>
-          <td>On (user can disable)</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <h3>Quantifying the Effect</h3>
-    <p>On typical podcast recordings with moderate proximity effect, allpass phase rotation at 200 Hz reduces crest factor by 1–4 dB. A 3 dB crest factor reduction means the limiter needs to apply 3 dB less gain reduction to stay below the same ceiling at the same loudness target. That translates directly to less audible limiting artifacts. On clean, well-recorded speech with minimal bass buildup, the crest factor reduction is smaller (0.5–1 dB). On a single-microphone recording the allpass has no audible downside: it costs nothing in audio quality and can only help. The caveats below cover the exceptions, principally multi-microphone configurations in shared acoustic space.</p>
-
-    <h3>Multiple Microphones in the Same Room</h3>
-    <p>The following is a workflow consideration, not an implementation limitation. WaxOn processes each file correctly. The question is whether applying phase rotation per-track — before the tracks are mixed — is the right place in the production chain to apply it, when those tracks were captured simultaneously in the same room.</p>
-    <p>The "no downside" claim above assumes a single microphone capturing a single source. In multi-mic recordings — two podcasters at separate mics in the same room, a host-and-guest setup, a roundtable, or any configuration where one acoustic source reaches multiple mics — the picture changes.</p>
-    <p>Consider two speakers, A and B, each on their own cardioid microphone. Speaker A's voice reaches both mics: strongly into A's mic, faintly into B's. This faint copy is called <em>bleed</em> or <em>spill</em>. The bleed and the main signal are acoustically coherent — the same waveform captured at slightly different times and levels — so when the tracks are summed in the mix, the bleed adds to the main signal in a phase-related way. The result has some comb filtering already (any time a signal sums with a delayed copy of itself, it does), but the comb is fixed and a property of the room.</p>
-    <p>Apply phase rotation independently to each track and that coherence is broken. Each track receives the same allpass filter, but the bleed on track B has different spectral content than the main signal on track A — it is highpass-shaped by the off-axis response of B's mic, attenuated by distance, and colored by reflections — so it emerges from the filter in a different phase state. Summing the tracks now combines a phase-shifted version of A's voice with a differently-phase-shifted version of A's voice. Comb filtering deepens, and the notches shift in frequency relative to what the room produced naturally. The audible result is a thinness or hollowness in the low-mid range, sometimes described as "phasey."</p>
-    <p>How bad it gets depends on bleed level. Close cardioid placement at typical podcast distances usually keeps bleed −20 to −30 dB below the direct signal, where the additional comb filtering from independent phase rotation is below the threshold of audibility. Loose placement, omnidirectional mics, or talkers who lean back from the mic put bleed in the −10 to −15 dB range, where artifacts become noticeable.</p>
-
-    <p><strong>The 3:1 rule.</strong> A useful guideline from broadcast practice: the distance between two microphones should be at least three times the distance from each microphone to its source. With talkers six inches from their mics, the mics themselves should be eighteen inches apart or more. This keeps bleed roughly 9–10 dB below the direct signal, low enough that downstream processing — phase rotation, EQ, compression — does not interact destructively across tracks.</p>
-
-    <p><strong>Working around it.</strong> If you suspect significant bleed in a multi-track session:</p>
-    <ul>
-      <li>Skip per-track phase rotation in WaxOn and apply it once at the mix-bus stage in WaxOff. A single allpass on the final stereo mix shifts the bleed and main signal together, preserving their original phase relationship.</li>
-      <li>If per-track processing is necessary, use identical allpass settings on every track captured in the same room. Coherent inputs through identical filters remain coherent; coherent inputs through differing filters do not.</li>
-      <li>Apply a noise gate or downward expander before phase rotation so that bleed below a threshold is suppressed and the allpass operates predominantly on the dominant signal.</li>
-      <li>At the recording stage, address the root cause: tighter mic placement, hypercardioid patterns, acoustic baffles between speakers, or — when feasible — recording each speaker in a separate room.</li>
-    </ul>
-
-    <h3>Stereo Recordings and Channel Coherence</h3>
-    <p>WaxOn and WaxOff apply phase rotation as a single allpass filter across the full signal — both channels receive exactly the same coefficients simultaneously, so the inter-channel phase relationship that defines the stereo image is preserved. Unlike the RNNoise stage (which requires an explicit per-channel split because the model was trained on mono), the allpass filter operates correctly on stereo input by design and needs no special handling.</p>
-    <p>The pitfall is in pre-processing outside the app: if a stereo recording is split into two mono files, processed individually through different tools or with different settings, and then recombined, the stereo image can shift unpredictably. Mid information (L + R) and side information (L − R) both depend on phase agreement between channels. A 90° shift on one channel and not the other moves energy from the mid component into the side component at that frequency, widening or hollowing the center image and degrading mono compatibility.</p>
-    <p>This matters most for stereo room recordings (XY, ORTF, spaced pair) where the image is built from genuine inter-channel arrival-time and level differences. It matters less for stereo created by panning mono sources, where both channels carry the same waveform with only a level difference; in that case an identical allpass on both leaves the image untouched.</p>
-
-    <h3>What Phase Rotation Cannot Fix</h3>
-    <p>Allpass phase rotation addresses asymmetric peaks caused by phase relationships between low-frequency and mid-frequency content. Several other sources of waveform asymmetry look similar on a meter but are immune to phase manipulation:</p>
-    <ul>
-      <li><strong>DC offset.</strong> A constant bias in the recorded signal shifts the entire waveform up or down, so peaks on one polarity exceed the other by a fixed amount. An allpass filter cannot remove a constant offset; the fix is a high-pass filter (which both WaxOn and WaxOff apply at 80 Hz before phase rotation) or an explicit DC blocker.</li>
-      <li><strong>Polarity inversion.</strong> A miswired XLR cable or a mic with reversed polarity flips the sign of every sample. The waveform is just as asymmetric afterward, only mirrored, and downstream summing with another mic that captured the same source coherently will produce dramatic cancellation. Phase rotation does not correct polarity; it must be flipped at the source or with an explicit polarity invert before further processing.</li>
-      <li><strong>Inherently asymmetric source material.</strong> Voiced speech is fundamentally asymmetric — the glottal pulse that drives the vocal folds is impulsive on closure and gradual on opening, producing waveforms with consistently larger peaks on one polarity. Brass instruments and some synth waveforms behave similarly. Phase rotation can reduce the visible asymmetry of the recorded waveform, but it cannot make a fundamentally asymmetric source symmetric. The residual asymmetry that remains after phase rotation is a property of the source itself.</li>
-      <li><strong>Clipping.</strong> Once a sample has been hard-clipped at the converter or by a previous processing stage, the lost peak information cannot be recovered. Phase rotation may slightly redistribute the energy of a clipped event in time, but the distortion is already baked in.</li>
-    </ul>
-  </section>
-
-  <!-- Dithering -->
-  <section id="dithering">
-    <h2>Quantization, Dithering, and Why It Doesn't Apply Here</h2>
-
-    <h3>The Quantization Problem</h3>
-    <p>Digital audio stores amplitude values as integers. A 16-bit system divides the amplitude range into 2<sup>16</sup> = 65,536 discrete steps; a 24-bit system uses 2<sup>24</sup> = 16,777,216. When a continuous floating-point value is rounded to its nearest representable integer, the difference is <em>quantization error</em>.</p>
-    <p>At high signal levels, quantization error is a negligible fraction of the signal amplitude. The problem surfaces at low levels: fade-outs, reverb tails, quiet passages, where the signal approaches the magnitude of a single quantization step. At that scale, the error is no longer random with respect to the signal; it becomes <em>correlated</em>. Correlated noise has harmonic structure. Harmonic noise is perceived as distortion.</p>
-    <p>The artifact is distinctive: as a 16-bit fade-out approaches silence, the smooth waveform begins to pixelate, crumbling into a grainy, granular texture. Engineers call it "going digital." It is most audible on sustained tones, piano decays, and reverb tails, anywhere a signal fades through the lower quantization steps rather than cutting abruptly.</p>
-
-    <details class="callout callout-history">
-      <summary><span class="callout-cat">History &amp; Context</span> The Classical Demonstration</summary>
-      <p>The canonical test (sometimes called the "fade-to-black") is simple: record a tone at a moderate level and fade it gradually to silence. Without dithering, the transition through the last few quantization steps produces a sequence of audible steps, then silence where the waveform simply stops being representable. The signal doesn't fade; it falls off a cliff.</p>
-      <p>Bob Katz, in <em>Mastering Audio: The Art and the Science</em>, describes piano decay as one of the most revealing cases. A sustained piano note fading naturally into a quiet room exposes quantization distortion immediately when compared against a properly dithered version. The undithered note develops a gritty texture as the decay reaches the noise floor, a form of distortion introduced by the word-length reduction itself, present nowhere in the original recording. He uses this comparison in workshops and has remarked that once engineers hear the difference, the idea of shipping 16-bit masters without dithering becomes unthinkable.</p>
-      <p>A less scientific but widely replicated demonstration: open any 16-bit DAW session, generate a −40 dBFS sine wave, export at 16-bit with dithering off, then again with TPDF dither. Zoom into the waveform near the fade-out in a spectral editor. The quantized version shows visible stairstepping. The dithered version shows a smooth descent into low-level noise. This is not a subtle difference at the bit level, even when it is subtle or inaudible at normal listening levels with typical program material.</p>
-    </details>
-
-    <h3>The Mathematical Fix: TPDF Dither</h3>
-    <p>The solution is counterintuitive: add noise to the signal <em>before</em> truncating it to a lower bit depth. This noise (dither) must be added at a specific amplitude and with a specific probability distribution to be effective.</p>
-    <p>The mathematical foundation was established by Stanley Lipshitz, Robert Wannamaker, and John Vanderkooy at the University of Waterloo in a series of papers beginning in 1984. Their central result: adding <strong>Triangular Probability Density Function (TPDF)</strong> noise (noise whose amplitude is distributed as a triangle between −1 and +1 LSB of the target word length) completely decorrelates the quantization error from the input signal. The quantization error becomes spectrally white and statistically independent of the audio. Harmonic distortion is eliminated; what remains is signal-independent white noise.</p>
-    <details class="callout callout-math">
-      <summary><span class="callout-cat">The Math</span> TPDF generation, variance, and subtractive dither</summary>
-      <p>TPDF noise is generated by summing two independent rectangular (uniform) noise samples. The resulting amplitude distribution is triangular, hence the name. Its variance is exactly 1/6 LSB², which is the minimum required to whiten quantization error under the conditions relevant to audio. Subtractive dither (where the same dither signal is subtracted after truncation) can achieve perfect cancellation of quantization error in theory; non-subtractive TPDF (the practical, deployable form) achieves statistical decorrelation, which is sufficient for all real-world applications.</p>
-    </details>
-    <p>The practical consequence: a properly TPDF-dithered 16-bit file has a smooth, analog-like noise floor rather than correlated quantization distortion. The fade-to-black test produces a clean descent into white noise. The artifact is gone.</p>
-
-    <details class="callout callout-math">
-      <summary><span class="callout-cat">The Math</span> The dithering theorem in one sentence</summary>
-      <p>Adding TPDF noise of variance 1/6 LSB² before truncation makes the quantization error a white, signal-independent noise process: the best possible outcome for a word-length reduction.</p>
-    </details>
-
-    <h3>Noise Shaping</h3>
-    <p>TPDF dithering trades correlated distortion for uncorrelated white noise. For archival files and intermediate stems, that trade is unconditionally correct. But the resulting noise floor sits at approximately −96 dBFS spread uniformly across the audio spectrum. Human hearing is not equally sensitive at all frequencies. Sensitivity peaks around 2–4 kHz and falls off substantially above ~15 kHz. Noise shaping exploits this asymmetry.</p>
-    <p>A noise-shaping filter feeds quantization error back into the system through a filter designed around a psychoacoustic model of human hearing. The filter pushes noise energy out of the 2–4 kHz sensitivity peak and into the 15–20 kHz region where hearing is least sensitive. Total noise energy is conserved (or slightly increased), but <em>perceptually weighted</em> noise (the noise you can actually hear) is reduced. A well-designed noise-shaped dither algorithm can achieve the perceived noise floor of a 20-bit system from a 16-bit word.</p>
-    <details class="callout callout-history">
-      <summary><span class="callout-cat">History &amp; Context</span> UV22HR and POW-r</summary>
-      <p><strong>Apogee's UV22HR</strong> dithering, developed in the 1990s and built into Apogee converters and later into Logic Pro's Bounce dialog, uses an ultrasonic noise curve that concentrates dither energy above 20 kHz, technically increasing broadband noise while keeping in-band noise below the threshold of audibility. <strong>POW-r</strong> (Psychoacoustically Optimized Wordlength Reduction), developed by a consortium that included Waves and Prism Sound, offers three progressively aggressive noise-shaping modes. POW-r Type 3 is widely used in mastering for 16-bit delivery. Bob Katz has written about using POW-r in preference to flat TPDF for final 16-bit masters, on the basis that the psychoacoustic optimization is audible on critical material at moderate listening levels.</p>
-    </details>
-
-    <details class="callout callout-history">
-      <summary><span class="callout-cat">History &amp; Context</span> The Early CD Era</summary>
-      <p>The first commercial CDs appeared in 1982. Digital mastering workflows were new territory, and understanding of quantization dithering was not yet widespread among recording engineers. Dithering had been described mathematically in signal processing literature (Lipshitz and Vanderkooy's most cited papers came in the years following), but its importance in audio mastering was not yet a settled professional consensus.</p>
-      <p>Several major remastering campaigns of the 1990s and 2000s revisited early digital recordings, and engineers working on them have commented on the difference between first-generation 16-bit masters (truncated without dithering) and properly dithered versions. Classical and acoustic jazz recordings, where genuine dynamic range, reverb tails, and instrument decays are central to the listening experience, are particularly revealing. The difference is most apparent on headphones with revealing source material: quiet passages and fade-outs in early digital releases can carry a subtle granularity that disappears in the remastered versions.</p>
-      <p>The issue extends into the digital audio workstation era. For years, some popular DAWs shipped with dithering off by default on export, or placed the dither option in a dialog that inexperienced users never opened. The result was that a significant volume of independently produced music from the 1990s and early 2000s was distributed as 16-bit audio truncated without dithering. The artifacts are often inaudible on typical program material at typical listening levels, but on a quiet room recording with a long reverb tail, they are there.</p>
-    </details>
-
-    <h3>Why WaxOn/WaxOff Does Not Apply Dithering</h3>
-    <p>The entire dithering question is contingent on one condition: <strong>word-length reduction</strong>. You dither when, and only when, you are truncating bits (converting from a higher to a lower bit depth). Dithering is not a general audio quality enhancement; it is a specific solution to a specific problem that arises at the moment of truncation.</p>
-    <p><strong>WaxOn and WaxOff output 24-bit WAV.</strong> Neither mode reduces bit depth. The processing chain (loudness analysis, gain adjustment, filtering, limiting) runs in floating-point arithmetic internally. FFmpeg's audio processing pipeline operates in 32-bit or 64-bit float throughout. When the float result is written to a 24-bit integer PCM file, any truncation from float to int24 occurs at a level approximately 120+ dB below the signal, far below the audible noise floor of any recording. There is no perceptible quantization distortion to address, and no dithering is needed or appropriate.</p>
-    <p>If WaxOff produced 16-bit output, dithering would be mandatory, applied as the final stage, after all gain processing, immediately before the word-length reduction. (Dithering applied earlier would be modified by subsequent gain stages, defeating the purpose.) For 24-bit output, the question simply does not arise.</p>
-    <p><strong>For MP3 output, dithering is inapplicable for a separate reason.</strong> MP3 encoding applies its own psychoacoustic quantization. The codec analyzes the signal using a masking model and allocates bits to spectral bands according to audibility thresholds. The quantization step sizes used by the MP3 encoder are orders of magnitude coarser than one LSB of 16-bit PCM. Any TPDF dither noise added before encoding would be completely absorbed into the codec's own quantization decisions. It contributes nothing and changes nothing. Adding dither before a lossy encoder is like whispering into a jackhammer.</p>
-  </section>
 
   <!-- RNNoise -->
   <section id="rnnoise">
@@ -938,6 +796,102 @@
 
     <h3>Cost</h3>
     <p>NR-for-measurement adds one additional FFmpeg pass per loudnorm analysis (running RNNoise on the intermediate audio to a temporary file). For a typical podcast recording on Apple Silicon, this adds a few seconds. The temporary NR'd files are created in the working directory and deleted automatically after processing.</p>
+  </section>
+
+  <!-- Phase Rotation -->
+  <section id="phase-rotation">
+    <h2>Phase Rotation and Crest Factor</h2>
+
+    <h3>Crest Factor</h3>
+    <p>Crest factor is the ratio of a signal's peak level to its RMS level, expressed in dB:</p>
+    <div class="formula">
+      Crest Factor (dB) = Peak (dBFS) − RMS (dBFS)
+    </div>
+    <p>Typical unprocessed speech has a crest factor of 18–25 dB, with 20–23 dB most commonly cited in speech processing literature. High crest factor has a practical consequence for loudness normalization: to reach a loudness target without exceeding the ceiling, the limiter must apply more gain reduction (limiting). More limiting means more audible artifacts: transient softening, pumping, coloration.</p>
+    <p>Reducing crest factor before normalization means the same LUFS target can be reached with less limiting and more transparency.</p>
+
+    <h3>How Allpass Filtering Reduces Crest Factor</h3>
+    <p>A first-order allpass filter passes all frequencies at equal amplitude but shifts the phase of different frequencies by different amounts. It doesn't alter the frequency response; it only changes <em>when</em> different frequency components arrive relative to each other.</p>
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> First-order allpass transfer function</summary>
+      <p>The transfer function of a first-order allpass is:</p>
+      <div class="formula">
+        H(z) = (a₁ + z⁻¹) / (1 + a₁z⁻¹)
+      </div>
+      <p>where <code>a₁</code> is computed from the design frequency and sample rate. The magnitude response |H(z)| = 1 at all frequencies (unity gain). The phase response varies continuously from 0° at DC to −180° at Nyquist, with −90° at the design frequency. This means frequencies below the design frequency are shifted slightly; frequencies above it are shifted more. The relative timing of low-frequency and high-frequency components in the waveform changes, but their amplitudes do not.</p>
+    </details>
+    <p>Much of the peak asymmetry in voice audio comes from low-frequency content: proximity effect from cardioid microphones, low-frequency resonances in recording spaces, and bass-heavy content in finished mixes. This energy tends to create asymmetric waveforms where one polarity consistently peaks higher than the other.</p>
+
+    <p>Proximity effect is worth understanding in detail because it affects nearly every podcast recording. Directional microphones (cardioids, supercardioids, figure-8 patterns) exhibit increasing bass boost as the sound source moves closer, beginning around 12 inches and growing progressively stronger below approximately 100–200 Hz. For cardioids at typical close-mic distances, proximity effect typically adds 6–12 dB of bass boost; figure-8 patterns can reach 20 dB or more at the same distances due to their stronger gradient response. Omnidirectional microphones do not exhibit proximity effect, but the cardioid pattern dominates consumer and prosumer podcast microphones (Shure SM7B, Audio-Technica ATR2100, most USB microphones), making this a near-universal issue. Podcasters without broadcast training tend to position themselves very close to their microphones to minimize room noise, an instinct that unfortunately triggers the strongest proximity effect and produces the most bass-heavy, asymmetric waveforms. The result lands squarely in the 150–250 Hz range that phase rotation is designed to address.</p>
+    <p>An allpass filter in the low-frequency range redistributes the phase relationships between bass components and midrange components, making peaks more symmetric. The result is a lower crest factor (peaks are shorter relative to average level) without any change to the frequency response or audible character of the audio.</p>
+    <p>The effect is genuinely inaudible. Human hearing is largely insensitive to absolute phase at audio frequencies. The cochlea performs a frequency decomposition that discards phase information. This is why polarity inversion (flipping the sign of every sample) and allpass filtering (frequency-dependent phase shift) are both perceptually transparent, despite being mathematically significant transformations of the waveform.</p>
+
+    <h3>WaxOn vs. WaxOff Frequencies</h3>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>WaxOn</th>
+          <th>WaxOff</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Frequency</td>
+          <td>200 Hz</td>
+          <td>150 Hz</td>
+        </tr>
+        <tr>
+          <td>Q</td>
+          <td>0.707 (Butterworth)</td>
+          <td>default</td>
+        </tr>
+        <tr>
+          <td>Rationale</td>
+          <td>Raw recordings often have proximity effect and mic combination issues in the 150–250 Hz range. 200 Hz targets the low-mid region where these artifacts cause most of the crest factor problem.</td>
+          <td>Finished mixes are already edited and processed. The remaining crest factor issue is typically pure bass energy. 150 Hz targets this lower.</td>
+        </tr>
+        <tr>
+          <td>Default</td>
+          <td>On (user can disable)</td>
+          <td>On (user can disable)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Quantifying the Effect</h3>
+    <p>On typical podcast recordings with moderate proximity effect, allpass phase rotation at 200 Hz reduces crest factor by 1–4 dB. A 3 dB crest factor reduction means the limiter needs to apply 3 dB less gain reduction to stay below the same ceiling at the same loudness target. That translates directly to less audible limiting artifacts. On clean, well-recorded speech with minimal bass buildup, the crest factor reduction is smaller (0.5–1 dB). On a single-microphone recording the allpass has no audible downside: it costs nothing in audio quality and can only help. The caveats below cover the exceptions, principally multi-microphone configurations in shared acoustic space.</p>
+
+    <h3>Multiple Microphones in the Same Room</h3>
+    <p>The following is a workflow consideration, not an implementation limitation. WaxOn processes each file correctly. The question is whether applying phase rotation per-track — before the tracks are mixed — is the right place in the production chain to apply it, when those tracks were captured simultaneously in the same room.</p>
+    <p>The "no downside" claim above assumes a single microphone capturing a single source. In multi-mic recordings — two podcasters at separate mics in the same room, a host-and-guest setup, a roundtable, or any configuration where one acoustic source reaches multiple mics — the picture changes.</p>
+    <p>Consider two speakers, A and B, each on their own cardioid microphone. Speaker A's voice reaches both mics: strongly into A's mic, faintly into B's. This faint copy is called <em>bleed</em> or <em>spill</em>. The bleed and the main signal are acoustically coherent — the same waveform captured at slightly different times and levels — so when the tracks are summed in the mix, the bleed adds to the main signal in a phase-related way. The result has some comb filtering already (any time a signal sums with a delayed copy of itself, it does), but the comb is fixed and a property of the room.</p>
+    <p>Apply phase rotation independently to each track and that coherence is broken. Each track receives the same allpass filter, but the bleed on track B has different spectral content than the main signal on track A — it is highpass-shaped by the off-axis response of B's mic, attenuated by distance, and colored by reflections — so it emerges from the filter in a different phase state. Summing the tracks now combines a phase-shifted version of A's voice with a differently-phase-shifted version of A's voice. Comb filtering deepens, and the notches shift in frequency relative to what the room produced naturally. The audible result is a thinness or hollowness in the low-mid range, sometimes described as "phasey."</p>
+    <p>How bad it gets depends on bleed level. Close cardioid placement at typical podcast distances usually keeps bleed −20 to −30 dB below the direct signal, where the additional comb filtering from independent phase rotation is below the threshold of audibility. Loose placement, omnidirectional mics, or talkers who lean back from the mic put bleed in the −10 to −15 dB range, where artifacts become noticeable.</p>
+
+    <p><strong>The 3:1 rule.</strong> A useful guideline from broadcast practice: the distance between two microphones should be at least three times the distance from each microphone to its source. With talkers six inches from their mics, the mics themselves should be eighteen inches apart or more. This keeps bleed roughly 9–10 dB below the direct signal, low enough that downstream processing — phase rotation, EQ, compression — does not interact destructively across tracks.</p>
+
+    <p><strong>Working around it.</strong> If you suspect significant bleed in a multi-track session:</p>
+    <ul>
+      <li>Skip per-track phase rotation in WaxOn and apply it once at the mix-bus stage in WaxOff. A single allpass on the final stereo mix shifts the bleed and main signal together, preserving their original phase relationship.</li>
+      <li>If per-track processing is necessary, use identical allpass settings on every track captured in the same room. Coherent inputs through identical filters remain coherent; coherent inputs through differing filters do not.</li>
+      <li>Apply a noise gate or downward expander before phase rotation so that bleed below a threshold is suppressed and the allpass operates predominantly on the dominant signal.</li>
+      <li>At the recording stage, address the root cause: tighter mic placement, hypercardioid patterns, acoustic baffles between speakers, or — when feasible — recording each speaker in a separate room.</li>
+    </ul>
+
+    <h3>Stereo Recordings and Channel Coherence</h3>
+    <p>WaxOn and WaxOff apply phase rotation as a single allpass filter across the full signal — both channels receive exactly the same coefficients simultaneously, so the inter-channel phase relationship that defines the stereo image is preserved. Unlike the RNNoise stage (which requires an explicit per-channel split because the model was trained on mono), the allpass filter operates correctly on stereo input by design and needs no special handling.</p>
+    <p>The pitfall is in pre-processing outside the app: if a stereo recording is split into two mono files, processed individually through different tools or with different settings, and then recombined, the stereo image can shift unpredictably. Mid information (L + R) and side information (L − R) both depend on phase agreement between channels. A 90° shift on one channel and not the other moves energy from the mid component into the side component at that frequency, widening or hollowing the center image and degrading mono compatibility.</p>
+    <p>This matters most for stereo room recordings (XY, ORTF, spaced pair) where the image is built from genuine inter-channel arrival-time and level differences. It matters less for stereo created by panning mono sources, where both channels carry the same waveform with only a level difference; in that case an identical allpass on both leaves the image untouched.</p>
+
+    <h3>What Phase Rotation Cannot Fix</h3>
+    <p>Allpass phase rotation addresses asymmetric peaks caused by phase relationships between low-frequency and mid-frequency content. Several other sources of waveform asymmetry look similar on a meter but are immune to phase manipulation:</p>
+    <ul>
+      <li><strong>DC offset.</strong> A constant bias in the recorded signal shifts the entire waveform up or down, so peaks on one polarity exceed the other by a fixed amount. An allpass filter cannot remove a constant offset; the fix is a high-pass filter (which both WaxOn and WaxOff apply at 80 Hz before phase rotation) or an explicit DC blocker.</li>
+      <li><strong>Polarity inversion.</strong> A miswired XLR cable or a mic with reversed polarity flips the sign of every sample. The waveform is just as asymmetric afterward, only mirrored, and downstream summing with another mic that captured the same source coherently will produce dramatic cancellation. Phase rotation does not correct polarity; it must be flipped at the source or with an explicit polarity invert before further processing.</li>
+      <li><strong>Inherently asymmetric source material.</strong> Voiced speech is fundamentally asymmetric — the glottal pulse that drives the vocal folds is impulsive on closure and gradual on opening, producing waveforms with consistently larger peaks on one polarity. Brass instruments and some synth waveforms behave similarly. Phase rotation can reduce the visible asymmetry of the recorded waveform, but it cannot make a fundamentally asymmetric source symmetric. The residual asymmetry that remains after phase rotation is a property of the source itself.</li>
+      <li><strong>Clipping.</strong> Once a sample has been hard-clipped at the converter or by a previous processing stage, the lost peak information cannot be recovered. Phase rotation may slightly redistribute the energy of a clipped event in time, but the distortion is already baked in.</li>
+    </ul>
   </section>
 
   <!-- Level Riding -->
@@ -1113,6 +1067,58 @@
       <li><strong>160 kbps as default</strong>: 128 kbps can produce audible artifacts on sibilants and high-frequency consonants in speech. 192 kbps is essentially transparent for voice and is worth using if file size is not a constraint. 160 kbps is the practical midpoint: transparent for the vast majority of voice material and widely used as a podcast delivery standard.</li>
       <li><strong>MP3 from WAV, not from source</strong>: WaxOff always generates the WAV first and derives the MP3 from it. This means the normalization and filtering happens exactly once; the MP3 is a faithful transcode of the normalized WAV, not a separate re-processing of the original file.</li>
     </ul>
+  </section>
+
+  <!-- Dithering -->
+  <section id="dithering">
+    <h2>Quantization, Dithering, and Why It Doesn't Apply Here</h2>
+
+    <h3>The Quantization Problem</h3>
+    <p>Digital audio stores amplitude values as integers. A 16-bit system divides the amplitude range into 2<sup>16</sup> = 65,536 discrete steps; a 24-bit system uses 2<sup>24</sup> = 16,777,216. When a continuous floating-point value is rounded to its nearest representable integer, the difference is <em>quantization error</em>.</p>
+    <p>At high signal levels, quantization error is a negligible fraction of the signal amplitude. The problem surfaces at low levels: fade-outs, reverb tails, quiet passages, where the signal approaches the magnitude of a single quantization step. At that scale, the error is no longer random with respect to the signal; it becomes <em>correlated</em>. Correlated noise has harmonic structure. Harmonic noise is perceived as distortion.</p>
+    <p>The artifact is distinctive: as a 16-bit fade-out approaches silence, the smooth waveform begins to pixelate, crumbling into a grainy, granular texture. Engineers call it "going digital." It is most audible on sustained tones, piano decays, and reverb tails, anywhere a signal fades through the lower quantization steps rather than cutting abruptly.</p>
+
+    <details class="callout callout-history">
+      <summary><span class="callout-cat">History &amp; Context</span> The Classical Demonstration</summary>
+      <p>The canonical test (sometimes called the "fade-to-black") is simple: record a tone at a moderate level and fade it gradually to silence. Without dithering, the transition through the last few quantization steps produces a sequence of audible steps, then silence where the waveform simply stops being representable. The signal doesn't fade; it falls off a cliff.</p>
+      <p>Bob Katz, in <em>Mastering Audio: The Art and the Science</em>, describes piano decay as one of the most revealing cases. A sustained piano note fading naturally into a quiet room exposes quantization distortion immediately when compared against a properly dithered version. The undithered note develops a gritty texture as the decay reaches the noise floor, a form of distortion introduced by the word-length reduction itself, present nowhere in the original recording. He uses this comparison in workshops and has remarked that once engineers hear the difference, the idea of shipping 16-bit masters without dithering becomes unthinkable.</p>
+      <p>A less scientific but widely replicated demonstration: open any 16-bit DAW session, generate a −40 dBFS sine wave, export at 16-bit with dithering off, then again with TPDF dither. Zoom into the waveform near the fade-out in a spectral editor. The quantized version shows visible stairstepping. The dithered version shows a smooth descent into low-level noise. This is not a subtle difference at the bit level, even when it is subtle or inaudible at normal listening levels with typical program material.</p>
+    </details>
+
+    <h3>The Mathematical Fix: TPDF Dither</h3>
+    <p>The solution is counterintuitive: add noise to the signal <em>before</em> truncating it to a lower bit depth. This noise (dither) must be added at a specific amplitude and with a specific probability distribution to be effective.</p>
+    <p>The mathematical foundation was established by Stanley Lipshitz, Robert Wannamaker, and John Vanderkooy at the University of Waterloo in a series of papers beginning in 1984. Their central result: adding <strong>Triangular Probability Density Function (TPDF)</strong> noise (noise whose amplitude is distributed as a triangle between −1 and +1 LSB of the target word length) completely decorrelates the quantization error from the input signal. The quantization error becomes spectrally white and statistically independent of the audio. Harmonic distortion is eliminated; what remains is signal-independent white noise.</p>
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> TPDF generation, variance, and subtractive dither</summary>
+      <p>TPDF noise is generated by summing two independent rectangular (uniform) noise samples. The resulting amplitude distribution is triangular, hence the name. Its variance is exactly 1/6 LSB², which is the minimum required to whiten quantization error under the conditions relevant to audio. Subtractive dither (where the same dither signal is subtracted after truncation) can achieve perfect cancellation of quantization error in theory; non-subtractive TPDF (the practical, deployable form) achieves statistical decorrelation, which is sufficient for all real-world applications.</p>
+    </details>
+    <p>The practical consequence: a properly TPDF-dithered 16-bit file has a smooth, analog-like noise floor rather than correlated quantization distortion. The fade-to-black test produces a clean descent into white noise. The artifact is gone.</p>
+
+    <details class="callout callout-math">
+      <summary><span class="callout-cat">The Math</span> The dithering theorem in one sentence</summary>
+      <p>Adding TPDF noise of variance 1/6 LSB² before truncation makes the quantization error a white, signal-independent noise process: the best possible outcome for a word-length reduction.</p>
+    </details>
+
+    <h3>Noise Shaping</h3>
+    <p>TPDF dithering trades correlated distortion for uncorrelated white noise. For archival files and intermediate stems, that trade is unconditionally correct. But the resulting noise floor sits at approximately −96 dBFS spread uniformly across the audio spectrum. Human hearing is not equally sensitive at all frequencies. Sensitivity peaks around 2–4 kHz and falls off substantially above ~15 kHz. Noise shaping exploits this asymmetry.</p>
+    <p>A noise-shaping filter feeds quantization error back into the system through a filter designed around a psychoacoustic model of human hearing. The filter pushes noise energy out of the 2–4 kHz sensitivity peak and into the 15–20 kHz region where hearing is least sensitive. Total noise energy is conserved (or slightly increased), but <em>perceptually weighted</em> noise (the noise you can actually hear) is reduced. A well-designed noise-shaped dither algorithm can achieve the perceived noise floor of a 20-bit system from a 16-bit word.</p>
+    <details class="callout callout-history">
+      <summary><span class="callout-cat">History &amp; Context</span> UV22HR and POW-r</summary>
+      <p><strong>Apogee's UV22HR</strong> dithering, developed in the 1990s and built into Apogee converters and later into Logic Pro's Bounce dialog, uses an ultrasonic noise curve that concentrates dither energy above 20 kHz, technically increasing broadband noise while keeping in-band noise below the threshold of audibility. <strong>POW-r</strong> (Psychoacoustically Optimized Wordlength Reduction), developed by a consortium that included Waves and Prism Sound, offers three progressively aggressive noise-shaping modes. POW-r Type 3 is widely used in mastering for 16-bit delivery. Bob Katz has written about using POW-r in preference to flat TPDF for final 16-bit masters, on the basis that the psychoacoustic optimization is audible on critical material at moderate listening levels.</p>
+    </details>
+
+    <details class="callout callout-history">
+      <summary><span class="callout-cat">History &amp; Context</span> The Early CD Era</summary>
+      <p>The first commercial CDs appeared in 1982. Digital mastering workflows were new territory, and understanding of quantization dithering was not yet widespread among recording engineers. Dithering had been described mathematically in signal processing literature (Lipshitz and Vanderkooy's most cited papers came in the years following), but its importance in audio mastering was not yet a settled professional consensus.</p>
+      <p>Several major remastering campaigns of the 1990s and 2000s revisited early digital recordings, and engineers working on them have commented on the difference between first-generation 16-bit masters (truncated without dithering) and properly dithered versions. Classical and acoustic jazz recordings, where genuine dynamic range, reverb tails, and instrument decays are central to the listening experience, are particularly revealing. The difference is most apparent on headphones with revealing source material: quiet passages and fade-outs in early digital releases can carry a subtle granularity that disappears in the remastered versions.</p>
+      <p>The issue extends into the digital audio workstation era. For years, some popular DAWs shipped with dithering off by default on export, or placed the dither option in a dialog that inexperienced users never opened. The result was that a significant volume of independently produced music from the 1990s and early 2000s was distributed as 16-bit audio truncated without dithering. The artifacts are often inaudible on typical program material at typical listening levels, but on a quiet room recording with a long reverb tail, they are there.</p>
+    </details>
+
+    <h3>Why WaxOn/WaxOff Does Not Apply Dithering</h3>
+    <p>The entire dithering question is contingent on one condition: <strong>word-length reduction</strong>. You dither when, and only when, you are truncating bits (converting from a higher to a lower bit depth). Dithering is not a general audio quality enhancement; it is a specific solution to a specific problem that arises at the moment of truncation.</p>
+    <p><strong>WaxOn and WaxOff output 24-bit WAV.</strong> Neither mode reduces bit depth. The processing chain (loudness analysis, gain adjustment, filtering, limiting) runs in floating-point arithmetic internally. FFmpeg's audio processing pipeline operates in 32-bit or 64-bit float throughout. When the float result is written to a 24-bit integer PCM file, any truncation from float to int24 occurs at a level approximately 120+ dB below the signal, far below the audible noise floor of any recording. There is no perceptible quantization distortion to address, and no dithering is needed or appropriate.</p>
+    <p>If WaxOff produced 16-bit output, dithering would be mandatory, applied as the final stage, after all gain processing, immediately before the word-length reduction. (Dithering applied earlier would be modified by subsequent gain stages, defeating the purpose.) For 24-bit output, the question simply does not arise.</p>
+    <p><strong>For MP3 output, dithering is inapplicable for a separate reason.</strong> MP3 encoding applies its own psychoacoustic quantization. The codec analyzes the signal using a masking model and allocates bits to spectral bands according to audibility thresholds. The quantization step sizes used by the MP3 encoder are orders of magnitude coarser than one LSB of 16-bit PCM. Any TPDF dither noise added before encoding would be completely absorbed into the codec's own quantization decisions. It contributes nothing and changes nothing. Adding dither before a lossy encoder is like whispering into a jackhammer.</p>
   </section>
 
   <!-- Summary -->
