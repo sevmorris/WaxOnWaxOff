@@ -1116,10 +1116,6 @@
       </thead>
       <tbody>
         <tr>
-          <td>RNNoise before HPF (WaxOn, optional)</td>
-          <td>Noise reduction runs on the unaltered signal, the spectral context the network was trained on. Removing noise first also produces cleaner input to every downstream stage. For stereo, channels are split and denoised independently to avoid RNNoise's mono-model divergence on multi-channel audio.</td>
-        </tr>
-        <tr>
           <td>HPF before all gain stages (WaxOn)</td>
           <td>Subsonic energy inflates loudness measurements and activates the limiter on content that isn't perceptually meaningful</td>
         </tr>
@@ -1133,7 +1129,7 @@
         </tr>
         <tr>
           <td>NR-for-measurement (WaxOn)</td>
-          <td>When NR is off, loudnorm analysis runs on a temporary NR'd copy to prevent broadband noise from inflating the loudness measurement. Speech hits the target LUFS more accurately.</td>
+          <td>Loudnorm analysis always runs on a temporary RNNoise-processed copy to prevent broadband noise from inflating the loudness measurement. The output signal is unaffected. Speech hits the target LUFS more accurately.</td>
         </tr>
         <tr>
           <td>Noise floor estimation</td>
