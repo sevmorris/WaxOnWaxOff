@@ -7,6 +7,13 @@ struct SettingsView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                Text("OUTPUT FORMAT")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .kerning(0.4)
+                    .padding(.top, 6)
+                    .padding(.horizontal, 2)
+
                 row(nil) {
                     Picker("", selection: $viewModel.settings.sampleRate) {
                         Text("44.1 kHz").tag(WaxOnSettings.SampleRate.s44100)
