@@ -1,7 +1,4 @@
 import Foundation
-import OSLog
-
-private let logger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
 
 // MARK: - Loudnorm Measurements
 
@@ -167,9 +164,10 @@ actor DeliveryProcessor {
             "-f", "null", "-"
         ]
 
-        let (_, stderr) = try await runFFmpeg(path: ffmpeg, arguments: args)
+        let stderr = try await FFmpegRunner.capture(exe: ffmpeg, args: args)
 
-        guard let measurements = parseLoudnormJSON(from: stderr) else {
+        guard let dict = FFmpegRunner.parseLoudnormJSON(from: stderr),
+              let measurements = LoudnormMeasurements(json: dict.mapValues { $0 as Any }) else {
             throw DeliveryError.analysisFailedNoMeasurements
         }
         return measurements
@@ -205,10 +203,7 @@ actor DeliveryProcessor {
             output.path
         ]
 
-        let (exitCode, stderr) = try await runFFmpeg(path: ffmpeg, arguments: args)
-        if exitCode != 0 {
-            throw DeliveryError.processingFailed(String(stderr.suffix(500)))
-        }
+        try await FFmpegRunner.run(exe: ffmpeg, args: args)
     }
 
     private func encodeMP3(
@@ -241,93 +236,7 @@ actor DeliveryProcessor {
             output.path
         ]
 
-        let (exitCode, stderr) = try await runFFmpeg(path: ffmpeg, arguments: args)
-        if exitCode != 0 {
-            throw DeliveryError.encodingFailed(String(stderr.suffix(500)))
-        }
-    }
-
-    private nonisolated func runFFmpeg(path: String, arguments: [String]) async throws -> (Int32, String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-
-        let stderrPipe = Pipe()
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = stderrPipe
-
-        final class DataBox: @unchecked Sendable { var value = Data() }
-        let box = DataBox()
-
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                let readGroup = DispatchGroup()
-                readGroup.enter()
-                DispatchQueue.global(qos: .utility).async {
-                    box.value = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    readGroup.leave()
-                }
-
-                let timeoutItem = DispatchWorkItem { process.terminate() }
-                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
-
-                process.terminationHandler = { proc in
-                    timeoutItem.cancel()
-                    readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal {
-                        continuation.resume(throwing: CancellationError())
-                        return
-                    }
-                    let stderrString = String(data: box.value, encoding: .utf8) ?? ""
-                    continuation.resume(returning: (proc.terminationStatus, stderrString))
-                }
-
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        } onCancel: {
-            process.terminate()
-        }
-    }
-
-    private nonisolated func parseLoudnormJSON(from stderr: String) -> LoudnormMeasurements? {
-        // Local logger avoids MainActor isolation conflict on the file-scope let.
-        let log = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
-
-        guard let braceRange = stderr.range(of: "{", options: .backwards) else {
-            log.debug("loudnorm — no JSON block found in FFmpeg output")
-            return nil
-        }
-
-        var depth = 0
-        var jsonEnd: String.Index?
-        outer: for idx in stderr[braceRange.lowerBound...].indices {
-            switch stderr[idx] {
-            case "{": depth += 1
-            case "}":
-                depth -= 1
-                if depth == 0 { jsonEnd = idx; break outer }
-            default: break
-            }
-        }
-
-        guard let jsonEnd else {
-            log.debug("loudnorm — unbalanced braces in FFmpeg output")
-            return nil
-        }
-
-        let jsonString = String(stderr[braceRange.lowerBound...jsonEnd])
-        guard let data = jsonString.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            log.debug("loudnorm — JSON parse failed")
-            return nil
-        }
-
-        return LoudnormMeasurements(json: json)
+        try await FFmpegRunner.run(exe: ffmpeg, args: args)
     }
 }
 

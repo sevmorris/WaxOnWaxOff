@@ -1,12 +1,11 @@
 @preconcurrency import Foundation
 
-/// Shared ffmpeg process runner used by AudioProcessor and DeliveryProcessor.
-/// Extracted to reduce duplication and make the command-building logic testable.
+/// Shared ffmpeg/ffprobe process runner used by AudioProcessor and DeliveryProcessor.
 enum FFmpegRunner {
 
-    /// Run an ffmpeg/ffprobe command, discarding stdout/stderr. Throws on non-zero exit.
+    /// Run a command, discarding output. Throws on non-zero exit.
     static func run(exe: String, args: [String]) async throws {
-        let (exitCode, stderr) = try await launch(exe: exe, args: args)
+        let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr)
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
@@ -15,9 +14,9 @@ enum FFmpegRunner {
         }
     }
 
-    /// Run an ffmpeg/ffprobe command and return captured stderr (used for loudnorm JSON, etc.).
+    /// Run a command and return captured stderr. Throws on non-zero exit.
     static func capture(exe: String, args: [String]) async throws -> String {
-        let (exitCode, stderr) = try await launch(exe: exe, args: args)
+        let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr)
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
@@ -27,9 +26,16 @@ enum FFmpegRunner {
         return stderr
     }
 
+    /// Capture stdout — used for ffprobe, which writes its output to stdout.
+    /// Exit code is not checked; callers must validate the returned string.
+    static func captureStdout(exe: String, args: [String]) async throws -> String {
+        let (_, stdout) = try await launch(exe: exe, args: args, capture: .stdout)
+        return stdout
+    }
+
     // MARK: - Loudnorm Parsing
 
-    /// Parse the loudnorm JSON block from ffmpeg stderr output.
+    /// Parse the loudnorm JSON block from ffmpeg stderr. Returns nil if not found or malformed.
     static func parseLoudnormJSON(from output: String) -> [String: String]? {
         guard let braceRange = output.range(of: "{", options: .backwards) else { return nil }
 
@@ -58,7 +64,13 @@ enum FFmpegRunner {
 
     // MARK: - Private
 
-    private static func launch(exe: String, args: [String]) async throws -> (Int32, String) {
+    private enum CaptureTarget { case stderr, stdout }
+
+    private static func launch(
+        exe: String,
+        args: [String],
+        capture: CaptureTarget
+    ) async throws -> (Int32, String) {
         guard FileManager.default.fileExists(atPath: exe) else {
             throw ProcessingError.ffmpegNotFound
         }
@@ -70,16 +82,22 @@ enum FFmpegRunner {
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Int32, String), Error>) in
-                let stderrPipe = Pipe()
-                process.standardOutput = FileHandle.nullDevice
-                process.standardError = stderrPipe
+                let pipe = Pipe()
+                switch capture {
+                case .stderr:
+                    process.standardOutput = FileHandle.nullDevice
+                    process.standardError = pipe
+                case .stdout:
+                    process.standardOutput = pipe
+                    process.standardError = FileHandle.nullDevice
+                }
 
                 final class DataBox: @unchecked Sendable { var value = Data() }
                 let box = DataBox()
                 let readGroup = DispatchGroup()
                 readGroup.enter()
                 DispatchQueue.global(qos: .utility).async {
-                    box.value = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                    box.value = pipe.fileHandleForReading.readDataToEndOfFile()
                     readGroup.leave()
                 }
 

@@ -5,14 +5,6 @@ struct JobInput: Sendable {
     let url: URL
 }
 
-private struct LoudnormStats {
-    let inputI: String
-    let inputTP: String
-    let inputLRA: String
-    let inputThresh: String
-    let targetOffset: String
-}
-
 actor AudioProcessor {
     let settings: WaxOnSettings
     let onFileStarted: (@Sendable (UUID) -> Void)?
@@ -30,7 +22,7 @@ actor AudioProcessor {
         guard !inputs.isEmpty else { return [] }
 
         let tools = try await FFmpegManager.shared.ensureTools()
-        let maxConcurrent = 3
+        let maxConcurrent = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
 
         return try await withThrowingTaskGroup(of: JobResult?.self) { group in
             var results: [JobResult] = []
@@ -101,7 +93,7 @@ actor AudioProcessor {
             let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
             step1Af = "highpass=f=\(settings.dcBlockHz),\(pan),\(phaseFilter)aresample=\(sr)"
         }
-        try await runFFmpeg(exe: tools.ffmpeg, args: [
+        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", input.path, "-af", step1Af,
             "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
@@ -131,7 +123,7 @@ actor AudioProcessor {
                         "-af", "apad=pad_dur=16,dynaudnorm=p=0.95:m=1.0:g=31"]
             if let d = dynaudnormDuration { args += ["-t", String(format: "%.6f", d)] }
             args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, levelURL.path]
-            try await runFFmpeg(exe: tools.ffmpeg, args: args)
+            try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
             postLevelURL = levelURL
             try Task.checkCancellation()
         } else {
@@ -149,7 +141,7 @@ actor AudioProcessor {
                         "-af", "apad=pad_dur=16,\(dynFilter)"]
             if let d = dynaudnormDuration { args += ["-t", String(format: "%.6f", d)] }
             args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
-            try await runFFmpeg(exe: tools.ffmpeg, args: args)
+            try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
             postDynLevelURL = dynLevelURL
             try Task.checkCancellation()
         } else {
@@ -177,13 +169,13 @@ actor AudioProcessor {
                         "[R]arnndn=m=\(escapedNrModel)[Rnr]",
                         "[Lnr][Rnr]join=inputs=2:channel_layout=stereo"
                     ].joined(separator: ";")
-                    try await runFFmpeg(exe: tools.ffmpeg, args: [
+                    try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                         "-i", postDynLevelURL.path, "-filter_complex", nrFc,
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
                     ])
                 } else {
-                    try await runFFmpeg(exe: tools.ffmpeg, args: [
+                    try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                         "-i", postDynLevelURL.path, "-af", "arnndn=m=\(escapedNrModel)",
                         "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
@@ -196,21 +188,28 @@ actor AudioProcessor {
 
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
             onLog?("  loudnorm: analyzing…", .verbose)
-            let analysisOutput = try await runFFmpegCapture(exe: tools.ffmpeg, args: [
+            let analysisOutput = try await FFmpegRunner.capture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
                 "-i", analysisInput.path, "-af", analyzeAf,
                 "-f", "null", "/dev/null"
             ])
 
-            let stats = try parseLoudnormStats(analysisOutput)
-            onLog?("  measured: \(stats.inputI) LUFS  |  TP \(stats.inputTP) dBTP  |  LRA \(stats.inputLRA) LU", .info)
-            onLog?("  target: \(target) LUFS  |  offset \(stats.targetOffset) dB  |  thresh \(stats.inputThresh) LUFS", .verbose)
+            guard let lnDict = FFmpegRunner.parseLoudnormJSON(from: analysisOutput),
+                  let inputI      = lnDict["input_i"],
+                  let inputTP     = lnDict["input_tp"],
+                  let inputLRA    = lnDict["input_lra"],
+                  let inputThresh = lnDict["input_thresh"],
+                  let targetOffset = lnDict["target_offset"] else {
+                throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
+            }
+            onLog?("  measured: \(inputI) LUFS  |  TP \(inputTP) dBTP  |  LRA \(inputLRA) LU", .info)
+            onLog?("  target: \(target) LUFS  |  offset \(targetOffset) dB  |  thresh \(inputThresh) LUFS", .verbose)
             onLog?("  loudnorm: normalizing…", .verbose)
 
             let normURL = work.appendingPathComponent("\(stem)_norm.wav")
-            let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(stats.inputI):measured_TP=\(stats.inputTP):measured_LRA=\(stats.inputLRA):measured_thresh=\(stats.inputThresh):offset=\(stats.targetOffset):linear=true"
+            let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(inputI):measured_TP=\(inputTP):measured_LRA=\(inputLRA):measured_thresh=\(inputThresh):offset=\(targetOffset):linear=true"
 
-            try await runFFmpeg(exe: tools.ffmpeg, args: [
+            try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                 "-i", postDynLevelURL.path, "-af", normAf,
                 "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
@@ -237,7 +236,7 @@ actor AudioProcessor {
             try? fm.removeItem(at: tmpURL)
         }
 
-        try await runFFmpeg(exe: tools.ffmpeg, args: [
+        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", limiterInput.path, "-af", step2Af,
             "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
@@ -257,168 +256,6 @@ actor AudioProcessor {
         onLog?("✓ \(outName)", .info)
         onLog?("  → \(finalURL.path)", .verbose)
         return JobResult(id: id, input: input, output: finalURL)
-    }
-
-    private nonisolated func runFFmpeg(exe: String, args: [String]) async throws {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: exe) else {
-            throw ProcessingError.ffmpegNotFound
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: exe)
-        process.arguments = args
-        process.standardInput = FileHandle.nullDevice
-
-        // MEDIUM-3: DataBox avoids nonisolated(unsafe) var across closure boundaries
-        final class DataBox: @unchecked Sendable { var value = Data() }
-
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                let stderrPipe = Pipe()
-                process.standardOutput = FileHandle.nullDevice
-                process.standardError = stderrPipe
-
-                let box = DataBox()
-                let readGroup = DispatchGroup()
-                readGroup.enter()
-                DispatchQueue.global(qos: .utility).async {
-                    box.value = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    readGroup.leave()
-                }
-
-                // MEDIUM-5: terminate after 15 minutes to prevent infinite hangs
-                let timeoutItem = DispatchWorkItem { process.terminate() }
-                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
-
-                process.terminationHandler = { proc in
-                    timeoutItem.cancel()
-                    readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal {
-                        continuation.resume(throwing: CancellationError())
-                        return
-                    }
-                    let exitCode = proc.terminationStatus
-                    let msg = String(data: box.value, encoding: .utf8) ?? ""
-                    if exitCode == 0 {
-                        continuation.resume(returning: ())
-                    } else {
-                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                    }
-                }
-
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
-                }
-            }
-        } onCancel: {
-            process.terminate()
-        }
-    }
-
-    private nonisolated func runFFmpegCapture(exe: String, args: [String]) async throws -> String {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: exe) else {
-            throw ProcessingError.ffmpegNotFound
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: exe)
-        process.arguments = args
-        process.standardInput = FileHandle.nullDevice
-
-        final class DataBox: @unchecked Sendable { var value = Data() }
-
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                let stderrPipe = Pipe()
-                process.standardOutput = FileHandle.nullDevice
-                process.standardError = stderrPipe
-
-                let box = DataBox()
-                let readGroup = DispatchGroup()
-                readGroup.enter()
-                DispatchQueue.global(qos: .utility).async {
-                    box.value = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                    readGroup.leave()
-                }
-
-                let timeoutItem = DispatchWorkItem { process.terminate() }
-                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
-
-                process.terminationHandler = { proc in
-                    timeoutItem.cancel()
-                    readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal {
-                        continuation.resume(throwing: CancellationError())
-                        return
-                    }
-                    let exitCode = proc.terminationStatus
-                    let msg = String(data: box.value, encoding: .utf8) ?? ""
-                    if exitCode == 0 {
-                        continuation.resume(returning: msg)
-                    } else {
-                        continuation.resume(throwing: ProcessingError.ffmpegFailed(code: exitCode, message: msg.isEmpty ? "Exit code \(exitCode)" : msg))
-                    }
-                }
-
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
-                }
-            }
-        } onCancel: {
-            process.terminate()
-        }
-    }
-
-    private nonisolated func parseLoudnormStats(_ output: String) throws -> LoudnormStats {
-        // Find the last '{' (start of the JSON block), then scan forward to its matching '}'
-        guard let braceRange = output.range(of: "{", options: .backwards) else {
-            throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
-        }
-
-        var depth = 0
-        var jsonEnd: String.Index?
-        outer: for idx in output[braceRange.lowerBound...].indices {
-            switch output[idx] {
-            case "{": depth += 1
-            case "}":
-                depth -= 1
-                if depth == 0 { jsonEnd = idx; break outer }
-            default: break
-            }
-        }
-
-        guard let jsonEnd else {
-            throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
-        }
-
-        let jsonStr = String(output[braceRange.lowerBound...jsonEnd])
-        guard let data = jsonStr.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data),
-              let dict = json as? [String: String] else {
-            throw ProcessingError.ffmpegFailed(code: -1, message: "Invalid loudnorm JSON output")
-        }
-
-        guard let inputI = dict["input_i"],
-              let inputTP = dict["input_tp"],
-              let inputLRA = dict["input_lra"],
-              let inputThresh = dict["input_thresh"],
-              let targetOffset = dict["target_offset"] else {
-            throw ProcessingError.ffmpegFailed(code: -1, message: "Missing loudnorm measurement fields")
-        }
-
-        return LoudnormStats(
-            inputI: inputI,
-            inputTP: inputTP,
-            inputLRA: inputLRA,
-            inputThresh: inputThresh,
-            targetOffset: targetOffset
-        )
     }
 
     private func makeTemp(prefix: String) throws -> URL {
@@ -464,7 +301,7 @@ actor AudioProcessor {
     }
 
     private nonisolated func getAudioDuration(exe: String, url: URL) async throws -> Double {
-        let output = try await runFFprobeCapture(exe: exe, args: [
+        let output = try await FFmpegRunner.captureStdout(exe: exe, args: [
             "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
@@ -475,58 +312,6 @@ actor AudioProcessor {
             throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse audio duration")
         }
         return d
-    }
-
-    private nonisolated func runFFprobeCapture(exe: String, args: [String]) async throws -> String {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: exe) else {
-            throw ProcessingError.ffmpegNotFound
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: exe)
-        process.arguments = args
-        process.standardInput = FileHandle.nullDevice
-
-        final class DataBox: @unchecked Sendable { var value = Data() }
-
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                let stdoutPipe = Pipe()
-                process.standardOutput = stdoutPipe
-                process.standardError = FileHandle.nullDevice
-
-                let box = DataBox()
-                let readGroup = DispatchGroup()
-                readGroup.enter()
-                DispatchQueue.global(qos: .utility).async {
-                    box.value = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                    readGroup.leave()
-                }
-
-                let timeoutItem = DispatchWorkItem { process.terminate() }
-                DispatchQueue.global().asyncAfter(deadline: .now() + 30, execute: timeoutItem)
-
-                process.terminationHandler = { proc in
-                    timeoutItem.cancel()
-                    readGroup.wait()
-                    if proc.terminationReason == .uncaughtSignal {
-                        continuation.resume(throwing: CancellationError())
-                        return
-                    }
-                    let msg = String(data: box.value, encoding: .utf8) ?? ""
-                    continuation.resume(returning: msg)
-                }
-
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(throwing: ProcessingError.ffmpegFailed(code: -1, message: "Failed to launch: \(error.localizedDescription)"))
-                }
-            }
-        } onCancel: {
-            process.terminate()
-        }
     }
 
     private func bestOutputDir(for input: URL) -> URL {
