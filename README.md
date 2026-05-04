@@ -17,7 +17,10 @@
 
 **WaxOn/WaxOff** solves a specific problem: you receive a guest recording that's quiet, uneven, or sitting in a bed of room noise, and you need a clean, normalized WAV before you open your session. No import-normalize-export dance. No sending audio to a cloud service.
 
-[SCREENSHOT NEEDED — alt: WaxOn processing a batch of guest recordings]
+<p align="center">
+  <img src="docs/images/waxon-waveform.png" width="49%" alt="WaxOn processing — waveform view" />
+  <img src="docs/images/waxon-console.png" width="49%" alt="WaxOn processing — console view" />
+</p>
 
 The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
 
@@ -35,13 +38,13 @@ The app runs in two stages that map onto the two moments in podcast production w
 ## I. WaxOn — Signal Conditioning (Prep)
 *Use on raw recordings prior to non-destructive editing.*
 
-* **High-Pass Filter:** Configurable cutoff (20–90 Hz) for HVAC/handling noise removal.
+* **High-Pass Filter:** Configurable cutoff (Off–90 Hz) for HVAC/handling noise removal. DC offset always removed.
 * **Level Riding:** Optional downward-only `dynaudnorm` to tame loud outliers without lifting the noise floor.
 * **Dynamic Leveling:** Optional bidirectional `dynaudnorm` for panel/multi-voice sources, with a Gentle→Aggressive responsiveness control.
 * **Loudness Normalization:** Two-pass EBU R128 linear gain (dynamics fully preserved).
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
-* **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom. Alters waveform phase — use with care on stereo music sources.
+* **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom.
 
 **Output Logic:** `{name}-{rate}waxon{ceiling}.wav` (24-bit; ceiling is e.g. `-1dB`)
 
@@ -51,6 +54,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **EBU R128 Normalization:** Two-pass analysis + linear gain; no dynamic compression.
 * **True Peak Management:** Configurable ceiling (−3.0 to −0.1 dBTP).
 * **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
+
 **Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
 
 ---

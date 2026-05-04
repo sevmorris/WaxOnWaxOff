@@ -68,7 +68,7 @@ struct SettingsView: View {
                     }
                 }
 
-                row("Phase Rotation", caption: "Allpass at 200 Hz — recovers headroom on asymmetric voice waveforms. Alters waveform phase; avoid on stereo music.") {
+                row("Phase Rotation", caption: "Allpass at 200 Hz — recovers headroom on asymmetric voice waveforms.") {
                     HStack(spacing: 8) {
                         Toggle("", isOn: $viewModel.settings.phaseRotationEnabled)
                             .toggleStyle(.switch)
