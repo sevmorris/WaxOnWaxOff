@@ -31,12 +31,24 @@ struct FileListView: View {
 struct FileRowView: View {
     let file: FileItem
     var isProcessing: Bool = false
+    var showMonoUpmixBadge: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text(file.url.lastPathComponent)
                     .font(.body)
+
+                if showMonoUpmixBadge && !file.isProcessed {
+                    Text("MONO→STEREO")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(.secondary.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                        .help("Mono source — will be upmixed to dual-mono stereo")
+                }
 
                 if file.hasHighNoiseFloor {
                     Image(systemName: "exclamationmark.triangle.fill")

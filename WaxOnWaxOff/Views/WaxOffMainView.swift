@@ -208,7 +208,7 @@ private struct DeliveryFileListView: View {
     var body: some View {
         List(selection: $viewModel.selectedFileIDs) {
             ForEach(viewModel.files) { file in
-                FileRowView(file: file)
+                FileRowView(file: file, showMonoUpmixBadge: file.fileInfo?.channelCount == 1)
                     .tag(file.id)
             }
             .onDelete { offsets in

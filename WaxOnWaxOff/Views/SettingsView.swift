@@ -86,7 +86,7 @@ struct SettingsView: View {
                         Toggle("", isOn: $viewModel.settings.deEsserEnabled)
                             .toggleStyle(.switch)
                             .labelsHidden()
-                        Text("Gentle (7.5 kHz)")
+                        Text("Gentle (\(String(format: "%.1f", (0.34 * Double(viewModel.settings.sampleRate.rawValue)) / 2000.0)) kHz)")
                     }
                 }
 

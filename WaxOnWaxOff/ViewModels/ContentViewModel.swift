@@ -15,6 +15,8 @@ final class ContentViewModel {
     }
     var isProcessing = false
     var alertMessage: String?
+    var showWaxonWarning = false
+    private var pendingWaxonFiles: [URL] = []
     var presetStore = WaxOnPresetStore()
     var log = ProcessingLog()
     private var processingTask: Task<Void, Never>?
@@ -54,9 +56,30 @@ final class ContentViewModel {
             alertMessage = notices.joined(separator: "\n\n")
         }
 
-        let newFiles = valid.map { FileItem(url: $0) }
-        files.append(contentsOf: newFiles)
+        if valid.contains(where: { $0.lastPathComponent.localizedCaseInsensitiveContains("-waxon") }) {
+            pendingWaxonFiles = valid
+            showWaxonWarning = true
+            return
+        }
 
+        commitFiles(valid)
+    }
+
+    func confirmWaxonWarning() {
+        let toAdd = pendingWaxonFiles
+        pendingWaxonFiles = []
+        showWaxonWarning = false
+        commitFiles(toAdd)
+    }
+
+    func dismissWaxonWarning() {
+        pendingWaxonFiles = []
+        showWaxonWarning = false
+    }
+
+    private func commitFiles(_ urls: [URL]) {
+        let newFiles = urls.map { FileItem(url: $0) }
+        files.append(contentsOf: newFiles)
         for file in newFiles {
             analyzeFile(file)
             generateWaveform(file)
@@ -173,7 +196,9 @@ final class ContentViewModel {
             } catch is CancellationError {
                 // User cancelled — no alert needed
             } catch {
-                alertMessage = error.localizedDescription
+                logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
+                log.append("✗ \(error.localizedDescription)", level: .info)
+                alertMessage = "Processing failed. Open the Console tab for details."
             }
 
             isProcessing = false

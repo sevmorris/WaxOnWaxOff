@@ -68,6 +68,15 @@ struct ContentView: View {
         } message: {
             Text(viewModel.alertMessage ?? "")
         }
+        .alert("Already Processed?", isPresented: Binding(
+            get: { viewModel.showWaxonWarning },
+            set: { if !$0 { viewModel.dismissWaxonWarning() } }
+        )) {
+            Button("Add Anyway") { viewModel.confirmWaxonWarning() }
+            Button("Cancel", role: .cancel) { viewModel.dismissWaxonWarning() }
+        } message: {
+            Text("One or more files appear to have already been processed by WaxOn. Processing them again may degrade audio quality.")
+        }
     }
 
     private var headerView: some View {

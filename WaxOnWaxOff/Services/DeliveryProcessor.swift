@@ -54,7 +54,7 @@ actor DeliveryProcessor {
         }
 
         let stem = url.deletingPathExtension().lastPathComponent
-        let outputStem = "\(stem)-lev-\(lufsString(settings.targetLUFS))LUFS"
+        let outputStem = "\(stem)-lev\(lufsString(settings.targetLUFS))LUFS"
         let lufs = lufsString(settings.targetLUFS)
         let tp = String(format: "%.1f", settings.truePeak)
         let lra = String(format: "%.0f", settings.lra)
