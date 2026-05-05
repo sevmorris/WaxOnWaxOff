@@ -880,7 +880,7 @@
 
     <h3>The Problem It Solves</h3>
     <p>Dynamic Leveling handles recordings where level variation is structural — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. You need to lift the quiet material and tame the loud material simultaneously.</p>
-    <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — it lifts quiet sections toward the target peak and attenuates loud ones. This is the right behavior for uneven source material, but it produces audible pumping on solo voice recordings with natural pauses: as the filter adjusts gain across the silence between sentences, the noise floor breathes in and out. The silence threshold (<code>t=0.05</code>) reduces the worst of this by preventing gain increases in near-silent frames, but it does not eliminate the ramp transitions around threshold-crossing content. Dynamic Leveling is a specialty tool for multi-voice sources, not a general-purpose enhancement for solo recordings.</p>
+    <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — it lifts quiet sections toward the target peak and attenuates loud ones. This is the right behavior for uneven source material, but it produces audible pumping on solo voice recordings with natural pauses: as the filter adjusts gain across the silence between sentences, the noise floor breathes in and out. WaxOn does not gate near-silent frames via <code>dynaudnorm</code>'s silence threshold (<code>t</code>) parameter, because an active threshold causes severe attenuation at speech-to-silence transitions: the Gaussian smoothing window interpolates between gated (unity-gain) and ungated frames, producing audible fade-outs on the trailing edge of every utterance. The trade-off is that the noise floor between words is boosted by up to the maximum gain factor — acceptable on the clean source material Dynamic Leveling targets. Dynamic Leveling is a specialty tool for multi-voice sources, not a general-purpose enhancement for solo recordings.</p>
 
     <h3>The Aggressiveness Slider</h3>
     <p>The Aggressiveness slider is a 0–1 control that maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
@@ -889,10 +889,9 @@
       <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 15 frames at Aggressive (forced odd). Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
       <li><strong>Max gain (<code>m</code>)</strong>: 2× at Gentle, 6× at Aggressive (≈ +6 dB to +15.6 dB). Controls how much the filter will boost a quiet frame to reach the target peak.</li>
     </ul>
-    <p>Two parameters are fixed across the slider range:</p>
+    <p>One parameter is fixed across the slider range:</p>
     <ul>
       <li><code>p=0.95</code> — target peak amplitude per frame (≈ −0.4 dBFS).</li>
-      <li><code>t=0.05</code> — peak-magnitude silence threshold (≈ −26 dBFS). Near-silent frames are passed at unity gain — the noise floor between words is never boosted.</li>
     </ul>
     <p>Gentle is the right starting point for most material. Aggressive is appropriate when level differences are extreme and the source already has significant background noise that boosting won't make materially worse.</p>
 

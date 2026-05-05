@@ -279,15 +279,18 @@ actor AudioProcessor {
 
     // Maps 0.0 (gentle) → 1.0 (aggressive) to dynaudnorm parameters.
     // Shorter frames and tighter Gaussian smoothing = more responsive leveling.
+    // No t (silence threshold): an active threshold causes severe attenuation at
+    // speech-to-silence transitions because the Gaussian window interpolates
+    // between gated (unity-gain) and ungated frames, producing audible fade-outs
+    // on the trailing edge of every utterance. The cost of dropping t is that the
+    // noise floor between words gets boosted by up to m dB — acceptable on the
+    // clean source material Dynamic Leveling targets (panel / multi-voice).
     private func dynamicLevelingFilter(amount: Double) -> String {
         let f = Int(500.0 - amount * 350.0)         // frame ms: 500 → 150
         let gRaw = Int(31.0 - amount * 16.0)        // gaussian: 31 → 15
         let g = gRaw % 2 == 0 ? gRaw - 1 : gRaw    // must be odd
         let m = 2.0 + amount * 4.0                  // max gain factor: 2x → 6x (+6 to +15 dB)
-        // t=0.05: silence threshold (~-26 dBFS). Frames below this peak magnitude
-        // are not amplified — prevents boosting the noise floor between words on
-        // sparse voice tracks. Note: dynaudnorm's `s` is compress, not threshold.
-        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m)):t=0.05"
+        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m))"
     }
 
     // Builds a filter_complex that mirror-pads the audio with reversed copies of the
