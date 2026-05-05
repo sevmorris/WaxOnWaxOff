@@ -106,25 +106,31 @@ actor AudioProcessor {
         try Task.checkCancellation()
 
         // Dynamic leveling (optional, dynaudnorm bidirectional)
-        // dynaudnorm boundary fix: the Gaussian window extends into nonexistent frames
-        // at both the head and the tail, causing fade-in / fade-out artifacts. adelay
-        // prepends 16s of silence and apad appends 16s; -ss skips the head padding and
-        // -t trims the tail. Both artifacts land in the discarded silence.
+        // Mirror padding: dynaudnorm's Gaussian smoothing window extends into nonexistent
+        // frames at the file boundaries. Padding with silence doesn't help — silent frames
+        // get gain=1.0 (silence threshold) which still pulls the smoothed gain down at the
+        // audio boundary, producing a ramp. Mirror padding (reversed copies of the first
+        // and last 16s) gives the smoothing window real audio with matching gain values
+        // on both sides of the boundary.
         let postDynLevelURL: URL
         if settings.dynamicLevelingEnabled {
             let dynLevelURL = work.appendingPathComponent("\(stem)_dynleveled.wav")
             let dynFilter = dynamicLevelingFilter()
             onLog?("  dynamic leveling: \(dynFilter)", .verbose)
-            var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path,
-                        "-af", "adelay=delays=16000:all=1,apad=pad_dur=16,\(dynFilter)",
-                        "-ss", "16"]
+            let args: [String]
             if let d = try? await getAudioDuration(exe: tools.ffprobe, url: midURL) {
-                args += ["-t", String(format: "%.6f", d)]
+                let filterComplex = mirrorPaddedFilter(duration: d, leveler: dynFilter)
+                args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", midURL.path,
+                        "-filter_complex", filterComplex,
+                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
             } else {
-                onLog?("⚠ Could not determine file duration; dynaudnorm tail-fade fix skipped.", .info)
+                onLog?("⚠ Could not determine file duration; dynaudnorm boundary fix skipped.", .info)
+                args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                        "-i", midURL.path,
+                        "-af", dynFilter,
+                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
             }
-            args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
             try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
             postDynLevelURL = dynLevelURL
             try Task.checkCancellation()
@@ -278,6 +284,23 @@ actor AudioProcessor {
     // t=0.05: silence threshold (≈ −26 dBFS) prevents boosting noise floor between words.
     private func dynamicLevelingFilter() -> String {
         "dynaudnorm=f=325:g=23:p=0.95:m=4.0:s=5.0:t=0.05"
+    }
+
+    // Builds a filter_complex that mirror-pads the audio with reversed copies of the
+    // first and last `padDur` seconds (capped at 16s, or the file length if shorter),
+    // runs the leveler over the padded stream, then trims the padding back off.
+    private func mirrorPaddedFilter(duration: Double, leveler: String) -> String {
+        let padDur = min(16.0, duration)
+        let tailStart = max(0.0, duration - padDur)
+        let pad = String(format: "%.6f", padDur)
+        let tStart = String(format: "%.6f", tailStart)
+        let dur = String(format: "%.6f", duration)
+        return "[0:a]asplit=3[h][m][t];" +
+               "[h]atrim=duration=\(pad),areverse,asetpts=PTS-STARTPTS[head];" +
+               "[m]asetpts=PTS-STARTPTS[body];" +
+               "[t]atrim=start=\(tStart),areverse,asetpts=PTS-STARTPTS[tail];" +
+               "[head][body][tail]concat=n=3:v=0:a=1," +
+               "\(leveler),atrim=start=\(pad):duration=\(dur),asetpts=PTS-STARTPTS"
     }
 
     private nonisolated func getAudioDuration(exe: String, url: URL) async throws -> Double {

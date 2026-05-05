@@ -896,8 +896,9 @@
     <h3>Placement in the Pipeline</h3>
     <p>Dynamic Leveling runs before loudness normalization. This means the loudnorm analysis pass sees a more consistent signal — bringing the overall level balance closer to even before measurement means the integrated loudness reading reflects typical content level rather than being skewed by a structural imbalance between speakers.</p>
 
-    <h3>Boundary Artifact Mitigation</h3>
-    <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces boundary artifacts at <em>both</em> ends of the file. At the start, the window has no past frames to look at; at the end, no future frames. In both cases the window extends into nonexistent samples (effectively zero-padded), causing the gain curve to distort near the file boundary and producing a slow ramp-up at the head and a slow fade-out at the tail. WaxOn mitigates this by prepending 16 seconds of silence with <code>adelay</code>, appending 16 seconds with <code>apad</code>, and using FFmpeg's output-side <code>-ss 16</code> and <code>-t</code> flags to skip the head padding and trim the tail. Both artifacts land in the discarded silence.</p>
+    <h3>Mirror-Padding Boundary Fix</h3>
+    <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces boundary artifacts at both ends of the file. The naive workaround of padding with silence does not solve this: <code>dynaudnorm</code> assigns silent frames a gain of 1.0 (silence-threshold behavior), and those unity-gain values get averaged into the smoothing window at the audio/silence boundary, pulling the smoothed gain down and producing an audible ramp into the real audio.</p>
+    <p>The actual fix is <strong>mirror padding</strong>: prepend a reversed copy of the first 16 seconds of audio, append a reversed copy of the last 16 seconds. The smoothing window now sees real audio with matching gain values on both sides of the boundary, so the smoothed gain at the edge matches what it would be in the middle of the file. After processing, the padding is trimmed off with <code>atrim</code> and the output matches the original duration. For clips shorter than 16 seconds, the pad length is capped at the clip's length.</p>
   </section>
 
   <!-- WaxOn Design -->
