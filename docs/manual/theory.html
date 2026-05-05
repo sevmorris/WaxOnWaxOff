@@ -490,8 +490,6 @@
     <h3>WaxOff</h3>
     <div class="chain">
       <div class="chain-row">
-        <div class="chain-node optional">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">150 Hz allpass</span></div>
-        <div class="chain-arrow">→</div>
         <div class="chain-node">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Encode MP3</span></div>
@@ -803,39 +801,6 @@
     <p>Proximity effect is worth understanding in detail because it affects nearly every podcast recording. Directional microphones (cardioids, supercardioids, figure-8 patterns) exhibit increasing bass boost as the sound source moves closer, beginning around 12 inches and growing progressively stronger below approximately 100–200 Hz. For cardioids at typical close-mic distances, proximity effect typically adds 6–12 dB of bass boost; figure-8 patterns can reach 20 dB or more at the same distances due to their stronger gradient response. Omnidirectional microphones do not exhibit proximity effect, but the cardioid pattern dominates consumer and prosumer podcast microphones (Shure SM7B, Audio-Technica ATR2100, most USB microphones), making this a near-universal issue. Podcasters without broadcast training tend to position themselves very close to their microphones to minimize room noise, an instinct that unfortunately triggers the strongest proximity effect and produces the most bass-heavy, asymmetric waveforms. The result lands squarely in the 150–250 Hz range that phase rotation is designed to address.</p>
     <p>An allpass filter in the low-frequency range redistributes the phase relationships between bass components and midrange components, making peaks more symmetric. The result is a lower crest factor (peaks are shorter relative to average level) without any change to the frequency response or audible character of the audio.</p>
     <p>The effect is genuinely inaudible. Human hearing is largely insensitive to absolute phase at audio frequencies. The cochlea performs a frequency decomposition that discards phase information. This is why polarity inversion (flipping the sign of every sample) and allpass filtering (frequency-dependent phase shift) are both perceptually transparent, despite being mathematically significant transformations of the waveform.</p>
-
-    <h3>WaxOn vs. WaxOff Frequencies</h3>
-    <table class="compare-table">
-      <thead>
-        <tr>
-          <th>Parameter</th>
-          <th>WaxOn</th>
-          <th>WaxOff</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Frequency</td>
-          <td>200 Hz</td>
-          <td>150 Hz</td>
-        </tr>
-        <tr>
-          <td>Q</td>
-          <td>0.707 (Butterworth)</td>
-          <td>default</td>
-        </tr>
-        <tr>
-          <td>Rationale</td>
-          <td>Raw recordings often have proximity effect and mic combination issues in the 150–250 Hz range. 200 Hz targets the low-mid region where these artifacts cause most of the crest factor problem.</td>
-          <td>Finished mixes are already edited and processed. The remaining crest factor issue is typically pure bass energy. 150 Hz targets this lower.</td>
-        </tr>
-        <tr>
-          <td>Default</td>
-          <td>On (user can disable)</td>
-          <td>On (user can disable)</td>
-        </tr>
-      </tbody>
-    </table>
 
     <h3>Quantifying the Effect</h3>
     <p>On typical podcast recordings with moderate proximity effect, allpass phase rotation at 200 Hz reduces crest factor by 1–4 dB. A 3 dB crest factor reduction means the limiter needs to apply 3 dB less gain reduction to stay below the same ceiling at the same loudness target. That translates directly to less audible limiting artifacts. On clean, well-recorded speech with minimal bass buildup, the crest factor reduction is smaller (0.5–1 dB). On a single-microphone recording the allpass has no audible downside: it costs nothing in audio quality and can only help. The caveats below cover the exceptions, principally multi-microphone configurations in shared acoustic space.</p>
