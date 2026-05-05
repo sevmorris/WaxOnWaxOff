@@ -896,8 +896,8 @@
     <h3>Placement in the Pipeline</h3>
     <p>Dynamic Leveling runs before loudness normalization. This means the loudnorm analysis pass sees a more consistent signal — bringing the overall level balance closer to even before measurement means the integrated loudness reading reflects typical content level rather than being skewed by a structural imbalance between speakers.</p>
 
-    <h3>Tail Artifact Mitigation</h3>
-    <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces a boundary artifact at the end of a file: the look-ahead window extends past the last audio frame into silence, causing the gain curve to distort near the file boundary — potentially producing over-attenuation or over-amplification at the tail. WaxOn mitigates this by prepending 16 seconds of silence to the input before running <code>dynaudnorm</code> and using FFmpeg's <code>-t</code> flag to trim the output back to the original duration. The artifact lands in the padding and is discarded.</p>
+    <h3>Boundary Artifact Mitigation</h3>
+    <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces boundary artifacts at <em>both</em> ends of the file. At the start, the window has no past frames to look at; at the end, no future frames. In both cases the window extends into nonexistent samples (effectively zero-padded), causing the gain curve to distort near the file boundary and producing a slow ramp-up at the head and a slow fade-out at the tail. WaxOn mitigates this by prepending 16 seconds of silence with <code>adelay</code>, appending 16 seconds with <code>apad</code>, and using FFmpeg's output-side <code>-ss 16</code> and <code>-t</code> flags to skip the head padding and trim the tail. Both artifacts land in the discarded silence.</p>
   </section>
 
   <!-- WaxOn Design -->

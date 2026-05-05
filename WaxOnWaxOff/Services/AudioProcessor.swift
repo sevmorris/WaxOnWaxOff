@@ -106,8 +106,10 @@ actor AudioProcessor {
         try Task.checkCancellation()
 
         // Dynamic leveling (optional, dynaudnorm bidirectional)
-        // dynaudnorm boundary fix: the Gaussian window looks ahead into zero-frames at the
-        // tail, causing a fade-out artifact. Padding pushes it into silence; -t trims it.
+        // dynaudnorm boundary fix: the Gaussian window extends into nonexistent frames
+        // at both the head and the tail, causing fade-in / fade-out artifacts. adelay
+        // prepends 16s of silence and apad appends 16s; -ss skips the head padding and
+        // -t trims the tail. Both artifacts land in the discarded silence.
         let postDynLevelURL: URL
         if settings.dynamicLevelingEnabled {
             let dynLevelURL = work.appendingPathComponent("\(stem)_dynleveled.wav")
@@ -115,7 +117,8 @@ actor AudioProcessor {
             onLog?("  dynamic leveling: \(dynFilter)", .verbose)
             var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                         "-i", midURL.path,
-                        "-af", "apad=pad_dur=16,\(dynFilter)"]
+                        "-af", "adelay=delays=16000:all=1,apad=pad_dur=16,\(dynFilter)",
+                        "-ss", "16"]
             if let d = try? await getAudioDuration(exe: tools.ffprobe, url: midURL) {
                 args += ["-t", String(format: "%.6f", d)]
             } else {
