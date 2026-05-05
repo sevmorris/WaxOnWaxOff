@@ -105,51 +105,28 @@ actor AudioProcessor {
 
         try Task.checkCancellation()
 
-        // dynaudnorm boundary fix: the Gaussian window looks back into prior loud frames
-        // when computing gain for the tail, causing the voice to fade. Padding the input
-        // with silence pushes the artifact into the padding; -t trims it from the output.
-        var dynaudnormDuration: Double? = nil
-        if settings.levelRidingEnabled || settings.dynamicLevelingEnabled {
-            if let d = try? await getAudioDuration(exe: tools.ffprobe, url: midURL) {
-                dynaudnormDuration = d
-            } else {
-                onLog?("⚠ Could not determine file duration; dynaudnorm tail-fade fix skipped.", .info)
-            }
-        }
-
-        // Level riding (optional, dynaudnorm downward-only)
-        let postLevelURL: URL
-        if settings.levelRidingEnabled {
-            let levelURL = work.appendingPathComponent("\(stem)_leveled.wav")
-            onLog?("  level riding: dynaudnorm (downward only, no boost)", .verbose)
-            var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path,
-                        "-af", "apad=pad_dur=16,dynaudnorm=p=0.95:m=1.0:g=31"]
-            if let d = dynaudnormDuration { args += ["-t", String(format: "%.6f", d)] }
-            args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, levelURL.path]
-            try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
-            postLevelURL = levelURL
-            try Task.checkCancellation()
-        } else {
-            postLevelURL = midURL
-        }
-
         // Dynamic leveling (optional, dynaudnorm bidirectional)
+        // dynaudnorm boundary fix: the Gaussian window looks ahead into zero-frames at the
+        // tail, causing a fade-out artifact. Padding pushes it into silence; -t trims it.
         let postDynLevelURL: URL
         if settings.dynamicLevelingEnabled {
             let dynLevelURL = work.appendingPathComponent("\(stem)_dynleveled.wav")
-            let dynFilter = dynamicLevelingFilter(amount: settings.dynamicLevelingAmount)
+            let dynFilter = dynamicLevelingFilter()
             onLog?("  dynamic leveling: \(dynFilter)", .verbose)
             var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postLevelURL.path,
+                        "-i", midURL.path,
                         "-af", "apad=pad_dur=16,\(dynFilter)"]
-            if let d = dynaudnormDuration { args += ["-t", String(format: "%.6f", d)] }
+            if let d = try? await getAudioDuration(exe: tools.ffprobe, url: midURL) {
+                args += ["-t", String(format: "%.6f", d)]
+            } else {
+                onLog?("⚠ Could not determine file duration; dynaudnorm tail-fade fix skipped.", .info)
+            }
             args += ["-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
             try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
             postDynLevelURL = dynLevelURL
             try Task.checkCancellation()
         } else {
-            postDynLevelURL = postLevelURL
+            postDynLevelURL = midURL
         }
 
         // Loudness normalization (optional, two-pass EBU R128)
@@ -291,17 +268,13 @@ actor AudioProcessor {
         return "\(s)dB"
     }
 
-    // Maps 0.0 (gentle) → 1.0 (aggressive) to dynaudnorm parameters.
-    // Shorter frames and tighter Gaussian smoothing = more responsive leveling.
-    private func dynamicLevelingFilter(amount: Double) -> String {
-        let f = Int(500.0 - amount * 350.0)         // frame ms: 500 → 150
-        let gRaw = Int(31.0 - amount * 16.0)        // gaussian: 31 → 15
-        let g = gRaw % 2 == 0 ? gRaw - 1 : gRaw    // must be odd
-        let m = 2.0 + amount * 4.0                  // max gain factor: 2x → 6x (+6 to +15 dB)
-        // t=0.05: silence threshold (~-26 dBFS). Frames below this peak magnitude
-        // are not amplified — prevents boosting the noise floor between words on
-        // sparse voice tracks. Note: dynaudnorm's `s` is compress, not threshold.
-        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m)):t=0.05"
+    // Fixed moderate dynaudnorm parameters for multi-voice / panel recordings.
+    // f=325ms, g=23: responsive enough to lift quiet voices without pumping on solo voice.
+    // m=4.0: max boost of 4× (+12 dB) — sufficient for a remote guest at half the host's level.
+    // s=5.0: compress factor limits extreme gain excursions in both directions.
+    // t=0.05: silence threshold (≈ −26 dBFS) prevents boosting noise floor between words.
+    private func dynamicLevelingFilter() -> String {
+        "dynaudnorm=f=325:g=23:p=0.95:m=4.0:s=5.0:t=0.05"
     }
 
     private nonisolated func getAudioDuration(exe: String, url: URL) async throws -> Double {

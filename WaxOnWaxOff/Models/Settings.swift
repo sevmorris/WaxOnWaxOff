@@ -24,9 +24,7 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     var loudnormTarget: Double = -30.0
     var highPassHz: Int = 80
     var phaseRotationEnabled: Bool = true
-    var levelRidingEnabled: Bool = false
     var dynamicLevelingEnabled: Bool = false
-    var dynamicLevelingAmount: Double = 0.5
     var outputDirectoryPath: String? = nil
 
     private static let storageKey = "WaxOnSettings"

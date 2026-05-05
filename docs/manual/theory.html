@@ -440,7 +440,6 @@
   <a href="#noise-floor">Noise Floor Estimation</a>
   <a href="#nr-measurement">NR-for-Measurement</a>
   <a href="#phase-rotation">Phase Rotation</a>
-  <a href="#level-riding">Level Riding</a>
   <a href="#dynamic-leveling">Dynamic Leveling</a>
   <a class="section-head" href="#">Design Decisions</a>
   <a href="#waxon-design">WaxOn Design</a>
@@ -478,8 +477,6 @@
         <div class="chain-node optional">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node">Resample<br><span style="font-size:0.75rem;font-weight:400;">to target rate</span></div>
-        <div class="chain-arrow">→</div>
-        <div class="chain-node optional">Level Riding<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm downward-only</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Dynamic Leveling<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm bidirectional</span></div>
         <div class="chain-arrow">→</div>
@@ -876,68 +873,31 @@
   </section>
 
   <!-- Level Riding -->
-  <section id="level-riding">
-    <h2>Level Riding</h2>
-    <p>Level Riding is an optional WaxOn processing stage that uses FFmpeg's <code>dynaudnorm</code> filter to attenuate sections that are significantly louder than the rest of the recording. It runs after filtering and before loudness normalization.</p>
-
-    <h3>The Problem It Solves</h3>
-    <p>Standard loudness normalization (EBU R128) applies a single linear gain to the entire file. If a recording has a few unusually loud passages — a host who got louder mid-sentence, a guest with inconsistent mic technique, a sudden laugh — those peaks dominate the integrated measurement. The result is a file where the loud sections land near target and the rest of the content is quieter than intended.</p>
-    <p>Level Riding addresses this by pulling down the loud sections before normalization measures the file, giving the loudnorm stage a more consistent signal to work with.</p>
-
-    <h3>How dynaudnorm Works</h3>
-    <p><code>dynaudnorm</code> divides the audio into overlapping frames (default 500 ms each) and computes the peak amplitude within a Gaussian-smoothed window of neighboring frames (default: 31 frames = 15.5 seconds of context). It then applies gain to bring each frame's peak toward a target amplitude. The Gaussian smoothing ensures transitions are gradual — no abrupt gain jumps between frames.</p>
-    <p>The key parameters WaxOn uses:</p>
-    <ul>
-      <li><code>p=0.95</code> — target peak amplitude (≈ −0.4 dBFS). Frames whose smoothed peak exceeds this value are attenuated toward it.</li>
-      <li><code>m=1.0</code> — maximum gain factor. A value of 1.0 means the filter can <em>only attenuate</em> — it will never boost a frame. Gain is capped at unity.</li>
-      <li><code>g=31</code> — Gaussian window size in frames (15.5 seconds). Controls how broadly the filter looks at surrounding context when computing gain. Larger values = smoother, slower response.</li>
-    </ul>
-
-    <h3>Why m=1.0 Is the Right Choice</h3>
-    <p>Without the <code>m=1.0</code> constraint, <code>dynaudnorm</code> is a full leveler: quiet frames get boosted toward the target just as much as loud frames get attenuated. This is the standard AGC behavior — useful for broadcast ingest but problematic for pre-edit podcast prep. Boosting quiet sections amplifies the noise floor, creates pumping on breath pauses, and destroys the dynamic character the editor needs to work with.</p>
-    <p>With <code>m=1.0</code>, the behavior changes entirely. To boost a frame from, say, −50 dBFS to the target would require a gain factor much greater than 1.0 — which is blocked. So the noise floor, room tone, and quiet passages are left completely untouched. Only frames whose peak is already above the target receive gain — and that gain is less than 1.0 (attenuation). The effective behavior is a downward-only, slow-attack, slow-release broadband compressor.</p>
-
-    <h3>Placement in the Pipeline</h3>
-    <p>Level Riding runs after filtering and before loudness normalization. This placement is deliberate: the loudnorm analysis pass sees a more consistent signal, so the linear gain it applies is more accurate. A recording with a few loud outlier sections would otherwise cause loudnorm to underestimate the average loudness and leave the output quieter than intended at the target LUFS.</p>
-
-    <h3>When to Use It</h3>
-    <p>Level Riding is off by default. It's appropriate for recordings with genuinely inconsistent levels — an interviewee who speaks at widely varying volumes, a host who leaned into the mic during an emphatic point, or a multi-speaker recording where one participant is noticeably louder than another. For well-recorded content with consistent mic technique, the effect will be minimal and the default pipeline is sufficient.</p>
-
-    <h3>Tail Artifact Mitigation</h3>
-    <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces a boundary artifact at the end of a file: because the look-ahead window extends past the last audio frame into silence (or into the absence of data), the local RMS estimate drops sharply near the end of the file. With Level Riding's large <code>g=31</code> window (15.5 seconds of context at the default 500 ms frame size), this can cause the filter to over-attenuate or miscompute gain for the last several seconds of speech — manifesting as a slow fade on the tail of the recording.</p>
-    <p>WaxOn mitigates this by prepending 16 seconds of silence to the input before each <code>dynaudnorm</code> pass and using FFmpeg's <code>-t</code> output flag to trim the result back to the original duration. The padding ensures the Gaussian window always has silence ahead of it, even at the true end of the speech content, so the gain curve computed for the real audio is not distorted by the file boundary. The silence padding is processed and then discarded; the output file has the same duration as the input.</p>
-  </section>
-
   <!-- Dynamic Leveling -->
   <section id="dynamic-leveling">
     <h2>Dynamic Leveling</h2>
-    <p>Dynamic Leveling is an optional WaxOn processing stage that uses FFmpeg's <code>dynaudnorm</code> filter in bidirectional mode to even out level differences across a recording. Unlike Level Riding, it can both attenuate loud sections and boost quiet ones. It runs after Level Riding (if enabled) and before loudness normalization.</p>
+    <p>Dynamic Leveling is an optional WaxOn processing stage that uses FFmpeg's <code>dynaudnorm</code> filter in bidirectional mode to even out level differences across a recording. It can both attenuate loud sections and boost quiet ones. It runs after filtering and before loudness normalization.</p>
 
     <h3>The Problem It Solves</h3>
-    <p>Level Riding handles recordings where loud outliers need taming. Dynamic Leveling handles recordings where the level variation is fundamental to the source — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. In these cases, downward-only gain riding doesn't help: you need to lift the quiet material, not just suppress the loud material.</p>
+    <p>Dynamic Leveling handles recordings where level variation is structural — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. You need to lift the quiet material and tame the loud material simultaneously.</p>
+    <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — it lifts quiet sections toward the target peak and attenuates loud ones. This is the right behavior for uneven source material, but it produces audible pumping on solo voice recordings with natural pauses: as the filter adjusts gain across the silence between sentences, the noise floor breathes in and out. The silence threshold (<code>t=0.05</code>) reduces the worst of this by preventing gain increases in near-silent frames, but it does not eliminate the ramp transitions around threshold-crossing content. Dynamic Leveling is a specialty tool for multi-voice sources, not a general-purpose enhancement for solo recordings.</p>
 
-    <h3>How It Differs from Level Riding</h3>
-    <p>Both features use <code>dynaudnorm</code>. The critical differences are the <code>m</code> parameter (maximum gain factor) and the silence-threshold <code>t</code>:</p>
+    <h3>Fixed Parameters</h3>
+    <p>WaxOn uses a single fixed moderate parameter set for Dynamic Leveling:</p>
     <ul>
-      <li>Level Riding: <code>m=1.0</code> — gain capped at unity, attenuation only.</li>
-      <li>Dynamic Leveling: <code>m</code> ranges from 2.0 to 6.0 (can boost frames up to 2×–6× above their original level, ≈ +6 to +15.6 dB) plus <code>t=0.05</code>, a peak-magnitude silence threshold (≈ −26 dBFS) that prevents the leveler from amplifying the noise floor between words on sparse voice material.</li>
+      <li><code>f=325</code> — 325 ms analysis frames. Responsive enough to catch voice-level swings without pumping on transients.</li>
+      <li><code>g=23</code> — Gaussian window of 23 frames (≈ 7.5 seconds of context). Produces smooth gain transitions.</li>
+      <li><code>p=0.95</code> — target peak amplitude per frame (≈ −0.4 dBFS).</li>
+      <li><code>m=4.0</code> — maximum gain factor. Frames can be boosted up to 4× (+12 dB) or attenuated as needed. Sufficient to lift a remote guest at half the host's level without risking runaway boost on very quiet frames.</li>
+      <li><code>s=5.0</code> — compress factor. Applies a soft compression curve to the gain function itself, limiting extreme gain excursions in both directions and guarding against sections dipping too low during transitions.</li>
+      <li><code>t=0.05</code> — peak-magnitude silence threshold (≈ −26 dBFS). Near-silent frames are passed at unity gain — the noise floor between words is never boosted.</li>
     </ul>
-    <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — given <code>m &gt; 1.0</code> it lifts quiet sections toward the target peak, not just leaves them alone. This is the right behavior for uneven source material, but it produces audible pumping on solo voice recordings with natural pauses: as the filter adjusts gain across the silence between sentences, the noise floor breathes in and out in a way that's clearly unnatural. The silence threshold (<code>t=0.05</code>) reduces the worst of this by preventing gain increases in near-silent frames, but it does not eliminate the ramp transitions around threshold-crossing content. Dynamic Leveling is a specialty tool for multi-voice sources, not a general-purpose enhancement for solo recordings.</p>
-
-    <h3>The Aggressiveness Slider</h3>
-    <p>The Aggressiveness slider is a 0–1 control that maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
-    <ul>
-      <li><strong>Frame size (<code>f</code>)</strong>: 500 ms at Gentle, 150 ms at Aggressive. Shorter frames mean the filter can respond to level changes more quickly.</li>
-      <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 15 frames at Aggressive (forced odd). Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
-      <li><strong>Max gain (<code>m</code>)</strong>: 2× at Gentle, 6× at Aggressive (≈ +6 dB to +15.6 dB). Controls how much the filter will boost a quiet frame to reach the target peak.</li>
-    </ul>
-    <p>Gentle is the right starting point for most material. Aggressive is appropriate when level differences are extreme and the source already has significant background noise that boosting won't make materially worse.</p>
 
     <h3>Placement in the Pipeline</h3>
-    <p>Dynamic Leveling runs after Level Riding (if both are enabled) and before loudness normalization. Running it before loudnorm means the loudness analysis sees a more consistent signal — the same rationale that applies to Level Riding. In practice, enabling both Level Riding and Dynamic Leveling on the same file is unusual: Level Riding is for single-voice recordings with level outliers, Dynamic Leveling is for multi-voice recordings with structural level imbalance. They serve different source types.</p>
+    <p>Dynamic Leveling runs before loudness normalization. This means the loudnorm analysis pass sees a more consistent signal — bringing the overall level balance closer to even before measurement means the integrated loudness reading reflects typical content level rather than being skewed by a structural imbalance between speakers.</p>
 
     <h3>Tail Artifact Mitigation</h3>
-    <p>Dynamic Leveling is subject to the same Gaussian window boundary artifact as Level Riding, and WaxOn applies the same fix: 16 seconds of silence padding before each pass, trimmed back to the original duration on output. See <a href="#level-riding">Level Riding → Tail Artifact Mitigation</a> for the full explanation. The only difference is that with bidirectional gain (m &gt; 1.0), an uncorrected boundary can produce either over-attenuation or over-amplification at the tail, depending on the signal level near the end of the file.</p>
+    <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces a boundary artifact at the end of a file: the look-ahead window extends past the last audio frame into silence, causing the gain curve to distort near the file boundary — potentially producing over-attenuation or over-amplification at the tail. WaxOn mitigates this by prepending 16 seconds of silence to the input before running <code>dynaudnorm</code> and using FFmpeg's <code>-t</code> flag to trim the output back to the original duration. The artifact lands in the padding and is discarded.</p>
   </section>
 
   <!-- WaxOn Design -->
@@ -950,8 +910,7 @@
       <li><strong>High-pass filter first</strong>: Subsonic content below 80 Hz is removed before any gain stage processes it. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't musically useful.</li>
       <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. The loudnorm analysis then also measures the real output signal.</li>
       <li><strong>Phase rotation before normalization</strong>: Reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
-      <li><strong>Level riding before dynamic leveling and normalization</strong>: Downward-only gain riding runs after filtering. Taming loud outlier sections before subsequent stages means the dynamic leveler and loudnorm analysis see a more consistent signal.</li>
-      <li><strong>Dynamic leveling before normalization</strong>: Bidirectional leveling runs after level riding. Bringing the overall level balance closer to even before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the material rather than being skewed by large quiet sections or loud outliers.</li>
+      <li><strong>Dynamic leveling before normalization</strong>: Bidirectional leveling runs after filtering. Bringing the overall level balance closer to even before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the material rather than being skewed by large quiet sections or loud outliers.</li>
       <li><strong>Limiter last</strong>: After any loudness normalization, with oversampling to catch true peaks.</li>
     </ol>
 

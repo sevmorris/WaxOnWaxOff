@@ -79,25 +79,6 @@ struct SettingsView: View {
 
                 Divider().padding(.vertical, 6)
 
-                row("Level Riding") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Toggle("", isOn: $viewModel.settings.levelRidingEnabled)
-                                .toggleStyle(.switch)
-                                .labelsHidden()
-                            Text("Tame loud peaks")
-                        }
-                        Text("Attenuates loud sections only — never boosts quiet ones")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .disabled(viewModel.settings.dynamicLevelingEnabled)
-                .opacity(viewModel.settings.dynamicLevelingEnabled ? 0.4 : 1)
-                .help(viewModel.settings.dynamicLevelingEnabled ? "Unavailable when Dynamic Leveling is on — it already handles gain control in both directions" : "")
-
-                Divider().padding(.vertical, 6)
-
                 VStack(alignment: .leading, spacing: 4) {
                     Text("PANEL / MULTI-VOICE")
                         .font(.system(size: 9, weight: .semibold))
@@ -113,15 +94,9 @@ struct SettingsView: View {
                 row("Dynamic Leveling") {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
-                            Toggle("", isOn: Binding(
-                                get: { viewModel.settings.dynamicLevelingEnabled },
-                                set: { newValue in
-                                    viewModel.settings.dynamicLevelingEnabled = newValue
-                                    if newValue { viewModel.settings.levelRidingEnabled = false }
-                                }
-                            ))
-                            .toggleStyle(.switch)
-                            .labelsHidden()
+                            Toggle("", isOn: $viewModel.settings.dynamicLevelingEnabled)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
                             Text("dynaudnorm")
                         }
                         Text("Lifts quiet voices, tames loud ones — panel shows, live Q&As. Can cause pumping on solo voice with natural pauses.")
@@ -129,18 +104,6 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
-                row("Aggressiveness", caption: "Max gain: Gentle +6 dB · Aggressive +15 dB. Audition output before editing.") {
-                    HStack(spacing: 6) {
-                        Slider(value: $viewModel.settings.dynamicLevelingAmount, in: 0 ... 1)
-                        Text(aggressivenessLabel(viewModel.settings.dynamicLevelingAmount))
-                            .font(.system(size: 11).monospaced())
-                            .frame(width: 68, alignment: .trailing)
-                    }
-                }
-                .disabled(!viewModel.settings.dynamicLevelingEnabled)
-                .opacity(!viewModel.settings.dynamicLevelingEnabled ? 0.4 : 1)
-                .help(!viewModel.settings.dynamicLevelingEnabled ? "Enable Dynamic Leveling to adjust" : "")
 
                 Divider().padding(.vertical, 6)
 
@@ -206,16 +169,6 @@ struct SettingsView: View {
             .padding(12)
         }
         .background(.thinMaterial)
-    }
-
-    private func aggressivenessLabel(_ amount: Double) -> String {
-        switch amount {
-        case ..<0.25: return "Gentle"
-        case ..<0.5:  return "Low"
-        case ..<0.75: return "Medium"
-        case ..<0.9:  return "High"
-        default:      return "Aggressive"
-        }
     }
 
     @ViewBuilder
