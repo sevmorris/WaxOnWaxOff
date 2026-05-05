@@ -105,6 +105,18 @@ struct SettingsView: View {
                     }
                 }
 
+                row("Aggressiveness", caption: "Max gain: Gentle +6 dB · Aggressive +15 dB. Audition output before editing.") {
+                    HStack(spacing: 6) {
+                        Slider(value: $viewModel.settings.dynamicLevelingAmount, in: 0 ... 1)
+                        Text(aggressivenessLabel(viewModel.settings.dynamicLevelingAmount))
+                            .font(.system(size: 11).monospaced())
+                            .frame(width: 68, alignment: .trailing)
+                    }
+                }
+                .disabled(!viewModel.settings.dynamicLevelingEnabled)
+                .opacity(!viewModel.settings.dynamicLevelingEnabled ? 0.4 : 1)
+                .help(!viewModel.settings.dynamicLevelingEnabled ? "Enable Dynamic Leveling to adjust" : "")
+
                 Divider().padding(.vertical, 6)
 
                 row("Loudness Norm", caption: "Two-pass EBU R128 normalization to a target loudness") {
@@ -169,6 +181,16 @@ struct SettingsView: View {
             .padding(12)
         }
         .background(.thinMaterial)
+    }
+
+    private func aggressivenessLabel(_ amount: Double) -> String {
+        switch amount {
+        case ..<0.25: return "Gentle"
+        case ..<0.5:  return "Low"
+        case ..<0.75: return "Medium"
+        case ..<0.9:  return "High"
+        default:      return "Aggressive"
+        }
     }
 
     @ViewBuilder

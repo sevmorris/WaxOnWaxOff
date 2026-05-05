@@ -639,7 +639,12 @@
         <tr>
           <td>Dynamic Leveling</td>
           <td>On · Off · default Off</td>
-          <td>Bidirectional dynamic normalization using a fixed moderate setting. Best for panel recordings, live Q&amp;As, and multi-guest sources where voices are at inconsistent levels. Not recommended for regular solo voice use — can cause pumping artifacts on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Theory of Operation</a>.</td>
+          <td>Bidirectional dynamic normalization. Best for panel recordings, live Q&amp;As, and multi-guest sources where voices are at inconsistent levels. Not recommended for regular solo voice use — can cause pumping artifacts on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Theory of Operation</a>.</td>
+        </tr>
+        <tr>
+          <td>Aggressiveness</td>
+          <td>Gentle → Aggressive · default Medium</td>
+          <td>Controls how quickly and strongly Dynamic Leveling responds. Lower settings use longer analysis frames and a smaller maximum gain (≈ +6 dB) for smoother, more conservative leveling; higher settings use shorter frames and a larger maximum gain (≈ +15 dB) for faster, more aggressive response. Audition output before editing. Grayed out when Dynamic Leveling is off.</td>
         </tr>
         <tr>
           <td>Loudness Norm</td>
@@ -674,7 +679,7 @@
       <li>
         <div>
           <strong>Dynamic Leveling <span class="tag">Optional</span></strong>
-          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code> at a fixed moderate setting (f=325 ms, g=23, m=4×, s=5.0 compress guard). Lifts quiet voices and tames loud ones. A silence threshold of <code>t=0.05</code> (≈ −26 dBFS) prevents boosting near-silence on sparse voice tracks. Best for panel recordings, live Q&amp;As, and multi-voice sources with inconsistent levels. Not recommended for solo voice — can cause pumping on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
+          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet voices and tames loud ones. The Aggressiveness slider maps to three <code>dynaudnorm</code> parameters simultaneously: frame size (<code>f</code> 500→150 ms), Gaussian smoothing window (<code>g</code> 31→15 frames), and maximum gain factor (<code>m</code> 2.0→6.0, ≈ +6 to +15 dB). A silence threshold of <code>t=0.05</code> (≈ −26 dBFS) prevents boosting near-silence on sparse voice tracks. Best for panel recordings, live Q&amp;As, and multi-voice sources with inconsistent levels. Not recommended for solo voice — can cause pumping on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
         </div>
       </li>
       <li>

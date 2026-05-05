@@ -882,16 +882,19 @@
     <p>Dynamic Leveling handles recordings where level variation is structural — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. You need to lift the quiet material and tame the loud material simultaneously.</p>
     <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — it lifts quiet sections toward the target peak and attenuates loud ones. This is the right behavior for uneven source material, but it produces audible pumping on solo voice recordings with natural pauses: as the filter adjusts gain across the silence between sentences, the noise floor breathes in and out. The silence threshold (<code>t=0.05</code>) reduces the worst of this by preventing gain increases in near-silent frames, but it does not eliminate the ramp transitions around threshold-crossing content. Dynamic Leveling is a specialty tool for multi-voice sources, not a general-purpose enhancement for solo recordings.</p>
 
-    <h3>Fixed Parameters</h3>
-    <p>WaxOn uses a single fixed moderate parameter set for Dynamic Leveling:</p>
+    <h3>The Aggressiveness Slider</h3>
+    <p>The Aggressiveness slider is a 0–1 control that maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
     <ul>
-      <li><code>f=325</code> — 325 ms analysis frames. Responsive enough to catch voice-level swings without pumping on transients.</li>
-      <li><code>g=23</code> — Gaussian window of 23 frames (≈ 7.5 seconds of context). Produces smooth gain transitions.</li>
+      <li><strong>Frame size (<code>f</code>)</strong>: 500 ms at Gentle, 150 ms at Aggressive. Shorter frames mean the filter can respond to level changes more quickly.</li>
+      <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 15 frames at Aggressive (forced odd). Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
+      <li><strong>Max gain (<code>m</code>)</strong>: 2× at Gentle, 6× at Aggressive (≈ +6 dB to +15.6 dB). Controls how much the filter will boost a quiet frame to reach the target peak.</li>
+    </ul>
+    <p>Two parameters are fixed across the slider range:</p>
+    <ul>
       <li><code>p=0.95</code> — target peak amplitude per frame (≈ −0.4 dBFS).</li>
-      <li><code>m=4.0</code> — maximum gain factor. Frames can be boosted up to 4× (+12 dB) or attenuated as needed. Sufficient to lift a remote guest at half the host's level without risking runaway boost on very quiet frames.</li>
-      <li><code>s=5.0</code> — compress factor. Applies a soft compression curve to the gain function itself, limiting extreme gain excursions in both directions and guarding against sections dipping too low during transitions.</li>
       <li><code>t=0.05</code> — peak-magnitude silence threshold (≈ −26 dBFS). Near-silent frames are passed at unity gain — the noise floor between words is never boosted.</li>
     </ul>
+    <p>Gentle is the right starting point for most material. Aggressive is appropriate when level differences are extreme and the source already has significant background noise that boosting won't make materially worse.</p>
 
     <h3>Placement in the Pipeline</h3>
     <p>Dynamic Leveling runs before loudness normalization. This means the loudnorm analysis pass sees a more consistent signal — bringing the overall level balance closer to even before measurement means the integrated loudness reading reflects typical content level rather than being skewed by a structural imbalance between speakers.</p>
