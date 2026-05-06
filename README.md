@@ -47,7 +47,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 
 **Output Logic:** `{name}-{rate}waxon{ceiling}.wav` (24-bit; ceiling is e.g. `-1dB`)
 
-## II. WaxOff — Distribution Mastering
+## II. WaxOff — Broadcast Delivery
 *Use on finished mixes to ensure broadcast compliance.*
 
 * **EBU R128 Normalization:** Two-pass analysis + linear gain; no dynamic compression.
@@ -76,3 +76,4 @@ If WaxOn/WaxOff saves you time, [buy me a coffee](https://ko-fi.com/sevmo). Free
 ### License
 Copyright © 2026 Seven Morris.
 Distributed under the [GNU General Public License v3.0](LICENSE).
+(LICENSE).
