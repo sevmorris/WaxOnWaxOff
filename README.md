@@ -6,7 +6,7 @@
   <br />
   <strong>Version:</strong> 1.13.0
   <br />
-  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.13.0.dmg"><strong>Download</strong></a>
+  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v1.13.0.dmg"><strong>Download Latest (DMG)</strong></a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/">App Page</a>
   ·
