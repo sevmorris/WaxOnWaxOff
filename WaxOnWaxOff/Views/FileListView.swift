@@ -54,7 +54,7 @@ struct FileRowView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .font(.caption)
-                        .help("High noise floor — loudness normalization may be less accurate. Consider enabling Noise Reduction.")
+                        .help("High noise floor — loudness normalization may be less accurate. Enable Loudness Norm so the automatic NR analysis runs.")
                 }
 
                 if file.isProcessed {

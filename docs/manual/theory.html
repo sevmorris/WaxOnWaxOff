@@ -716,7 +716,7 @@
 [Lnr][Rnr]join=inputs=2:channel_layout=stereo</code></pre>
     </details>
     <p>Each channel receives its own fully independent denoiser instance with its own recurrent state, initialized cleanly. The model processes each as a standard mono stream — the format it was trained on — and the results are predictable and balanced. The remaining filter chain (high-pass, phase rotation, resample) runs on the rejoined stereo signal.</p>
-    <p>For <strong>mono output</strong>, the issue does not arise. <code>arnndn</code> runs on the full stereo source first — since FFmpeg routes each channel through its own independent denoiser instance, the target channel is denoised cleanly. The <code>pan</code> filter then immediately extracts the selected channel. Because only one channel's result is kept, the per-channel state divergence that causes problems with stereo output is irrelevant. The simple <code>-af</code> chain is used in this case.</p>
+    <p>For <strong>mono output</strong>, the issue does not arise. The pipeline's first FFmpeg stage already extracts the selected channel via <code>pan</code> (alongside the high-pass and phase-rotation filters), so the audio reaching the loudnorm analysis pass is already a single channel. The simple <code>-af "arnndn=m=…"</code> chain runs over that mono signal — one denoiser instance, one stream — with no per-channel state divergence to worry about.</p>
     <p>The same per-channel split is applied in the <a href="#nr-measurement">NR-for-measurement</a> analysis paths.</p>
 
     <details class="callout callout-impl">

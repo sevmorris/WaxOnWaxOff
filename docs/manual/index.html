@@ -673,7 +673,7 @@
       <li>
         <div>
           <strong>Filter, Channel &amp; Resample</strong>
-          <span>Silent 20 Hz DC block (always applied), high-pass filter at the configured cutoff (if not set to Off), an optional 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom — on by default), channel selection if Mono output is selected, and resampling to the target rate. Output at this stage: 24-bit PCM WAV at the target sample rate.</span>
+          <span>A single high-pass filter at <code>max(cutoff, 20 Hz)</code> — so even with HPF set to Off, a 20 Hz floor remains and DC offset is always removed. Followed by channel selection if Mono output is selected, an optional 200 Hz allpass for phase rotation (reduces peak asymmetry and improves limiter headroom — on by default), and resampling to the target rate. Output at this stage: 24-bit PCM WAV at the target sample rate.</span>
         </div>
       </li>
       <li>
@@ -858,8 +858,9 @@
     <h2>WaxOff Output Files <span class="mode-badge mode-waxoff">WaxOff</span></h2>
 
     <h3>Naming</h3>
-    <pre><code>{original-name}-lev-{target}LUFS.wav
-{original-name}-lev-{target}LUFS.mp3</code></pre>
+    <pre><code>{original-name}-lev{target}LUFS.wav
+{original-name}-lev{target}LUFS.mp3</code></pre>
+    <p>The <code>{target}</code> placeholder includes its sign — e.g. <code>-18</code> — so a target of −18 LUFS produces <code>…-lev-18LUFS.wav</code>.</p>
     <p>Examples: <code>episode-42-final-lev-18LUFS.wav</code> &nbsp; <code>episode-42-final-lev-18LUFS.mp3</code></p>
 
     <h3>Channels</h3>
@@ -912,7 +913,7 @@
 
     <div class="callout">
       <strong>Noise Floor Warning</strong>
-      Files with a high estimated noise floor show a ⚠️ badge next to the filename in the file list. A high noise floor can inflate integrated loudness measurements, causing loudness normalization to underestimate the gain needed for the speech content. When Loudness Norm is enabled, WaxOn automatically uses noise reduction for the measurement pass to mitigate this. If the badge appears and NR is off, consider enabling Noise Reduction for the best results.
+      Files with a high estimated noise floor show a ⚠️ badge next to the filename in the file list. A high noise floor can inflate integrated loudness measurements, causing loudness normalization to underestimate the gain needed for the speech content. When Loudness Norm is enabled, WaxOn automatically applies RNNoise to the measurement pass (only — the output signal is never touched) to mitigate this. If the badge appears, the most reliable mitigation is to enable Loudness Norm so the auto-NR analysis runs.
     </div>
   </section>
 
@@ -941,7 +942,7 @@
     <p>Select a file and read the stats strip before hitting Process. The <strong>LUFS</strong> value tells you how loud the file is. In WaxOn, if LUFS is much lower than your target, normalization will apply significant gain, which is fine for ingest but worth knowing. In WaxOff, comparing input LUFS to your target tells you how much gain WaxOff will apply.</p>
 
     <h3>Reading the Noise Floor</h3>
-    <p>The <strong>FLOOR</strong> stat estimates the background noise level. Below −60 dBFS is typically a clean recording. Between −60 and −50 dBFS the noise may be audible but is unlikely to affect processing. Above −50 dBFS (orange) the noise floor is high enough to skew loudness measurements, and above −40 dBFS (red) it will almost certainly affect results. At those levels, enabling Noise Reduction is recommended.</p>
+    <p>The <strong>FLOOR</strong> stat estimates the background noise level. Below −60 dBFS is typically a clean recording. Between −60 and −50 dBFS the noise may be audible but is unlikely to affect processing. Above −50 dBFS (orange) the noise floor is high enough to skew loudness measurements, and above −40 dBFS (red) it will almost certainly affect results. At those levels, make sure Loudness Norm is enabled — WaxOn auto-applies RNNoise to the measurement pass — and consider running a dedicated noise-reduction tool (e.g. iZotope RX) on the source before WaxOn for the best result.</p>
 
     <h3>WaxOn: Loudnorm On or Off?</h3>
     <p>For consistent batch ingest where files were recorded at different gain levels, turn Loudness Norm on. It ensures every file lands at the same integrated loudness before the limiter. For a single file or when you want to preserve the original level relationship between takes, leave it off and let the limiter handle ceiling compliance only.</p>

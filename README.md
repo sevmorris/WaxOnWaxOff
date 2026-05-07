@@ -39,7 +39,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 *Use on raw recordings prior to non-destructive editing.*
 
 * **High-Pass Filter:** Configurable cutoff (Off–90 Hz) for HVAC/handling noise removal. DC offset always removed.
-* **Dynamic Leveling:** Optional bidirectional `dynaudnorm` (fixed moderate setting) for panel/multi-voice sources with inconsistent levels.
+* **Dynamic Leveling:** Optional bidirectional `dynaudnorm` with adjustable aggressiveness (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
 * **Loudness Normalization:** Two-pass EBU R128 linear gain (dynamics fully preserved).
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
@@ -76,4 +76,3 @@ If WaxOn/WaxOff saves you time, [buy me a coffee](https://ko-fi.com/sevmo). Free
 ### License
 Copyright © 2026 Seven Morris.
 Distributed under the [GNU General Public License v3.0](LICENSE).
-(LICENSE).
