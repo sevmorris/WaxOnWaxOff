@@ -488,7 +488,7 @@
 
 
     <h3>First Launch: Mode Picker</h3>
-    <p>On first launch (and any time you click the active mode button in the toolbar), a compact mode picker appears. Choose <strong>WaxOn</strong> to prepare raw recordings, or <strong>WaxOff</strong> to finalize a mix. Each mode maintains its own independent file list; switching modes doesn't disturb your work in the other mode.</p>
+    <p>On first launch, a compact mode picker appears. Choose <strong>WaxOn</strong> to prepare raw recordings, or <strong>WaxOff</strong> to finalize a mix. After your first selection, the app remembers your last-used mode and opens directly into it. Switch modes any time using the <strong>WaxOn | WaxOff</strong> segmented control in the toolbar; each mode maintains its own independent file list, so switching doesn't disturb your work in the other mode.</p>
 
     <h3>Updates</h3>
     <p>WaxOn/WaxOff checks for updates silently on launch and notifies you when a new version is available. You can also check manually at any time: <strong>Help → Check for Updates…</strong></p>
@@ -500,18 +500,19 @@
     <p>Both modes share the same window layout, divided into four areas.</p>
 
     <h3>Toolbar</h3>
-    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by a Preset picker, and then the action buttons. Clicking the active mode button returns to the mode picker.</p>
+    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by a Preset picker, and then the action buttons (Process, Remove, Clear). The far right end of the toolbar holds the settings-sidebar toggle.</p>
 
     <h3>File List</h3>
     <p>The left panel shows all loaded files. Each row displays the filename and a status label. Drag rows to reorder; drag the vertical divider to resize the panel.</p>
     <ul>
       <li><strong>Waiting</strong> — file queued, analysis pending</li>
       <li><strong>Calculating stats</strong> — audio stats are being computed</li>
+      <li><strong>RMS … dBFS · Peak … dBFS</strong> — analysis complete; the file is ready to process</li>
       <li><strong>Processing</strong> — pipeline is running; a progress bar appears under the row</li>
-      <li><strong>Output: …</strong> — processed; click the folder icon to reveal in Finder</li>
+      <li><strong>Output: …</strong> — processed; a green ✓ Complete indicator appears next to the filename and a folder icon reveals the output in Finder</li>
       <li><strong>Error</strong> — something went wrong; the message is shown inline</li>
     </ul>
-    <p>Files with a high estimated noise floor show a ⚠️ warning badge next to the filename. Hover over the badge for detail.</p>
+    <p>Files with a high estimated noise floor show an orange warning triangle next to the filename. Hover over the badge for detail. In WaxOff, mono sources also show a small <strong>MONO→STEREO</strong> badge as a reminder that the output will be upmixed to dual-mono.</p>
 
     <p>WaxOn processes multiple files concurrently, scaling with available CPU cores. Files waiting their turn show a muted static progress bar so it's clear they are queued and not stalled.</p>
     <p>Select files and press <kbd>Delete</kbd> to remove them, or use <kbd>⌘⌥Delete</kbd> to clear the entire list.</p>
@@ -525,7 +526,7 @@
     <p>A toggle button in the top-right corner switches between the waveform view and the <strong>Console</strong>, a scrollable log showing what WaxOn is doing during processing. A Verbose checkbox reveals additional detail such as filter parameters and per-file loudnorm measurements.</p>
 
     <h3>Settings Sidebar</h3>
-    <p>A collapsible panel on the right edge of the window contains all processing settings for the current mode. Toggle it open or closed with the <strong>⊟</strong> button at the far right of the toolbar. Settings persist between sessions.</p>
+    <p>A collapsible panel on the right edge of the window contains all processing settings for the current mode. Toggle it open or closed with the sliders icon at the far right of the toolbar. Settings persist between sessions.</p>
   </section>
 
   <!-- WaxOn Mode -->
