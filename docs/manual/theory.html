@@ -490,12 +490,14 @@
     <h3>WaxOff</h3>
     <div class="chain">
       <div class="chain-row">
+        <div class="chain-node">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass</span></div>
+        <div class="chain-arrow">→</div>
         <div class="chain-node">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Encode MP3</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--muted);">All dashed nodes are optional. Output: 24-bit WAV and/or MP3.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Phase rotation runs in both the analysis and render passes so the loudnorm TP measurement matches the output waveform. Dashed nodes are optional. Output: 24-bit WAV and/or MP3.</p>
 
   </section>
 
@@ -790,7 +792,7 @@
     <p>An allpass filter passes all frequencies at equal amplitude but shifts the phase of different frequencies by different amounts. It doesn't alter the frequency response; it only changes <em>when</em> different frequency components arrive relative to each other.</p>
     <details class="callout callout-impl">
       <summary><span class="callout-cat">Under the Hood</span> Filter implementation</summary>
-      <p>WaxOn uses FFmpeg's <code>allpass</code> filter at <code>f=200, t=q, w=0.707</code> — a second-order (biquad) allpass with a Butterworth-Q response. The magnitude |H(z)| = 1 at all frequencies (unity gain). The phase response varies continuously from 0° at DC to −360° at Nyquist, passing through −180° at the design frequency. Frequencies below the design frequency are shifted slightly; frequencies above it are shifted more. The relative timing of low-frequency and mid-frequency components in the waveform changes, but their amplitudes do not.</p>
+      <p>Both modes use FFmpeg's <code>allpass</code> filter at <code>f=200, t=q, w=0.707</code> — a second-order (biquad) allpass with a Butterworth-Q response. The magnitude |H(z)| = 1 at all frequencies (unity gain). The phase response varies continuously from 0° at DC to −360° at Nyquist, passing through −180° at the design frequency. Frequencies below the design frequency are shifted slightly; frequencies above it are shifted more. The relative timing of low-frequency and mid-frequency components in the waveform changes, but their amplitudes do not.</p>
     </details>
     <p>Much of the peak asymmetry in voice audio comes from low-frequency content: proximity effect from cardioid microphones, low-frequency resonances in recording spaces, and bass-heavy content in finished mixes. This energy tends to create asymmetric waveforms where one polarity consistently peaks higher than the other.</p>
 
@@ -817,6 +819,10 @@
       <li>Apply a noise gate or downward expander before phase rotation so that bleed below a threshold is suppressed and the allpass operates predominantly on the dominant signal.</li>
       <li>At the recording stage, address the root cause: tighter mic placement, hypercardioid patterns, acoustic baffles between speakers, or — when feasible — recording each speaker in a separate room.</li>
     </ul>
+
+    <h3>Phase Rotation at the Delivery Stage</h3>
+    <p>WaxOff applies the same allpass filter at the same frequency, but the context is different. By the time audio reaches WaxOff it is a finished, summed mix — every track has been combined, leveled, and committed to a single stereo file — so the per-track bleed concerns above no longer apply. The filter operates on the summed program, exactly the recommended approach when multi-mic bleed is a concern at the WaxOn stage.</p>
+    <p>The case for phase rotation is actually stronger at the delivery stage than at ingest. Music beds, stingers, archival clips, and broadcast inserts in a podcast mix tend to be more asymmetric than solo voice — bass-heavy program material, sustained low notes, and pre-mastered loud sources all introduce waveform asymmetry that the WaxOff limiter would otherwise have to absorb. Reducing crest factor before loudnorm's TP measurement means the pass-1 measurement reflects the actual peak budget of the rendered output, so the pass-2 linear gain correction is accurate. Without it, loudnorm measures the peaks of the un-rotated signal and constrains the gain to that (lower) peak budget, producing an output that fails to hit the target LUFS by the headroom phase rotation would have recovered. WaxOff applies phase rotation unconditionally for this reason — there is no toggle, since at the delivery stage there is no scenario in which skipping it produces a better result.</p>
 
     <h3>Stereo Recordings and Channel Coherence</h3>
     <p>WaxOn applies phase rotation as a single allpass filter across the full signal — both channels receive exactly the same coefficients simultaneously, so the inter-channel phase relationship that defines the stereo image is preserved. Unlike the RNNoise stage (which requires an explicit per-channel split because the model was trained on mono), the allpass filter operates correctly on stereo input by design and needs no special handling.</p>

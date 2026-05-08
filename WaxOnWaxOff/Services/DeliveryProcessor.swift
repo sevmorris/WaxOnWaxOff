@@ -58,6 +58,7 @@ actor DeliveryProcessor {
 
         onLog?("▶ \(url.lastPathComponent)", .info)
         onLog?("  target: \(lufs) LUFS  |  TP \(tp) dBTP  |  LRA \(lra) LU", .verbose)
+        onLog?("  phase rotation: 200 Hz allpass (always applied)", .verbose)
         // Phase 1: Analyze loudness
         onPhase?("Analyzing loudness…")
         try Task.checkCancellation()  // CRITICAL-2
@@ -151,7 +152,10 @@ actor DeliveryProcessor {
         let lufs = lufsString(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
         let lra  = String(format: "%.0f", settings.lra)
-        let filterChain = "loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
+        // Phase rotation runs first so loudnorm's TP measurement reflects the
+        // post-rotation waveform — otherwise the pass-2 gain correction is based
+        // on a peak budget that no longer matches the rendered output.
+        let filterChain = "allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
 
         let args = [
             "-hide_banner", "-nostats", "-y",
@@ -179,7 +183,7 @@ actor DeliveryProcessor {
         let lufs = lufsString(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
         let lra  = String(format: "%.0f", settings.lra)
-        var filterChain = "loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra)"
+        var filterChain = "allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra)"
         filterChain += ":measured_I=\(measurements.inputI)"
         filterChain += ":measured_TP=\(measurements.inputTP)"
         filterChain += ":measured_LRA=\(measurements.inputLRA)"

@@ -710,8 +710,8 @@
   <!-- WaxOff Mode -->
   <section id="waxoff-overview">
     <h2>WaxOff Mode <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <p>WaxOff finalizes your edited podcast mix for distribution. It applies EBU R128 loudness normalization and delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
-    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment to hit the target loudness — no dynamic processing, no changes to stereo image or transients. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
+    <p>WaxOff finalizes your edited podcast mix for distribution. It applies phase rotation (200 Hz allpass) for headroom recovery, then EBU R128 loudness normalization, and delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
+    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment to hit the target loudness — no dynamic processing, no changes to stereo image. Phase rotation is applied unconditionally as a transparent crest-factor reduction; see the <a href="theory.html#phase-rotation">Theory of Operation</a> for detail. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -827,13 +827,13 @@
       <li>
         <div>
           <strong>Analysis Pass</strong>
-          <span>FFmpeg's <code>loudnorm</code> filter measures integrated loudness (I), true peak (TP), and loudness range (LRA) for the entire file. The measured values feed the next pass.</span>
+          <span>A 200 Hz allpass for phase rotation is prepended to FFmpeg's <code>loudnorm</code> filter, which measures integrated loudness (I), true peak (TP), and loudness range (LRA) for the entire file. The allpass runs first so the TP measurement reflects the post-rotation peak budget; the measured values feed the next pass.</span>
         </div>
       </li>
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. This applies a single precise linear gain: no limiting, no change to stereo image or transients. Output is always stereo (2-channel) — mono sources are upmixed to dual-mono. Output: 24-bit WAV at the target sample rate.</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no limiting, no change to stereo image. Output is always stereo (2-channel) — mono sources are upmixed to dual-mono. Output: 24-bit WAV at the target sample rate.</span>
         </div>
       </li>
       <li>
