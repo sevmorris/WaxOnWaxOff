@@ -41,19 +41,12 @@ struct SettingsView: View {
                 .opacity(viewModel.settings.outputChannels == .stereo ? 0.4 : 1)
                 .help(viewModel.settings.outputChannels == .stereo ? "Only applies in Mono output mode" : "")
 
-                row("High Pass", caption: "DC offset is always removed regardless of this setting.") {
-                    HStack(spacing: 6) {
-                        Slider(
-                            value: Binding(
-                                get: { Double(viewModel.settings.highPassHz) },
-                                set: { viewModel.settings.highPassHz = Int($0) }
-                            ),
-                            in: 0...90,
-                            step: 5
-                        )
-                        Text(viewModel.settings.highPassHz == 0 ? "Off" : "\(viewModel.settings.highPassHz) Hz")
-                            .font(.system(size: 11).monospaced())
-                            .frame(width: 55, alignment: .trailing)
+                row("High Pass", caption: "80 Hz — removes rumble and proximity effect. DC offset is always removed regardless of this setting.") {
+                    HStack(spacing: 8) {
+                        Toggle("", isOn: $viewModel.settings.highPassEnabled)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        Text("80 Hz")
                     }
                 }
 

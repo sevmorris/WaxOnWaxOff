@@ -21,7 +21,7 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     var channel: MonoChannel = .left
     var loudnormEnabled: Bool = false
     var loudnormTarget: Double = -30.0
-    var highPassHz: Int = 80
+    var highPassEnabled: Bool = true
     var phaseRotationEnabled: Bool = true
     var dynamicLevelingEnabled: Bool = false
     var dynamicLevelingAmount: Double = 0.5
@@ -57,7 +57,7 @@ extension WaxOnSettings {
             channel:                try c.decodeIfPresent(MonoChannel.self,    forKey: .channel)               ?? d.channel,
             loudnormEnabled:        try c.decodeIfPresent(Bool.self,           forKey: .loudnormEnabled)       ?? d.loudnormEnabled,
             loudnormTarget:         try c.decodeIfPresent(Double.self,         forKey: .loudnormTarget)        ?? d.loudnormTarget,
-            highPassHz:             try c.decodeIfPresent(Int.self,            forKey: .highPassHz)            ?? d.highPassHz,
+            highPassEnabled:        try c.decodeIfPresent(Bool.self,           forKey: .highPassEnabled)       ?? d.highPassEnabled,
             phaseRotationEnabled:   try c.decodeIfPresent(Bool.self,           forKey: .phaseRotationEnabled)  ?? d.phaseRotationEnabled,
             dynamicLevelingEnabled: try c.decodeIfPresent(Bool.self,           forKey: .dynamicLevelingEnabled) ?? d.dynamicLevelingEnabled,
             dynamicLevelingAmount:  try c.decodeIfPresent(Double.self,         forKey: .dynamicLevelingAmount) ?? d.dynamicLevelingAmount,

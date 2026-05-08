@@ -87,7 +87,7 @@ struct WaxOnPreset: Identifiable, Codable, Equatable {
 
                 loudnormEnabled: true,
                 loudnormTarget: -30.0,
-                highPassHz: 80
+                highPassEnabled: true
             )
         ),
         WaxOnPreset(
@@ -100,7 +100,7 @@ struct WaxOnPreset: Identifiable, Codable, Equatable {
 
                 loudnormEnabled: true,
                 loudnormTarget: -23.0,
-                highPassHz: 80
+                highPassEnabled: true
             )
         ),
     ]

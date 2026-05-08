@@ -86,7 +86,7 @@ actor AudioProcessor {
         onLog?("▶ \(filename)", .info)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
         let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
-        let hpFreq = max(settings.highPassHz, 20)
+        let hpFreq = settings.highPassEnabled ? 80 : 20
         onLog?("  filter: highpass=\(hpFreq) Hz\(phaseDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
 
         let step1Af: String
