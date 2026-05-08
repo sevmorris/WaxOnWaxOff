@@ -494,10 +494,12 @@
         <div class="chain-arrow">→</div>
         <div class="chain-node">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
-        <div class="chain-node optional">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Encode MP3</span></div>
+        <div class="chain-node">2× Oversample Limit<br><span style="font-size:0.75rem;font-weight:400;">safety backstop</span></div>
+        <div class="chain-arrow">→</div>
+        <div class="chain-node optional">Encode MP3<br><span style="font-size:0.75rem;font-weight:400;">2× oversample limiter</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--muted);">Phase rotation runs in both the analysis and render passes so the loudnorm TP measurement matches the output waveform. Dashed nodes are optional. Output: 24-bit WAV and/or MP3.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Phase rotation runs in both the analysis and render passes so the loudnorm TP measurement matches the output waveform. The WAV-path limiter is a backstop for inter-sample peaks loudnorm's linear mode missed; on most material it doesn't engage. Dashed nodes are optional. Output: 24-bit WAV and/or MP3.</p>
 
   </section>
 
@@ -560,7 +562,7 @@
 
     <h3>Loudness Range (LRA)</h3>
     <p>LRA measures the spread between loud and quiet sections of a program (its macro-dynamics) in Loudness Units. It is computed as the difference between the 95th and 10th percentiles of the short-term loudness distribution (after gating). EBU R128 does not mandate a specific LRA target but recommends keeping it below 18 LU for broadcast.</p>
-    <p>Both modes pass an LRA value to the <code>loudnorm</code> filter. WaxOn hardcodes LRA=20 (effectively unconstrained, no dynamic processing). WaxOff defaults to LRA=11, which allows the filter to apply gentle dynamic compression to constrain the macro-dynamic spread of a finished mix. Lower values compress more aggressively; higher values relax the constraint.</p>
+    <p>Both modes pass an LRA value to the <code>loudnorm</code> filter. WaxOn hardcodes LRA=20 (effectively unconstrained, no dynamic processing). WaxOff defaults to LRA=9, which sits in the typical podcast delivery range (6–10 LU) — loose enough to preserve a well-balanced mix but tight enough to constrain occasional overly-dynamic material for car and headphone listening. Lower values compress more aggressively; higher values relax the constraint.</p>
   </section>
 
   <!-- Two-Pass -->
@@ -647,22 +649,28 @@
       </ul>
     </details>
 
-    <h3>WaxOff Pre-Encode Limiter</h3>
-    <p>WaxOff's loudnorm filter targets true peak via its <code>TP</code> parameter, but this is a soft target. The filter's internal gain calculation accounts for it, but it does not guarantee a hard ceiling. In practice, the loudnorm output can exceed the TP target by up to ~0.5–1.0 dB in edge cases.</p>
-    <p>For WAV-only output this is acceptable: the file plays back through a DAC and any overshoot is minor. For MP3 output it is a real problem. The encoding process adds its own inter-sample peaks (typically +0.1–1.5 dB), so a file already approaching the ceiling will clip after decode.</p>
+    <h3>WaxOff Limiters</h3>
+    <p>WaxOff's loudnorm filter targets true peak via its <code>TP</code> parameter, but this is a soft target. The filter's internal gain calculation accounts for it, but it does not guarantee a hard ceiling. In practice, the loudnorm output can exceed the TP target by up to ~0.5–1.0 dB in edge cases — particularly on dynamic material where inter-sample peaks slip past loudnorm's analysis. WaxOff applies a brick-wall limiter on both output paths to enforce the user's true-peak target reliably.</p>
+
     <details class="callout callout-impl">
-      <summary><span class="callout-cat">Under the Hood</span> Pre-encode limiter parameters</summary>
-      <p>WaxOff solves this with a dedicated pre-encode limiter applied only when producing MP3:</p>
+      <summary><span class="callout-cat">Under the Hood</span> WAV-path limiter</summary>
+      <p>A 2× oversampled true-peak limiter runs after loudnorm in the WAV render filter chain:</p>
       <ul>
-        <li><strong>Ceiling: −2.0 dBTP</strong>: 1 dB of headroom below the intended −1.0 dBTP loudnorm target. This comfortably absorbs both loudnorm overshoot and typical MP3 codec-induced peaks, resulting in decoded MP3 files that land at or below −1.0 dBTP.</li>
-        <li><strong>attack=1 ms, release=20 ms</strong>: faster than WaxOn's limiter because this stage has no creative role. It is pure safety. At these speeds on voice material, the limiting is completely transparent.</li>
-        <li>Same 2× oversampling approach as WaxOn for true peak accuracy.</li>
+        <li><strong>Ceiling</strong>: matches the user's true-peak setting exactly. Loudnorm's linear-mode TP analysis aims to hit the same target via gain reduction; the limiter only acts on what slips past it.</li>
+        <li><strong>attack=5 ms, release=50 ms</strong>: same parameters as WaxOn's limiter — fast enough to catch transients, slow enough to stay transparent on voice. On a well-mixed source the limiter doesn't engage, so these parameters rarely matter in practice.</li>
+        <li>2× oversampling at <code>2 × sample rate</code> for true-peak accuracy.</li>
       </ul>
+      <p>The limiter is a safety backstop, not a loudness maximizer. WaxOff doesn't push gain above what loudnorm calculated; the limiter exists so the user can trust that the rendered WAV will not exceed the configured ceiling.</p>
     </details>
 
     <details class="callout callout-impl">
-      <summary><span class="callout-cat">Under the Hood</span> Why −2 dBTP and not −1 dBTP?</summary>
-      <p>The loudnorm filter targets −1.0 dBTP but can overshoot by up to ~1 dB. The MP3 codec can then add another 0.1–1.5 dB of inter-sample peaks. A hard limiter at −2.0 dBTP provides 1 dB of margin that reliably keeps the decoded MP3 below −1.0 dBTP under virtually all real-world conditions.</p>
+      <summary><span class="callout-cat">Under the Hood</span> MP3-path limiter</summary>
+      <p>The MP3 path applies a separate pre-encode limiter on top of the already-rendered WAV. Lossy decoding adds 0.5–1.5 dB of inter-sample peak overshoot, so a WAV that landed exactly at the user's TP ceiling would clip after MP3 decode.</p>
+      <ul>
+        <li><strong>Ceiling: TP − 1.0 dB</strong>. With the default TP of −1.0 dBTP, the MP3 limiter sits at −2.0 dBTP — providing 1 dB of margin to absorb decoder overshoot, so the decoded MP3 lands at or below the user's effective target. If the user sets TP to −0.5 dBTP, the MP3 limiter scales to −1.5 dBTP automatically.</li>
+        <li><strong>attack=1 ms, release=20 ms</strong>: faster than the WAV-path limiter because this stage is pure safety — it has no creative role and only catches the residual overshoot the codec introduces.</li>
+        <li>2× oversampling at <code>2 × 44.1 kHz</code>. MP3 is always encoded at 44.1 kHz regardless of the WAV sample rate setting.</li>
+      </ul>
     </details>
   </section>
 
@@ -910,9 +918,9 @@
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
 
-    <h3>Fixed LRA=11 (with hidden override)</h3>
-    <p>WaxOff sets <code>LRA=11</code> on the loudnorm filter. The value is configurable in code — <code>WaxOffSettings.lra</code>, default 11.0 — but no UI control exposes it, so in normal use it's a fixed value. For delivery, some macro-dynamic constraint is appropriate. A podcast episode should have a consistent loudness profile throughout. 11 LU is a reasonable fixed value: it constrains macro-dynamics enough to ensure consistent perceived loudness across the episode without audibly squashing the mix's dynamics.</p>
-    <p>The loudnorm filter with LRA=11 applies gentle, program-level gain changes (not sample-by-sample compression). The effect is less aggressive than any compressor you would have used during editing.</p>
+    <h3>Fixed LRA=9 (with hidden override)</h3>
+    <p>WaxOff sets <code>LRA=9</code> on the loudnorm filter. The value is configurable in code — <code>WaxOffSettings.lra</code>, default 9.0 — but no UI control exposes it, so in normal use it's a fixed value. For delivery, some macro-dynamic constraint is appropriate: a podcast episode should have a consistent loudness profile throughout, and most podcasts are consumed on earbuds, laptop speakers, or in cars where wide macro-dynamics push quiet passages below ambient noise and loud passages over the listening comfort threshold. 9 LU sits in the typical podcast delivery range (6–10 LU) — loose enough to preserve a well-balanced mix's natural dynamics, tight enough to constrain occasional overly-dynamic material.</p>
+    <p>The loudnorm filter with LRA=9 applies gentle, program-level gain changes (not sample-by-sample compression). The effect is less aggressive than any compressor you would have used during editing.</p>
 
     <h3>Delivery Targets</h3>
     <table class="compare-table">
@@ -1073,8 +1081,12 @@
           <td>Inter-sample peaks are invisible to a standard sample-rate limiter; oversampling makes them visible and catchable</td>
         </tr>
         <tr>
-          <td>Pre-encode −2 dBTP limiter (WaxOff MP3)</td>
-          <td>Loudnorm TP is a soft target; MP3 encoding adds further inter-sample peaks; −2 dBTP provides 1 dB headroom for decoded files to land at or below −1.0 dBTP</td>
+          <td>Brick-wall limiter on WAV path (WaxOff)</td>
+          <td>Loudnorm linear-mode TP is a soft target — inter-sample peaks can slip past its analysis; a 2× oversampled limiter at the user's TP target enforces the ceiling reliably so the rendered WAV honors the configured true peak</td>
+        </tr>
+        <tr>
+          <td>MP3 limiter at TP − 1 dB (WaxOff)</td>
+          <td>Lossy decode adds 0.5–1.5 dB of inter-sample peak overshoot; placing the MP3 limiter 1 dB below the WAV ceiling means the decoded MP3 lands at or below the user's effective TP target</td>
         </tr>
         <tr>
           <td>MP3 derived from WAV output</td>

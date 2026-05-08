@@ -9,7 +9,7 @@ enum OutputMode: String, Codable, CaseIterable {
 struct WaxOffSettings: Codable, Equatable, Sendable {
     var targetLUFS: Double = -18
     var truePeak: Double = -1.0
-    var lra: Double = 11.0
+    var lra: Double = 9.0
     var outputMode: OutputMode = .both
     var mp3Bitrate: Int = 160
     var sampleRate: Int = 44100
@@ -21,8 +21,13 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
 
     static func load() -> WaxOffSettings {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let settings = try? JSONDecoder().decode(WaxOffSettings.self, from: data)
+              var settings = try? JSONDecoder().decode(WaxOffSettings.self, from: data)
         else { return WaxOffSettings() }
+        // LRA was never user-configurable; anyone with the prior 11.0 default
+        // gets bumped to the new 9.0 default automatically.
+        if settings.lra == 11.0 {
+            settings.lra = 9.0
+        }
         return settings
     }
 

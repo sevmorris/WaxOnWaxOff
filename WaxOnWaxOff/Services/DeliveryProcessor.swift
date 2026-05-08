@@ -71,6 +71,7 @@ actor DeliveryProcessor {
         onPhase?("Normalizing…")
         try Task.checkCancellation()  // CRITICAL-2
         onLog?("  loudnorm: normalizing…", .verbose)
+        onLog?("  limiter: 2× oversample (\(settings.sampleRate * 2) Hz)  |  ceiling \(tp) dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
         let wavTempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).wav")
         let wavFinalURL = outputDir.appendingPathComponent("\(outputStem).wav")
 
@@ -104,7 +105,8 @@ actor DeliveryProcessor {
         if settings.outputMode == .mp3 || settings.outputMode == .both {
             onPhase?("Encoding MP3…")
             try Task.checkCancellation()  // CRITICAL-2
-            onLog?("  mp3: \(settings.mp3Bitrate)k  |  limiter: 2× oversample  |  ceiling -2.0 dBTP", .verbose)
+            let mp3TPCeiling = settings.truePeak - 1.0
+            onLog?("  mp3: \(settings.mp3Bitrate)k  |  limiter: 2× oversample  |  ceiling \(String(format: "%.1f", mp3TPCeiling)) dBTP", .verbose)
 
             let sourceForMP3 = settings.outputMode == .both ? wavFinalURL : wavTempURL
             let mp3TempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).mp3")
@@ -191,6 +193,15 @@ actor DeliveryProcessor {
         filterChain += ":offset=\(measurements.targetOffset)"
         filterChain += ":linear=true"
 
+        // Brick-wall limiter as a safety backstop for inter-sample peaks that
+        // loudnorm's linear-mode TP analysis missed. Ceiling matches the user's
+        // TP setting; on most material the limiter doesn't engage.
+        let limitAmp = pow(10.0, settings.truePeak / 20.0)
+        let oversampleSr = settings.sampleRate * 2
+        filterChain += ",aresample=\(oversampleSr)"
+        filterChain += ",alimiter=limit=\(String(format: "%.6f", limitAmp)):attack=5:release=50:level=disabled"
+        filterChain += ",aresample=\(settings.sampleRate)"
+
         let args = [
             "-hide_banner", "-nostats", "-y",
             "-i", input.path,
@@ -211,10 +222,13 @@ actor DeliveryProcessor {
         output: URL,
         settings: WaxOffSettings
     ) async throws {
-        // 2× oversample → -2 dBTP brick-wall limit → resample back
-        // Lossy codecs can introduce +0.1–1.5 dB inter-sample peaks; this prevents decode clipping.
+        // 2× oversample → brick-wall limit → resample back
+        // Lossy codecs introduce ~0.5–1.5 dB of inter-sample peak overshoot during decode;
+        // limiter sits 1 dB below the user's true-peak target as a margin so the decoded
+        // MP3 stays under the same effective ceiling as the WAV output.
         // MP3 always targets 44.1 kHz regardless of the WAV sample rate setting.
-        let limitAmp = pow(10.0, -2.0 / 20.0)
+        let mp3TP = settings.truePeak - 1.0
+        let limitAmp = pow(10.0, mp3TP / 20.0)
         let mp3SampleRate = 44100
         let oversampleSr = mp3SampleRate * 2
         let preEncodeFilter = [

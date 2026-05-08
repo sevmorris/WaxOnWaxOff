@@ -710,8 +710,8 @@
   <!-- WaxOff Mode -->
   <section id="waxoff-overview">
     <h2>WaxOff Mode <span class="mode-badge mode-waxoff">WaxOff</span></h2>
-    <p>WaxOff finalizes your edited podcast mix for distribution. It applies phase rotation (200 Hz allpass) for headroom recovery, then EBU R128 loudness normalization, and delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
-    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment to hit the target loudness — no dynamic processing, no changes to stereo image. Phase rotation is applied unconditionally as a transparent crest-factor reduction; see the <a href="theory.html#phase-rotation">Theory of Operation</a> for detail. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
+    <p>WaxOff finalizes your edited podcast mix for distribution. It applies phase rotation (200 Hz allpass) for headroom recovery, EBU R128 loudness normalization, and a 2× oversampled brick-wall limiter as a true-peak safety backstop. It delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
+    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment from loudnorm to hit the target loudness — no compression, no changes to stereo image. Phase rotation is applied unconditionally as a transparent crest-factor reduction. The brick-wall limiter only engages when inter-sample peaks slip past loudnorm's TP analysis; on a well-mixed source it leaves the audio untouched. See the <a href="theory.html#phase-rotation">Theory of Operation</a> for detail. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -833,13 +833,19 @@
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no limiting, no change to stereo image. Output is always stereo (2-channel) — mono sources are upmixed to dual-mono. Output: 24-bit WAV at the target sample rate.</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no compression, no change to stereo image. Output is always stereo (2-channel) — mono sources are upmixed to dual-mono.</span>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Brick-Wall Limiter</strong>
+          <span>A 2× oversampled true-peak limiter runs after loudnorm with its ceiling set to the user's true-peak target. It exists as a safety backstop for inter-sample peaks that loudnorm's linear-mode TP analysis missed; on a well-mixed source it doesn't engage. Output: 24-bit WAV at the target sample rate.</span>
         </div>
       </li>
       <li>
         <div>
           <strong>MP3 Encoding <span class="tag">Optional</span></strong>
-          <span>If Output is MP3 or Both, the normalized WAV is encoded using <code>libmp3lame</code> at the chosen CBR bitrate. A pre-encode brick-wall limiter at −2 dBTP prevents inter-sample peak violations after MP3 decode. MP3 is always encoded at 44.1 kHz regardless of the sample rate setting. The WAV is always written first; MP3 is derived from it.</span>
+          <span>If Output is MP3 or Both, the normalized WAV is encoded using <code>libmp3lame</code> at the chosen CBR bitrate. A pre-encode brick-wall limiter sits 1 dB below the user's true-peak target as a margin for the inter-sample peak overshoot lossy decoders introduce, so the decoded MP3 stays under the same effective ceiling as the WAV output. MP3 is always encoded at 44.1 kHz regardless of the sample rate setting. The WAV is always written first; MP3 is derived from it.</span>
         </div>
       </li>
     </ol>
