@@ -19,7 +19,6 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     var sampleRate: SampleRate = .s44100
     var outputChannels: OutputChannels = .mono
     var channel: MonoChannel = .left
-    var limitDb: Double = -1.0
     var loudnormEnabled: Bool = false
     var loudnormTarget: Double = -30.0
     var highPassHz: Int = 80
@@ -56,7 +55,6 @@ extension WaxOnSettings {
             sampleRate:             try c.decodeIfPresent(SampleRate.self,     forKey: .sampleRate)            ?? d.sampleRate,
             outputChannels:         try c.decodeIfPresent(OutputChannels.self, forKey: .outputChannels)        ?? d.outputChannels,
             channel:                try c.decodeIfPresent(MonoChannel.self,    forKey: .channel)               ?? d.channel,
-            limitDb:                try c.decodeIfPresent(Double.self,         forKey: .limitDb)               ?? d.limitDb,
             loudnormEnabled:        try c.decodeIfPresent(Bool.self,           forKey: .loudnormEnabled)       ?? d.loudnormEnabled,
             loudnormTarget:         try c.decodeIfPresent(Double.self,         forKey: .loudnormTarget)        ?? d.loudnormTarget,
             highPassHz:             try c.decodeIfPresent(Int.self,            forKey: .highPassHz)            ?? d.highPassHz,

@@ -41,17 +41,6 @@ struct SettingsView: View {
                 .opacity(viewModel.settings.outputChannels == .stereo ? 0.4 : 1)
                 .help(viewModel.settings.outputChannels == .stereo ? "Only applies in Mono output mode" : "")
 
-                Divider().padding(.vertical, 6)
-
-                row("Ceiling") {
-                    HStack(spacing: 6) {
-                        Slider(value: $viewModel.settings.limitDb, in: -3 ... -1, step: 1)
-                        Text(String(format: "%.0f dB", viewModel.settings.limitDb))
-                            .font(.system(size: 11).monospaced())
-                            .frame(width: 34, alignment: .trailing)
-                    }
-                }
-
                 row("High Pass", caption: "DC offset is always removed regardless of this setting.") {
                     HStack(spacing: 6) {
                         Slider(

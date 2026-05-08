@@ -623,11 +623,6 @@
           <td>Mono mode only. Which channel to extract. Use Left for a standard single-mic recording on channel 1. Grayed out when Output is Stereo.</td>
         </tr>
         <tr>
-          <td>Ceiling</td>
-          <td>−1.0 to −3.0 dB</td>
-          <td>True peak ceiling for the brick-wall limiter. −1.0 dB is a safe default for most delivery formats.</td>
-        </tr>
-        <tr>
           <td>High Pass</td>
           <td>Off–90 Hz · default 80 Hz</td>
           <td>High-pass filter cutoff. Off applies only the silent 20 Hz DC block. 80 Hz removes most rumble and handling noise without thinning the voice. DC offset is always removed regardless of this setting.</td>
@@ -705,8 +700,8 @@
     <h2>WaxOn Output Files <span class="mode-badge mode-waxon">WaxOn</span></h2>
 
     <h3>Individual Files</h3>
-    <pre><code>{original-name}-{rate}waxon{ceiling}.wav</code></pre>
-    <p>Examples: <code>episode-01-44kwaxon-1dB.wav</code> &nbsp; <code>guest-48kwaxon-1dB.wav</code></p>
+    <pre><code>{original-name}-{rate}waxon.wav</code></pre>
+    <p>Examples: <code>episode-01-44kwaxon.wav</code> &nbsp; <code>guest-48kwaxon.wav</code></p>
 
     <h3>Location</h3>
     <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code>. Existing files with the same name are overwritten.</p>

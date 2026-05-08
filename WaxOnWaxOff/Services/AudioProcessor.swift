@@ -64,10 +64,9 @@ actor AudioProcessor {
         let rateTag = sr == 44100 ? "44k" : "48k"
         let stem = input.deletingPathExtension().lastPathComponent
         let filename = input.lastPathComponent
-        let limitAmp = pow(10.0, settings.limitDb / 20.0)
-        let limitTag = formatDbTag(settings.limitDb)
+        let limitAmp = pow(10.0, -1.0 / 20.0)
         let outDir = bestOutputDir(for: input)
-        let outName = "\(stem)-\(rateTag)waxon\(limitTag).wav"
+        let outName = "\(stem)-\(rateTag)waxon.wav"
         let finalURL = outDir.appendingPathComponent(outName)
 
         let work = try makeTemp(prefix: "waxon_\(rateTag)_")
@@ -142,7 +141,7 @@ actor AudioProcessor {
         let limiterInput: URL
         if settings.loudnormEnabled {
             let target = settings.loudnormTarget
-            let tp = settings.limitDb
+            let tp = -1.0
 
             // Run RNNoise on a temp copy for the analysis pass only.
             // This prevents broadband noise from inflating the loudness measurement,
@@ -220,7 +219,7 @@ actor AudioProcessor {
             "aresample=\(sr)"
         ].joined(separator: ",")
 
-        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling \(settings.limitDb) dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
+        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
 
         if fm.fileExists(atPath: tmpURL.path) {
             try? fm.removeItem(at: tmpURL)
@@ -267,14 +266,6 @@ actor AudioProcessor {
          .replacingOccurrences(of: ":",  with: "\\:")
          .replacingOccurrences(of: "[",  with: "\\[")
          .replacingOccurrences(of: "]",  with: "\\]")
-    }
-
-    private func formatDbTag(_ db: Double) -> String {
-        var s = String(format: "%.2f", db)
-        while s.contains(".") && (s.hasSuffix("0") || s.hasSuffix(".")) {
-            s.removeLast()
-        }
-        return "\(s)dB"
     }
 
     // Maps 0.0 (gentle) → 1.0 (aggressive) to dynaudnorm parameters.

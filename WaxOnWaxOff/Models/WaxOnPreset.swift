@@ -84,7 +84,7 @@ struct WaxOnPreset: Identifiable, Codable, Equatable {
                 sampleRate: .s44100,
                 outputChannels: .mono,
                 channel: .left,
-                limitDb: -1.0,
+
                 loudnormEnabled: true,
                 loudnormTarget: -30.0,
                 highPassHz: 80
@@ -97,7 +97,7 @@ struct WaxOnPreset: Identifiable, Codable, Equatable {
                 sampleRate: .s44100,
                 outputChannels: .mono,
                 channel: .left,
-                limitDb: -1.0,
+
                 loudnormEnabled: true,
                 loudnormTarget: -23.0,
                 highPassHz: 80

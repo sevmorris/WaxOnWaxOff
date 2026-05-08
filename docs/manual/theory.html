@@ -638,7 +638,7 @@
       <summary><span class="callout-cat">Under the Hood</span> alimiter parameters</summary>
       <p>WaxOn's alimiter is configured for transparent peak control:</p>
       <ul>
-        <li><strong>limit</strong>: linear amplitude equivalent of the configured ceiling (e.g., −1.0 dB → 0.891251)</li>
+        <li><strong>limit</strong>: 0.891251 — the linear amplitude equivalent of −1.0 dBTP, hardcoded as the EBU R128 standard ceiling</li>
         <li><strong>attack=5 ms</strong>: the limiter begins attenuating 5 ms before the peak. Fast enough to prevent transient overshoot, slow enough to avoid pre-ringing artifacts on voice. For reference, a typical plosive consonant (p, b, t) has a voice onset time of roughly 10–30 ms in English speech; 5 ms catches the transient before it peaks without introducing audible artifacts on voiced content.</li>
         <li><strong>release=50 ms</strong>: gain recovers in 50 ms after the peak passes. On typical voice material, this is fast enough to be inaudible as pumping while still recovering promptly between words. For comparison, inter-word pauses in conversational speech are typically 150–300 ms, so a 50 ms release completes well before the next word begins.</li>
         <li><strong>level=disabled</strong>: prevents the limiter from applying makeup gain. Without this, <code>alimiter</code> compensates for gain reduction, undoing the ceiling control. With it disabled, the limiter only attenuates, never amplifies.</li>
@@ -885,8 +885,8 @@
     <h3>Default Loudnorm Target: −30 LUFS</h3>
     <p>−30 LUFS is conservative by design. At this level, even a recording with significant dynamic range and a crest factor of 20 dB will have peaks well below −10 dBFS, giving the limiter ample headroom. The goal is to bring different recordings to a <em>consistent</em> level for editing, not to hit a delivery target. −30 LUFS leaves plenty of room for the final mix to breathe.</p>
 
-    <h3>Loudnorm TP = limitDb</h3>
-    <p>Both the loudnorm <code>TP</code> parameter and the alimiter <code>limit</code> are set to the same value (the configured ceiling, default −1.0 dB). These are not redundant:</p>
+    <h3>Loudnorm TP and Limiter Ceiling</h3>
+    <p>Both the loudnorm <code>TP</code> parameter and the alimiter <code>limit</code> are set to −1.0 dBTP. These are not redundant:</p>
     <ul>
       <li>Loudnorm's <code>TP</code> influences its internal gain calculation. It tries to avoid exceeding the ceiling, but this is a soft target.</li>
       <li>The alimiter is the hard ceiling. It guarantees no output sample (at 2× sample rate) exceeds the limit.</li>
