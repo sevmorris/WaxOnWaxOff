@@ -27,7 +27,7 @@ struct LoudnormMeasurements: Sendable {
     /// some measurements. Pass 2 rejects those values with "Result too large",
     /// so callers must check before plumbing measurements into the linear-mode
     /// filter string.
-    var isFinite: Bool {
+    nonisolated var isFinite: Bool {
         inputI.isFinite && inputTP.isFinite && inputLRA.isFinite &&
             inputThresh.isFinite && targetOffset.isFinite
     }

@@ -38,7 +38,7 @@ enum FFmpegRunner {
     /// Parse the loudnorm JSON block from ffmpeg stderr. Returns nil if not found or malformed.
     /// Values may arrive as JSON strings (current FFmpeg) or JSON numbers (in case the
     /// upstream output format ever changes); both are normalized to strings.
-    static func parseLoudnormJSON(from output: String) -> [String: String]? {
+    nonisolated static func parseLoudnormJSON(from output: String) -> [String: String]? {
         // Anchor on the loudnorm filter's own log prefix so any later stderr
         // chatter that happens to contain `{` (filter parameter dumps,
         // deprecation notices, etc.) can't latch the parser onto the wrong
