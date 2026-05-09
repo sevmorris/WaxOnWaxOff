@@ -23,6 +23,15 @@ struct LoudnormMeasurements: Sendable {
         self.targetOffset = targetOffset
     }
 
+    /// Silent or near-silent inputs cause `loudnorm` to emit -inf / inf for
+    /// some measurements. Pass 2 rejects those values with "Result too large",
+    /// so callers must check before plumbing measurements into the linear-mode
+    /// filter string.
+    var isFinite: Bool {
+        inputI.isFinite && inputTP.isFinite && inputLRA.isFinite &&
+            inputThresh.isFinite && targetOffset.isFinite
+    }
+
     private nonisolated static func parseNumber(_ value: Any?) -> Double? {
         if let num = value as? Double { return num }
         if let str = value as? String { return Double(str) }
@@ -51,10 +60,10 @@ actor DeliveryProcessor {
         }
 
         let stem = url.deletingPathExtension().lastPathComponent
-        let outputStem = "\(stem)-lev\(lufsString(settings.targetLUFS))LUFS"
-        let lufs = lufsString(settings.targetLUFS)
+        let outputStem = "\(stem)-lev\(formatNumber(settings.targetLUFS))LUFS"
+        let lufs = formatNumber(settings.targetLUFS)
         let tp = String(format: "%.1f", settings.truePeak)
-        let lra = String(format: "%.0f", settings.lra)
+        let lra = formatNumber(settings.lra)
 
         onLog?("▶ \(url.lastPathComponent)", .info)
         onLog?("  target: \(lufs) LUFS  |  TP \(tp) dBTP  |  LRA \(lra) LU", .verbose)
@@ -64,8 +73,12 @@ actor DeliveryProcessor {
         try Task.checkCancellation()  // CRITICAL-2
         onLog?("  loudnorm: analyzing…", .verbose)
         let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings)
-        onLog?("  measured: \(String(format: "%.1f", measurements.inputI)) LUFS  |  TP \(String(format: "%.1f", measurements.inputTP)) dBTP  |  LRA \(String(format: "%.1f", measurements.inputLRA)) LU", .info)
-        onLog?("  offset: \(String(format: "%.2f", measurements.targetOffset)) dB  |  thresh \(String(format: "%.1f", measurements.inputThresh)) LUFS", .verbose)
+        if let m = measurements {
+            onLog?("  measured: \(String(format: "%.1f", m.inputI)) LUFS  |  TP \(String(format: "%.1f", m.inputTP)) dBTP  |  LRA \(String(format: "%.1f", m.inputLRA)) LU", .info)
+            onLog?("  offset: \(String(format: "%.2f", m.targetOffset)) dB  |  thresh \(String(format: "%.1f", m.inputThresh)) LUFS", .verbose)
+        } else {
+            onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
+        }
 
         // Phase 2: Render WAV
         onPhase?("Normalizing…")
@@ -142,18 +155,24 @@ actor DeliveryProcessor {
 
     // MARK: - Private
 
-    private func lufsString(_ value: Double) -> String {
+    /// Whole numbers render without a decimal ("9"), fractions render with one ("9.5").
+    /// Used for both display strings and FFmpeg filter parameters — `loudnorm`
+    /// accepts either form.
+    private func formatNumber(_ value: Double) -> String {
         value == value.rounded() ? "\(Int(value))" : String(format: "%.1f", value)
     }
 
+    /// Returns nil if the analysis ran but the input was silent / near-silent
+    /// (loudnorm reports -inf / inf measurements that pass 2 cannot consume).
+    /// Throws only on actual ffmpeg or JSON parsing failures.
     private func analyzeAudio(
         ffmpeg: String,
         input: URL,
         settings: WaxOffSettings
-    ) async throws -> LoudnormMeasurements {
-        let lufs = lufsString(settings.targetLUFS)
+    ) async throws -> LoudnormMeasurements? {
+        let lufs = formatNumber(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
-        let lra  = String(format: "%.0f", settings.lra)
+        let lra  = formatNumber(settings.lra)
         // Phase rotation runs first so loudnorm's TP measurement reflects the
         // post-rotation waveform — otherwise the pass-2 gain correction is based
         // on a peak budget that no longer matches the rendered output.
@@ -172,7 +191,7 @@ actor DeliveryProcessor {
               let measurements = LoudnormMeasurements(json: dict.mapValues { $0 as Any }) else {
             throw DeliveryError.analysisFailedNoMeasurements
         }
-        return measurements
+        return measurements.isFinite ? measurements : nil
     }
 
     private func renderWAV(
@@ -180,18 +199,23 @@ actor DeliveryProcessor {
         input: URL,
         output: URL,
         settings: WaxOffSettings,
-        measurements: LoudnormMeasurements
+        measurements: LoudnormMeasurements?
     ) async throws {
-        let lufs = lufsString(settings.targetLUFS)
-        let tp   = String(format: "%.1f", settings.truePeak)
-        let lra  = String(format: "%.0f", settings.lra)
-        var filterChain = "allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra)"
-        filterChain += ":measured_I=\(measurements.inputI)"
-        filterChain += ":measured_TP=\(measurements.inputTP)"
-        filterChain += ":measured_LRA=\(measurements.inputLRA)"
-        filterChain += ":measured_thresh=\(measurements.inputThresh)"
-        filterChain += ":offset=\(measurements.targetOffset)"
-        filterChain += ":linear=true"
+        // Phase rotation always runs. Loudnorm only runs when measurements
+        // are available — silent inputs skip it to avoid pass-2 errors.
+        var filterChain = "allpass=f=200:t=q:w=0.707"
+        if let m = measurements {
+            let lufs = formatNumber(settings.targetLUFS)
+            let tp   = String(format: "%.1f", settings.truePeak)
+            let lra  = formatNumber(settings.lra)
+            filterChain += ",loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra)"
+            filterChain += ":measured_I=\(m.inputI)"
+            filterChain += ":measured_TP=\(m.inputTP)"
+            filterChain += ":measured_LRA=\(m.inputLRA)"
+            filterChain += ":measured_thresh=\(m.inputThresh)"
+            filterChain += ":offset=\(m.targetOffset)"
+            filterChain += ":linear=true"
+        }
 
         // Brick-wall limiter as a safety backstop for inter-sample peaks that
         // loudnorm's linear-mode TP analysis missed. Ceiling matches the user's

@@ -84,6 +84,7 @@ actor AudioProcessor {
         let outputChannelCount: String = isStereo ? "2" : "1"
 
         onLog?("▶ \(filename)", .info)
+        let inputChannelCount = (try? await getChannelCount(exe: tools.ffprobe, url: input)) ?? 0
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
         let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
         let hpFreq = settings.highPassEnabled ? 80 : 20
@@ -93,7 +94,18 @@ actor AudioProcessor {
         if isStereo {
             step1Af = "highpass=f=\(hpFreq),\(phaseFilter)aresample=\(sr)"
         } else {
-            let pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
+            // For >2 channel sources (5.1, 7.1, ambisonic), the user's Left/Right
+            // selection picks input channel 0 or 1 — which on a 5.1 stem skips
+            // the center channel where dialogue typically lives. Fall back to
+            // FFmpeg's default mono downmix matrix for those cases so center
+            // and surrounds are summed in.
+            let pan: String
+            if inputChannelCount > 2 {
+                pan = "aformat=channel_layouts=mono"
+                onLog?("⚠ \(inputChannelCount)-channel input — using mono downmix instead of \(settings.channel.rawValue) channel pick.", .info)
+            } else {
+                pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
+            }
             step1Af = "highpass=f=\(hpFreq),\(pan),\(phaseFilter)aresample=\(sr)"
         }
         try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
@@ -172,6 +184,7 @@ actor AudioProcessor {
                 }
                 analysisInput = nrTempURL
             } else {
+                onLog?("⚠ RNNoise model not found in bundle — loudness measurement may be biased by noise floor.", .info)
                 analysisInput = postDynLevelURL
             }
 
@@ -191,20 +204,36 @@ actor AudioProcessor {
                   let targetOffset = lnDict["target_offset"] else {
                 throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
             }
-            onLog?("  measured: \(inputI) LUFS  |  TP \(inputTP) dBTP  |  LRA \(inputLRA) LU", .info)
-            onLog?("  target: \(target) LUFS  |  offset \(targetOffset) dB  |  thresh \(inputThresh) LUFS", .verbose)
-            onLog?("  loudnorm: normalizing…", .verbose)
 
-            let normURL = work.appendingPathComponent("\(stem)_norm.wav")
-            let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(inputI):measured_TP=\(inputTP):measured_LRA=\(inputLRA):measured_thresh=\(inputThresh):offset=\(targetOffset):linear=true"
+            // Silent / near-silent inputs cause loudnorm to emit -inf or inf.
+            // Pass 2 rejects those values with "Result too large", so skip the
+            // normalization step and pass the audio through to the limiter as-is.
+            let measuredFinite =
+                (Double(inputI)?.isFinite ?? false) &&
+                (Double(inputTP)?.isFinite ?? false) &&
+                (Double(inputLRA)?.isFinite ?? false) &&
+                (Double(inputThresh)?.isFinite ?? false) &&
+                (Double(targetOffset)?.isFinite ?? false)
 
-            try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", postDynLevelURL.path, "-af", normAf,
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
-            ])
+            if !measuredFinite {
+                onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
+                limiterInput = postDynLevelURL
+            } else {
+                onLog?("  measured: \(inputI) LUFS  |  TP \(inputTP) dBTP  |  LRA \(inputLRA) LU", .info)
+                onLog?("  target: \(target) LUFS  |  offset \(targetOffset) dB  |  thresh \(inputThresh) LUFS", .verbose)
+                onLog?("  loudnorm: normalizing…", .verbose)
 
-            limiterInput = normURL
+                let normURL = work.appendingPathComponent("\(stem)_norm.wav")
+                let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(inputI):measured_TP=\(inputTP):measured_LRA=\(inputLRA):measured_thresh=\(inputThresh):offset=\(targetOffset):linear=true"
+
+                try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+                    "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                    "-i", postDynLevelURL.path, "-af", normAf,
+                    "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
+                ])
+
+                limiterInput = normURL
+            }
         } else {
             limiterInput = postDynLevelURL
         }
@@ -313,6 +342,21 @@ actor AudioProcessor {
             throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse audio duration")
         }
         return d
+    }
+
+    private nonisolated func getChannelCount(exe: String, url: URL) async throws -> Int {
+        let output = try await FFmpegRunner.captureStdout(exe: exe, args: [
+            "-v", "error",
+            "-select_streams", "a:0",
+            "-show_entries", "stream=channels",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            url.path
+        ])
+        let str = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let n = Int(str), n > 0 else {
+            throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse channel count")
+        }
+        return n
     }
 
     private func bestOutputDir(for input: URL) -> URL {

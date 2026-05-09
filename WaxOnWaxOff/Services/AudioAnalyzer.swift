@@ -186,12 +186,19 @@ enum AudioAnalyzer {
             let crestDb = peakDb - rmsDb
             let lufs = computeGatedLUFS(blockMeanSqs: blockMeanSqs)
 
-            // Noise floor: 10th percentile of per-block RMS (quietest blocks ≈ room tone / noise)
+            // Noise floor: 10th percentile of per-block RMS (quietest blocks ≈ room tone / noise).
+            // Uses linear-interpolation (Type 7) percentile so the result lines up with the
+            // common Excel/R/NumPy convention. The previous `Int(count * 0.1)` formula was
+            // biased one rank high on long files and degenerate (returned MIN) for counts
+            // around 5–10 where the bucket edge fell on index 0.
             let noiseFloor: Double?
             if blockRmsValues.count >= 5 {
                 let sorted = blockRmsValues.sorted()
-                let p10Index = max(0, Int(Double(sorted.count) * 0.1))
-                let p10Rms = sorted[p10Index]
+                let rank = Double(sorted.count - 1) * 0.1
+                let lo = Int(rank.rounded(.down))
+                let hi = min(sorted.count - 1, lo + 1)
+                let frac = rank - Double(lo)
+                let p10Rms = sorted[lo] * (1 - frac) + sorted[hi] * frac
                 noiseFloor = 20 * log10(max(p10Rms, 1e-12))
             } else {
                 noiseFloor = nil

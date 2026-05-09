@@ -36,6 +36,8 @@ enum FFmpegRunner {
     // MARK: - Loudnorm Parsing
 
     /// Parse the loudnorm JSON block from ffmpeg stderr. Returns nil if not found or malformed.
+    /// Values may arrive as JSON strings (current FFmpeg) or JSON numbers (in case the
+    /// upstream output format ever changes); both are normalized to strings.
     static func parseLoudnormJSON(from output: String) -> [String: String]? {
         guard let braceRange = output.range(of: "{", options: .backwards) else { return nil }
 
@@ -56,10 +58,19 @@ enum FFmpegRunner {
         let jsonStr = String(output[braceRange.lowerBound...jsonEnd])
         guard let data = jsonStr.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data),
-              let dict = json as? [String: String] else {
+              let dict = json as? [String: Any] else {
             return nil
         }
-        return dict
+
+        var result: [String: String] = [:]
+        for (key, value) in dict {
+            if let s = value as? String {
+                result[key] = s
+            } else if let n = value as? NSNumber {
+                result[key] = n.stringValue
+            }
+        }
+        return result.isEmpty ? nil : result
     }
 
     // MARK: - Private
