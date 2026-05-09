@@ -39,7 +39,17 @@ enum FFmpegRunner {
     /// Values may arrive as JSON strings (current FFmpeg) or JSON numbers (in case the
     /// upstream output format ever changes); both are normalized to strings.
     static func parseLoudnormJSON(from output: String) -> [String: String]? {
-        guard let braceRange = output.range(of: "{", options: .backwards) else { return nil }
+        // Anchor on the loudnorm filter's own log prefix so any later stderr
+        // chatter that happens to contain `{` (filter parameter dumps,
+        // deprecation notices, etc.) can't latch the parser onto the wrong
+        // brace. Falls back to "last `{`" only if the prefix isn't present.
+        let searchStart: String.Index
+        if let prefixRange = output.range(of: "[Parsed_loudnorm_", options: .backwards) {
+            searchStart = prefixRange.upperBound
+        } else {
+            searchStart = output.startIndex
+        }
+        guard let braceRange = output.range(of: "{", range: searchStart..<output.endIndex) else { return nil }
 
         var depth = 0
         var jsonEnd: String.Index?

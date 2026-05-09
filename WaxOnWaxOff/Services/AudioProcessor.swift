@@ -125,25 +125,42 @@ actor AudioProcessor {
         // on both sides of the boundary.
         let postDynLevelURL: URL
         if settings.dynamicLevelingEnabled {
-            let dynLevelURL = work.appendingPathComponent("\(stem)_dynleveled.wav")
-            let dynFilter = dynamicLevelingFilter(amount: settings.dynamicLevelingAmount)
-            onLog?("  dynamic leveling: \(dynFilter)", .verbose)
-            let args: [String]
-            if let d = try? await getAudioDuration(exe: tools.ffprobe, url: midURL) {
-                let filterComplex = mirrorPaddedFilter(duration: d, leveler: dynFilter)
-                args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path,
-                        "-filter_complex", filterComplex,
-                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
+            let duration = try? await getAudioDuration(exe: tools.ffprobe, url: midURL)
+            let amount = settings.dynamicLevelingAmount
+            // Half of the dynaudnorm Gaussian window (g hops × frame_ms). Mirror
+            // padding only works if the clip is at least this long — otherwise
+            // the smoothing window peeks past the padded edge.
+            let frameMs = 500.0 - amount * 350.0
+            let gauss = max(1, Int((31.0 - amount * 16.0).rounded()))
+            let smoothingRadiusS = Double(gauss) * frameMs / 1000.0 / 2.0
+
+            if let d = duration, d < 2.0 {
+                onLog?("⚠ Clip is shorter than 2 s — dynamic leveling skipped.", .info)
+                postDynLevelURL = midURL
             } else {
-                onLog?("⚠ Could not determine file duration; dynaudnorm boundary fix skipped.", .info)
-                args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", midURL.path,
-                        "-af", dynFilter,
-                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
+                let dynLevelURL = work.appendingPathComponent("\(stem)_dynleveled.wav")
+                let dynFilter = dynamicLevelingFilter(amount: amount)
+                onLog?("  dynamic leveling: \(dynFilter)", .verbose)
+                if let d = duration, d < smoothingRadiusS {
+                    onLog?(String(format: "⚠ Clip (%.1fs) is shorter than dynaudnorm's smoothing radius (%.1fs); boundary smoothing will be approximate.", d, smoothingRadiusS), .info)
+                }
+                let args: [String]
+                if let d = duration {
+                    let filterComplex = mirrorPaddedFilter(duration: d, leveler: dynFilter)
+                    args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                            "-i", midURL.path,
+                            "-filter_complex", filterComplex,
+                            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
+                } else {
+                    onLog?("⚠ Could not determine file duration; dynaudnorm boundary fix skipped.", .info)
+                    args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                            "-i", midURL.path,
+                            "-af", dynFilter,
+                            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
+                }
+                try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
+                postDynLevelURL = dynLevelURL
             }
-            try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
-            postDynLevelURL = dynLevelURL
             try Task.checkCancellation()
         } else {
             postDynLevelURL = midURL
@@ -163,6 +180,10 @@ actor AudioProcessor {
                 let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
                 onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
                 let escapedNrModel = ffmpegFilterEscape(modelURL.path)
+                // arnndn is fixed at 48 kHz internally. Writing the temp file at 48 kHz
+                // avoids a 44.1 → 48 → 44.1 round-trip that costs CPU for nothing — this
+                // file is only consumed by loudnorm pass 1, which doesn't care about rate.
+                let nrSampleRate = "48000"
                 if isStereo {
                     let nrFc = [
                         "[0:a]channelsplit=channel_layout=stereo[L][R]",
@@ -173,13 +194,13 @@ actor AudioProcessor {
                     try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                         "-i", postDynLevelURL.path, "-filter_complex", nrFc,
-                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
+                        "-c:a", "pcm_s24le", "-ar", nrSampleRate, "-ac", outputChannelCount, nrTempURL.path
                     ])
                 } else {
                     try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                         "-i", postDynLevelURL.path, "-af", "arnndn=m=\(escapedNrModel)",
-                        "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, nrTempURL.path
+                        "-c:a", "pcm_s24le", "-ar", nrSampleRate, "-ac", outputChannelCount, nrTempURL.path
                     ])
                 }
                 analysisInput = nrTempURL

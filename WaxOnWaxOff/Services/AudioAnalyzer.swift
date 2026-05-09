@@ -87,24 +87,41 @@ enum AudioAnalyzer {
             // ITU-R BS.1770 K-weighting filter coefficients for this sample rate
             let kw = KWeightCoeffs(sampleRate: sr)
 
-            // Per-channel biquad state (transposed direct form II)
+            // 80 Hz Butterworth HPF for the noise-floor mono path. Matches WaxOn's
+            // HPF stage so the displayed noise floor reflects what survives after
+            // rumble/HVAC is removed during processing. Doesn't touch peak, overall
+            // RMS, or LUFS — those still see the unfiltered audio.
+            let nfHp = NoiseFloorHPF(sampleRate: sr)
+            var nfHpW1: Double = 0
+            var nfHpW2: Double = 0
+
+            // Per-channel K-weighting biquad state (transposed direct form II)
             var preW1 = [Double](repeating: 0, count: channels)
             var preW2 = [Double](repeating: 0, count: channels)
             var hpW1  = [Double](repeating: 0, count: channels)
             var hpW2  = [Double](repeating: 0, count: channels)
 
-            // LUFS: non-overlapping 400 ms blocks
-            let blockFrames = max(1, Int(sr * 0.4))
-            var blockChannelSumSq = [Double](repeating: 0, count: channels)
-            var blockCurrentFrames = 0
+            // LUFS: 400 ms blocks at 75% overlap (one new block every 100 ms).
+            // Implemented as a 4-deep ring of 100 ms hop sums; each completed
+            // ring emits a block. Matches ITU-R BS.1770 / EBU R128.
+            let hopFrames = max(1, Int((sr * 0.1).rounded()))
+            let hopsPerBlock = 4
+            var hopChannelSumSq = [Double](repeating: 0, count: channels)
+            var hopFramesElapsed = 0
+            var hopHistorySS: [[Double]] = Array(repeating: [], count: channels)
+            var hopHistoryFrames: [Int] = []
             var blockMeanSqs = [Double]()
-            var blockRmsValues = [Double]()  // per-block RMS for noise floor estimation
+
+            // Noise floor: non-overlapping 400 ms blocks of HP-filtered mono RMS.
+            let nfBlockFrames = max(1, Int((sr * 0.4).rounded()))
+            var nfBlockMonoSumSq: Double = 0
+            var nfBlockFramesElapsed = 0
+            var blockRmsValues = [Double]()
 
             file.framePosition = 0
             var sumSquares: Double = 0
             var peak: Double = 0
             var totalFrames: Int = 0
-            var blockMonoSumSq: Double = 0  // mono sum-of-squares for current block
 
             while file.framePosition < frameCount {
                 do {
@@ -137,43 +154,73 @@ enum AudioAnalyzer {
                         hpW1[ch] = kw.hp_b1 * y1 - kw.hp_a1 * y2 + hpW2[ch]
                         hpW2[ch] = kw.hp_b2 * y1 - kw.hp_a2 * y2
 
-                        blockChannelSumSq[ch] += y2 * y2
+                        hopChannelSumSq[ch] += y2 * y2
                         monoSample += Float(x)
                     }
 
                     monoSample /= Float(channels)
                     let doubleMono = Double(monoSample)
                     sumSquares += doubleMono * doubleMono
-                    blockMonoSumSq += doubleMono * doubleMono
 
-                    // Complete a block when it reaches 400 ms
-                    blockCurrentFrames += 1
-                    if blockCurrentFrames >= blockFrames {
-                        var avgSq = 0.0
-                        for ch in 0..<channels { avgSq += blockChannelSumSq[ch] / Double(blockCurrentFrames) }
-                        avgSq /= Double(channels)
-                        blockMeanSqs.append(avgSq)
+                    // 80 Hz HPF on mono path before noise-floor accumulation
+                    let nfFiltered = nfHp.process(doubleMono, w1: &nfHpW1, w2: &nfHpW2)
+                    nfBlockMonoSumSq += nfFiltered * nfFiltered
 
-                        let blockRms = sqrt(blockMonoSumSq / Double(blockCurrentFrames))
-                        blockRmsValues.append(blockRms)
+                    hopFramesElapsed += 1
+                    nfBlockFramesElapsed += 1
 
-                        blockChannelSumSq = [Double](repeating: 0, count: channels)
-                        blockMonoSumSq = 0
-                        blockCurrentFrames = 0
+                    // 100 ms hop boundary: push hop into ring, possibly emit a block.
+                    if hopFramesElapsed >= hopFrames {
+                        for ch in 0..<channels {
+                            hopHistorySS[ch].append(hopChannelSumSq[ch])
+                            if hopHistorySS[ch].count > hopsPerBlock { hopHistorySS[ch].removeFirst() }
+                            hopChannelSumSq[ch] = 0
+                        }
+                        hopHistoryFrames.append(hopFramesElapsed)
+                        if hopHistoryFrames.count > hopsPerBlock { hopHistoryFrames.removeFirst() }
+                        hopFramesElapsed = 0
+
+                        if hopHistoryFrames.count == hopsPerBlock {
+                            let totalHopFrames = hopHistoryFrames.reduce(0, +)
+                            var avgSq = 0.0
+                            for ch in 0..<channels {
+                                let sumSS = hopHistorySS[ch].reduce(0, +)
+                                avgSq += sumSS / Double(totalHopFrames)
+                            }
+                            avgSq /= Double(channels)
+                            blockMeanSqs.append(avgSq)
+                        }
+                    }
+
+                    // 400 ms noise-floor block boundary
+                    if nfBlockFramesElapsed >= nfBlockFrames {
+                        let nfRms = sqrt(nfBlockMonoSumSq / Double(nfBlockFramesElapsed))
+                        blockRmsValues.append(nfRms)
+                        nfBlockMonoSumSq = 0
+                        nfBlockFramesElapsed = 0
                     }
                 }
                 totalFrames += frames
             }
 
-            // Flush partial last block (if any)
-            if blockCurrentFrames > 0 {
-                var avgSq = 0.0
-                for ch in 0..<channels { avgSq += blockChannelSumSq[ch] / Double(blockCurrentFrames) }
-                avgSq /= Double(channels)
-                blockMeanSqs.append(avgSq)
-
-                let blockRms = sqrt(blockMonoSumSq / Double(blockCurrentFrames))
-                blockRmsValues.append(blockRms)
+            // Flush partial trailing data so very short clips still produce a
+            // measurement. For LUFS, only emit a partial block if no full block
+            // was ever completed — otherwise we'd skew the gated mean.
+            if blockMeanSqs.isEmpty {
+                let trailingFrames = hopHistoryFrames.reduce(0, +) + hopFramesElapsed
+                if trailingFrames > 0 {
+                    var avgSq = 0.0
+                    for ch in 0..<channels {
+                        let sumSS = hopHistorySS[ch].reduce(0, +) + hopChannelSumSq[ch]
+                        avgSq += sumSS / Double(trailingFrames)
+                    }
+                    avgSq /= Double(channels)
+                    blockMeanSqs.append(avgSq)
+                }
+            }
+            if nfBlockFramesElapsed > 0 {
+                let nfRms = sqrt(nfBlockMonoSumSq / Double(nfBlockFramesElapsed))
+                blockRmsValues.append(nfRms)
             }
 
             guard totalFrames > 0 else {
@@ -227,6 +274,34 @@ enum AudioAnalyzer {
 
         let gatedMean = relativeGated.reduce(0, +) / Double(relativeGated.count)
         return -0.691 + 10 * log10(max(gatedMean, 1e-10))
+    }
+}
+
+/// 2nd-order Butterworth high-pass biquad at 80 Hz. Used by the analyzer to
+/// match WaxOn's HPF stage when estimating the noise floor — keeps low-frequency
+/// rumble (HVAC, traffic, table thumps) out of the displayed RMS so the user
+/// isn't warned about content the processing chain will already remove.
+private struct NoiseFloorHPF {
+    let b0, b1, b2, a1, a2: Double
+
+    init(sampleRate: Double) {
+        let f0 = 80.0
+        let K = tan(.pi * f0 / sampleRate)
+        let Ksq = K * K
+        let Q = 1.0 / 2.0.squareRoot()  // Butterworth
+        let d = 1 + K / Q + Ksq
+        b0 = 1.0 / d
+        b1 = -2.0 / d
+        b2 = 1.0 / d
+        a1 = 2 * (Ksq - 1) / d
+        a2 = (1 - K / Q + Ksq) / d
+    }
+
+    func process(_ x: Double, w1: inout Double, w2: inout Double) -> Double {
+        let y = b0 * x + w1
+        w1 = b1 * x - a1 * y + w2
+        w2 = b2 * x - a2 * y
+        return y
     }
 }
 
