@@ -47,11 +47,10 @@ struct WaxOnPresetPicker: View {
                     Image(systemName: "slider.horizontal.3")
                     Text(currentPresetName)
                         .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
                 }
             }
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .frame(width: 160, alignment: .leading)
         }
         .sheet(isPresented: $showingSaveSheet) {

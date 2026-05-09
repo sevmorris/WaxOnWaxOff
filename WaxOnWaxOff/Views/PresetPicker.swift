@@ -47,11 +47,10 @@ struct WaxOffPresetPicker: View {
                     Image(systemName: "slider.horizontal.3")
                     Text(currentPresetName)
                         .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
                 }
             }
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .frame(minWidth: 120, maxWidth: 200, alignment: .leading)
             .help(currentPresetName)
         }

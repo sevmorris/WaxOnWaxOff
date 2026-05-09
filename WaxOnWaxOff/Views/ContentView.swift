@@ -135,6 +135,11 @@ struct ContentView: View {
         }
         .padding()
         .background(.regularMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.accentColor.opacity(0.35))
+                .frame(height: 1)
+        }
     }
 
     @ViewBuilder

@@ -12,10 +12,10 @@ struct FileInfoStatsView: View {
                     if showingOutput {
                         Text("OUTPUT")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.accentColor)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
-                            .background(.blue.opacity(0.15))
+                            .background(Color.accentColor.opacity(0.15))
                             .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                     infoRow(info)

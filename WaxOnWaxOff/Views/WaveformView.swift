@@ -26,7 +26,7 @@ struct WaveformView: View {
             ZStack {
                 dbGridLines
                 WaveformShape(peaks: peaks)
-                    .fill(LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing))
+                    .fill(LinearGradient(colors: [.accentColor, Color(red: 0.918, green: 0.722, blue: 0.278)], startPoint: .leading, endPoint: .trailing))
             }
         }
     }
@@ -48,7 +48,7 @@ struct WaveformView: View {
         ZStack(alignment: .topLeading) {
             dbGridLines
             WaveformShape(peaks: peaks)
-                .fill(LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing))
+                .fill(LinearGradient(colors: [.accentColor, Color(red: 0.918, green: 0.722, blue: 0.278)], startPoint: .leading, endPoint: .trailing))
             Text(label)
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.secondary)
