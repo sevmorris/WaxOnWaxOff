@@ -53,9 +53,9 @@ struct WaxOffMainView: View {
                     .transition(.move(edge: .trailing))
                 }
             }
+            WaxOffControlBar(viewModel: viewModel)
         }
         .frame(minWidth: 1092, minHeight: 624)
-        .padding(.bottom)
         .dropDestination(for: URL.self) { urls, _ in
             viewModel.addFiles(urls)
             return !urls.isEmpty

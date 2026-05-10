@@ -16,14 +16,17 @@ struct WaxOffSettingsView: View {
 
                 row(nil) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Picker("", selection: $viewModel.settings.sampleRate) {
-                            Text("44.1 kHz").tag(44100)
-                            Text("48 kHz").tag(48000)
-                        }
-                        .pickerStyle(.segmented)
+                        LabeledToggleSwitch(
+                            selection: $viewModel.settings.sampleRate,
+                            leftLabel: "44.1 kHz",
+                            leftValue: 44100,
+                            rightLabel: "48 kHz",
+                            rightValue: 48000
+                        )
+                        .frame(maxWidth: .infinity)
                         if viewModel.settings.outputMode != .wav {
                             Text("MP3 always outputs at 44.1 kHz")
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -41,7 +44,7 @@ struct WaxOffSettingsView: View {
                         }
                         .pickerStyle(.segmented)
                         Text("Always stereo — mono sources upmixed to dual-mono")
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -56,28 +59,6 @@ struct WaxOffSettingsView: View {
                 }
                 .disabled(viewModel.settings.outputMode == .wav)
                 .opacity(viewModel.settings.outputMode == .wav ? 0.4 : 1)
-
-                Divider().padding(.vertical, 6)
-
-                row("True Peak") {
-                    HStack(spacing: 6) {
-                        Slider(value: $viewModel.settings.truePeak, in: -3.0 ... -0.1, step: 0.1)
-                        Text("\(viewModel.settings.truePeakString) dBTP")
-                            .font(.system(size: 11).monospaced())
-                            .frame(width: 76, alignment: .trailing)
-                    }
-                }
-
-                row("Target LUFS") {
-                    HStack(spacing: 6) {
-                        Slider(value: $viewModel.settings.targetLUFS, in: -24 ... -14, step: 1)
-                        Text(viewModel.settings.targetLUFS == viewModel.settings.targetLUFS.rounded()
-                             ? "\(Int(viewModel.settings.targetLUFS)) LUFS"
-                             : String(format: "%.1f LUFS", viewModel.settings.targetLUFS))
-                            .font(.system(size: 11).monospaced())
-                            .frame(width: 60, alignment: .trailing)
-                    }
-                }
 
                 Divider().padding(.vertical, 6)
 
