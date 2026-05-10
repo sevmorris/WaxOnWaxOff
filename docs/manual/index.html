@@ -526,7 +526,10 @@
     <p>A toggle button in the top-right corner switches between the waveform view and the <strong>Console</strong>, a scrollable log showing what WaxOn is doing during processing. A Verbose checkbox reveals additional detail such as filter parameters and per-file loudnorm measurements.</p>
 
     <h3>Settings Sidebar</h3>
-    <p>A collapsible panel on the right edge of the window contains all processing settings for the current mode. Toggle it open or closed with the sliders icon at the far right of the toolbar. Settings persist between sessions.</p>
+    <p>A collapsible panel on the right edge of the window holds output format settings for the current mode (sample rate, channels, output directory). Toggle it open or closed with the sliders icon at the far right of the toolbar.</p>
+
+    <h3>Processor Strip</h3>
+    <p>The bar across the bottom of the window holds all processing controls for the current mode — high-pass, phase rotation, dynamic leveling, loudness normalization in WaxOn; true peak and target loudness in WaxOff. Toggles glow orange when enabled. Knobs respond to vertical drag or the scroll wheel and snap to discrete steps; a short helper line under each control describes what it does. All values persist between sessions and are captured by presets.</p>
   </section>
 
   <!-- WaxOn Mode -->
@@ -538,7 +541,7 @@
     <h3>Quick Start</h3>
     <ol>
       <li>Click <strong>WaxOn</strong> in the toolbar (or choose it from the mode picker)</li>
-      <li>Select a preset from the Preset menu in the toolbar, or configure settings manually in the Settings sidebar</li>
+      <li>Select a preset from the Preset menu in the toolbar, or adjust controls in the processor strip and Settings sidebar</li>
       <li>Drag your audio files onto the window</li>
       <li>Click <strong>Process</strong></li>
     </ol>
@@ -638,9 +641,9 @@
           <td>Bidirectional dynamic normalization. Best for panel recordings, live Q&amp;As, and multi-guest sources where voices are at inconsistent levels. Not recommended for regular solo voice use — can cause pumping artifacts on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Theory of Operation</a>.</td>
         </tr>
         <tr>
-          <td>Aggressiveness</td>
-          <td>Gentle → Aggressive · default Medium</td>
-          <td>Controls how quickly and strongly Dynamic Leveling responds. Lower settings use longer analysis frames and a smaller maximum gain (≈ +6 dB) for smoother, more conservative leveling; higher settings use shorter frames and a larger maximum gain (≈ +15 dB) for faster, more aggressive response. Audition output before editing. Grayed out when Dynamic Leveling is off.</td>
+          <td>Strength</td>
+          <td>Gentle → Aggressive · 8 steps · default Medium</td>
+          <td>Controls how quickly and strongly Dynamic Leveling responds. Lower settings use longer analysis frames and a smaller maximum gain (≈ +6 dB) for smoother, more conservative leveling; higher settings use shorter frames and a larger maximum gain (≈ +15 dB) for faster, more aggressive response. Audition output before editing. Dimmed when Dynamic Leveling is off.</td>
         </tr>
         <tr>
           <td>Loudness Norm</td>
@@ -648,9 +651,9 @@
           <td>Enables two-pass EBU R128 loudness normalization. The analysis pass applies RNNoise internally on a temp copy to prevent broadband noise from skewing the loudness measurement; the output signal is not affected. Off = filtering and limiting only.</td>
         </tr>
         <tr>
-          <td>Target</td>
-          <td>−16 to −35 LUFS · default −30</td>
-          <td>Integrated loudness target when Loudness Norm is on. −30 LUFS is conservative for ingest and leaves plenty of headroom for editing. Grayed out when Loudness Norm is off.</td>
+          <td>Target LUFS</td>
+          <td>−16 to −35 LUFS · 1 LUFS steps · default −30</td>
+          <td>Integrated loudness target when Loudness Norm is on. −30 LUFS is conservative for ingest and leaves plenty of headroom for editing. Dimmed when Loudness Norm is off.</td>
         </tr>
         <tr>
           <td>Output Dir</td>
@@ -675,7 +678,7 @@
       <li>
         <div>
           <strong>Dynamic Leveling <span class="tag">Optional</span></strong>
-          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet voices and tames loud ones. The Aggressiveness slider maps to three <code>dynaudnorm</code> parameters simultaneously: frame size (<code>f</code> 500→150 ms), Gaussian smoothing window (<code>g</code> 31→15 frames), and maximum gain factor (<code>m</code> 2.0→6.0, ≈ +6 to +15 dB). Best for panel recordings, live Q&amp;As, and multi-voice sources with inconsistent levels. Not recommended for solo voice — can cause pumping on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
+          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet voices and tames loud ones. The Strength knob maps to three <code>dynaudnorm</code> parameters simultaneously: frame size (<code>f</code> 500→150 ms), Gaussian smoothing window (<code>g</code> 31→15 frames), and maximum gain factor (<code>m</code> 2.0→6.0, ≈ +6 to +15 dB). Best for panel recordings, live Q&amp;As, and multi-voice sources with inconsistent levels. Not recommended for solo voice — can cause pumping on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
         </div>
       </li>
       <li>
@@ -716,7 +719,7 @@
     <h3>Quick Start</h3>
     <ol>
       <li>Click <strong>WaxOff</strong> in the toolbar</li>
-      <li>Select a preset from the Preset menu in the toolbar, or dial in your settings manually</li>
+      <li>Select a preset from the Preset menu in the toolbar, or dial in true peak and target loudness in the processor strip</li>
       <li>Drag your finished mix file onto the window</li>
       <li>Click <strong>Process</strong></li>
     </ol>
@@ -802,12 +805,12 @@
         </tr>
         <tr>
           <td>True Peak</td>
-          <td>−3.0 to −0.1 dBTP · default −1.0</td>
+          <td>−3.0 to −0.5 dBTP · 0.5 dBTP steps · default −1.0</td>
           <td>Maximum true peak ceiling. −1.0 dBTP is the standard for podcast streaming platforms and prevents inter-sample clipping on compressed streams.</td>
         </tr>
         <tr>
           <td>Target LUFS</td>
-          <td>−24 to −14 LUFS · default −18</td>
+          <td>−24 to −14 LUFS · 1 LUFS steps · default −18</td>
           <td>Integrated loudness target. −18 LUFS is the podcast standard used by most hosting platforms. −16 LUFS gives a louder result.</td>
         </tr>
         <tr>
