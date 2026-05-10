@@ -15,109 +15,28 @@ struct SettingsView: View {
                     .padding(.horizontal, 2)
 
                 row("Sample Rate") {
-                    Picker("", selection: $viewModel.settings.sampleRate) {
-                        Text("44.1 kHz").tag(WaxOnSettings.SampleRate.s44100)
-                        Text("48 kHz").tag(WaxOnSettings.SampleRate.s48000)
-                    }
-                    .pickerStyle(.segmented)
+                    LabeledToggleSwitch(
+                        selection: $viewModel.settings.sampleRate,
+                        leftLabel: "44.1 kHz",
+                        leftValue: WaxOnSettings.SampleRate.s44100,
+                        rightLabel: "48 kHz",
+                        rightValue: WaxOnSettings.SampleRate.s48000
+                    )
+                    .frame(maxWidth: .infinity)
                 }
 
                 row("Channels") {
-                    Picker("", selection: $viewModel.settings.outputChannels) {
-                        Text("Mono").tag(WaxOnSettings.OutputChannels.mono)
-                        Text("Stereo").tag(WaxOnSettings.OutputChannels.stereo)
-                    }
-                    .pickerStyle(.segmented)
+                    LabeledToggleSwitch(
+                        selection: $viewModel.settings.outputChannels,
+                        leftLabel: "Mono",
+                        leftValue: WaxOnSettings.OutputChannels.mono,
+                        rightLabel: "Stereo",
+                        rightValue: WaxOnSettings.OutputChannels.stereo
+                    )
+                    .frame(maxWidth: .infinity)
                 }
 
-                row("Channel") {
-                    Picker("", selection: $viewModel.settings.channel) {
-                        Text("Left").tag(WaxOnSettings.MonoChannel.left)
-                        Text("Right").tag(WaxOnSettings.MonoChannel.right)
-                    }
-                    .pickerStyle(.segmented)
-                }
-                .disabled(viewModel.settings.outputChannels == .stereo)
-                .opacity(viewModel.settings.outputChannels == .stereo ? 0.4 : 1)
-                .help(viewModel.settings.outputChannels == .stereo ? "Only applies in Mono output mode" : "")
-
-                row("High Pass", caption: "80 Hz — removes rumble and proximity effect. DC offset is always removed regardless of this setting.") {
-                    HStack(spacing: 8) {
-                        Toggle("", isOn: $viewModel.settings.highPassEnabled)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        Text("80 Hz")
-                    }
-                }
-
-                row("Phase Rotation", caption: "Allpass at 200 Hz — recovers headroom on asymmetric voice waveforms.") {
-                    HStack(spacing: 8) {
-                        Toggle("", isOn: $viewModel.settings.phaseRotationEnabled)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        Text("200 Hz allpass")
-                    }
-                }
-
-                Divider().padding(.vertical, 6)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("PANEL / MULTI-VOICE")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Color.accentColor.opacity(0.8))
-                        .kerning(0.4)
-                    Text("For recordings with multiple voices at inconsistent levels.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 2)
-
-                row("Dynamic Leveling") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Toggle("", isOn: $viewModel.settings.dynamicLevelingEnabled)
-                                .toggleStyle(.switch)
-                                .labelsHidden()
-                            Text("dynaudnorm")
-                        }
-                        Text("Lifts quiet voices, tames loud ones — panel shows, live Q&As. Can cause pumping on solo voice with natural pauses.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                row("Aggressiveness", caption: "Max gain: Gentle +6 dB · Aggressive +15 dB. Audition output before editing.") {
-                    HStack(spacing: 6) {
-                        Slider(value: $viewModel.settings.dynamicLevelingAmount, in: 0 ... 1)
-                        Text(aggressivenessLabel(viewModel.settings.dynamicLevelingAmount))
-                            .font(.system(size: 11).monospaced())
-                            .frame(width: 68, alignment: .trailing)
-                    }
-                }
-                .disabled(!viewModel.settings.dynamicLevelingEnabled)
-                .opacity(!viewModel.settings.dynamicLevelingEnabled ? 0.4 : 1)
-                .help(!viewModel.settings.dynamicLevelingEnabled ? "Enable Dynamic Leveling to adjust" : "")
-
-                Divider().padding(.vertical, 6)
-
-                row("Loudness Norm", caption: "Two-pass EBU R128 normalization to a target loudness") {
-                    Toggle("", isOn: $viewModel.settings.loudnormEnabled)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                }
-
-                row("Target") {
-                    HStack(spacing: 6) {
-                        Slider(value: $viewModel.settings.loudnormTarget, in: -35 ... -16, step: 1)
-                        Text(String(format: "%.0f LUFS", viewModel.settings.loudnormTarget))
-                            .font(.system(size: 11).monospaced())
-                            .frame(width: 52, alignment: .trailing)
-                    }
-                }
-                .disabled(!viewModel.settings.loudnormEnabled)
-                .opacity(!viewModel.settings.loudnormEnabled ? 0.4 : 1)
-                .help(!viewModel.settings.loudnormEnabled ? "Enable Loudness Norm to adjust" : "")
+                channelRow
 
                 Divider().padding(.vertical, 6)
 
@@ -165,20 +84,33 @@ struct SettingsView: View {
         .background(.thinMaterial)
     }
 
-    private func aggressivenessLabel(_ amount: Double) -> String {
-        switch amount {
-        case ..<0.25: return "Gentle"
-        case ..<0.5:  return "Low"
-        case ..<0.75: return "Medium"
-        case ..<0.9:  return "High"
-        default:      return "Aggressive"
+    private var channelRow: some View {
+        let channelEnabled = viewModel.settings.outputChannels == .mono
+        return VStack(alignment: .leading, spacing: 5) {
+            Text("CHANNEL")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .kerning(0.4)
+                .opacity(channelEnabled ? 1 : 0.4)
+            LabeledToggleSwitch(
+                selection: $viewModel.settings.channel,
+                leftLabel: "Left",
+                leftValue: WaxOnSettings.MonoChannel.left,
+                rightLabel: "Right",
+                rightValue: WaxOnSettings.MonoChannel.right
+            )
+            .frame(maxWidth: .infinity)
+            .opacity(channelEnabled ? 1 : 0.4)
         }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 2)
+        .disabled(!channelEnabled)
+        .help(channelEnabled ? "" : "Only applies in Mono output mode")
     }
 
     @ViewBuilder
     private func row<Content: View>(
         _ label: String?,
-        caption: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -189,11 +121,6 @@ struct SettingsView: View {
                     .kerning(0.4)
             }
             content()
-            if let caption {
-                Text(caption)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 2)

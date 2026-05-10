@@ -19,6 +19,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             headerView
             HStack(spacing: 0) {
+
                 fileListSection
                     .frame(width: fileListWidth)
 
@@ -56,9 +57,9 @@ struct ContentView: View {
                     .transition(.move(edge: .trailing))
                 }
             }
+            WaxOnControlBar(viewModel: viewModel)
         }
         .frame(minWidth: 1092, minHeight: 624)
-        .padding(.bottom)
         .dropDestination(for: URL.self) { urls, _ in
             viewModel.addFiles(urls)
             return !urls.isEmpty
