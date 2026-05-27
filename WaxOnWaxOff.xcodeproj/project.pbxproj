@@ -6,13 +6,26 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		E1F2A3AD2EC99000003A77C7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C6DEF1302EC98B05003A77C7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C6DEF1372EC98B05003A77C7;
+			remoteInfo = WaxOnWaxOff;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		C6DEF1382EC98B05003A77C7 /* WaxOnWaxOff.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaxOnWaxOff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		738488A095C14915AEB595B2 /* rnnoise */ = {isa = PBXFileReference; lastKnownFileType = file; name = rnnoise; path = WaxOnWaxOff/rnnoise; sourceTree = "<group>"; };
+		E1F2A3B42EC99000003A77C7 /* WaxOnWaxOffTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WaxOnWaxOffTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1F2A3A82EC99000003A77C7 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXBuildFile section */
 		39B1C655FCFC4AF39D85DB92 /* rnnoise in Resources */ = {isa = PBXBuildFile; fileRef = 738488A095C14915AEB595B2 /* rnnoise */; };
+		E1F2A3A92EC99000003A77C7 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1F2A3A82EC99000003A77C7 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -34,6 +47,11 @@
 			path = WaxOnWaxOff;
 			sourceTree = "<group>";
 		};
+		E1F2A3B32EC99000003A77C7 /* WaxOnWaxOffTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WaxOnWaxOffTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +62,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E1F2A3B02EC99000003A77C7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E1F2A3A92EC99000003A77C7 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -51,14 +77,25 @@
 			isa = PBXGroup;
 			children = (
 				C6DEF13A2EC98B05003A77C7 /* WaxOnWaxOff */,
+				E1F2A3B32EC99000003A77C7 /* WaxOnWaxOffTests */,
 				C6DEF1392EC98B05003A77C7 /* Products */,
+				E1F2A3A72EC99000003A77C7 /* Frameworks */,
 			);
+			sourceTree = "<group>";
+		};
+		E1F2A3A72EC99000003A77C7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				E1F2A3A82EC99000003A77C7 /* XCTest.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		C6DEF1392EC98B05003A77C7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				C6DEF1382EC98B05003A77C7 /* WaxOnWaxOff.app */,
+				E1F2A3B42EC99000003A77C7 /* WaxOnWaxOffTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +107,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C6DEF1432EC98B06003A77C7 /* Build configuration list for PBXNativeTarget "WaxOnWaxOff" */;
 			buildPhases = (
+				E1F2A3B52EC99001003A77C7 /* Fetch FFmpeg */,
 				C6DEF1342EC98B05003A77C7 /* Sources */,
 				C6DEF1352EC98B05003A77C7 /* Frameworks */,
 				C6DEF1362EC98B05003A77C7 /* Resources */,
@@ -88,6 +126,29 @@
 			productReference = C6DEF1382EC98B05003A77C7 /* WaxOnWaxOff.app */;
 			productType = "com.apple.product-type.application";
 		};
+		E1F2A3B22EC99000003A77C7 /* WaxOnWaxOffTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E1F2A3AA2EC99000003A77C7 /* Build configuration list for PBXNativeTarget "WaxOnWaxOffTests" */;
+			buildPhases = (
+				E1F2A3B12EC99000003A77C7 /* Sources */,
+				E1F2A3B02EC99000003A77C7 /* Frameworks */,
+				E1F2A3AF2EC99000003A77C7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E1F2A3AE2EC99000003A77C7 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E1F2A3B32EC99000003A77C7 /* WaxOnWaxOffTests */,
+			);
+			name = WaxOnWaxOffTests;
+			packageProductDependencies = (
+			);
+			productName = WaxOnWaxOffTests;
+			productReference = E1F2A3B42EC99000003A77C7 /* WaxOnWaxOffTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -100,6 +161,10 @@
 				TargetAttributes = {
 					C6DEF1372EC98B05003A77C7 = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					E1F2A3B22EC99000003A77C7 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = C6DEF1372EC98B05003A77C7;
 					};
 				};
 			};
@@ -118,6 +183,7 @@
 			projectRoot = "";
 			targets = (
 				C6DEF1372EC98B05003A77C7 /* WaxOnWaxOff */,
+				E1F2A3B22EC99000003A77C7 /* WaxOnWaxOffTests */,
 			);
 		};
 /* End PBXProject section */
@@ -131,7 +197,36 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E1F2A3AF2EC99000003A77C7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E1F2A3B52EC99001003A77C7 /* Fetch FFmpeg */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Vendor/ffmpeg-manifest.env",
+				"$(SRCROOT)/scripts/fetch-ffmpeg.sh",
+			);
+			name = "Fetch FFmpeg";
+			outputPaths = (
+				"$(SRCROOT)/WaxOnWaxOff/ffmpeg",
+				"$(SRCROOT)/WaxOnWaxOff/ffprobe",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/fetch-ffmpeg.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C6DEF1342EC98B05003A77C7 /* Sources */ = {
@@ -141,7 +236,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E1F2A3B12EC99000003A77C7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E1F2A3AE2EC99000003A77C7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C6DEF1372EC98B05003A77C7 /* WaxOnWaxOff */;
+			targetProxy = E1F2A3AD2EC99000003A77C7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		C6DEF1412EC98B06003A77C7 /* Debug */ = {
@@ -267,12 +377,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = WaxOnWaxOff/WaxOnWaxOff.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "WaxOn/WaxOff";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -299,12 +410,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = WaxOnWaxOff/WaxOnWaxOff.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "WaxOn/WaxOff";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -326,6 +438,54 @@
 			};
 			name = Release;
 		};
+		E1F2A3AC2EC99000003A77C7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.sevmorris.WaxOnWaxOffTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WaxOnWaxOff.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WaxOnWaxOff";
+			};
+			name = Debug;
+		};
+		E1F2A3AB2EC99000003A77C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.sevmorris.WaxOnWaxOffTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WaxOnWaxOff.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WaxOnWaxOff";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -343,6 +503,15 @@
 			buildConfigurations = (
 				C6DEF1442EC98B06003A77C7 /* Debug */,
 				C6DEF1452EC98B06003A77C7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E1F2A3AA2EC99000003A77C7 /* Build configuration list for PBXNativeTarget "WaxOnWaxOffTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E1F2A3AC2EC99000003A77C7 /* Debug */,
+				E1F2A3AB2EC99000003A77C7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

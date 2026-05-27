@@ -78,7 +78,7 @@ struct WaxOffPreset: Identifiable, Codable, Equatable {
             settings: WaxOffSettings(
                 targetLUFS: -18,
                 truePeak: -1.0,
-                lra: 11.0,
+                lra: 9.0,
                 outputMode: .both,
                 mp3Bitrate: 160,
                 sampleRate: 44100
@@ -90,7 +90,7 @@ struct WaxOffPreset: Identifiable, Codable, Equatable {
             settings: WaxOffSettings(
                 targetLUFS: -16,
                 truePeak: -1.0,
-                lra: 11.0,
+                lra: 9.0,
                 outputMode: .both,
                 mp3Bitrate: 160,
                 sampleRate: 44100
@@ -102,7 +102,7 @@ struct WaxOffPreset: Identifiable, Codable, Equatable {
             settings: WaxOffSettings(
                 targetLUFS: -18,
                 truePeak: -1.0,
-                lra: 11.0,
+                lra: 9.0,
                 outputMode: .wav,
                 mp3Bitrate: 160,
                 sampleRate: 48000

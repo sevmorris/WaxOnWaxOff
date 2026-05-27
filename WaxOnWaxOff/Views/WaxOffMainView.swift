@@ -91,7 +91,8 @@ struct WaxOffMainView: View {
                 } label: {
                     Label("Process", systemImage: "play.fill")
                 }
-                .disabled(viewModel.files.isEmpty)
+                .disabled(viewModel.files.isEmpty || viewModel.isAnyFileAnalyzing)
+                .help(viewModel.isAnyFileAnalyzing ? "Waiting for analysis to complete…" : "")
             }
 
             Button {
@@ -213,7 +214,11 @@ private struct DeliveryFileListView: View {
     var body: some View {
         List(selection: $viewModel.selectedFileIDs) {
             ForEach(viewModel.files) { file in
-                FileRowView(file: file, showMonoUpmixBadge: file.fileInfo?.channelCount == 1)
+                FileRowView(
+                    file: file,
+                    isProcessing: viewModel.isProcessing,
+                    showMonoUpmixBadge: file.fileInfo?.channelCount == 1
+                )
                     .tag(file.id)
             }
             .onDelete { offsets in

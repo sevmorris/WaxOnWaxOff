@@ -148,12 +148,33 @@ final class ContentViewModel {
             return
         }
 
+        let inputs = files.compactMap { file -> JobInput? in
+            guard case .ready = file.status else { return nil }
+            return JobInput(id: file.id, url: file.url)
+        }
+        guard !inputs.isEmpty else {
+            alertMessage = "No files are ready to process — wait for analysis to finish or fix errors first."
+            return
+        }
+
+        let outputDirectories = inputs.map {
+            OutputDirectory.waxOnOutputDirectory(for: $0.url, settings: settings)
+        }
+        let concurrentJobs = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
+        if let reason = DiskSpaceChecker.waxOnBatchBlockedReason(
+            inputURLs: inputs.map(\.url),
+            outputDirectories: outputDirectories,
+            concurrentJobs: concurrentJobs
+        ) {
+            alertMessage = reason
+            return
+        }
+
         isProcessing = true
         processingCancelled = false
         log.clear()
 
         let currentSettings = settings
-        let inputs = files.map { JobInput(id: $0.id, url: $0.url) }
 
         // Snapshot stats so they survive the status transition
         for i in files.indices {
@@ -169,8 +190,7 @@ final class ContentViewModel {
                         guard let self else { return }
                         Task { @MainActor [self] in
                             guard !self.processingCancelled else { return }
-                            guard let index = self.files.firstIndex(where: { $0.id == id }),
-                                  !self.files[index].isProcessed else { return }
+                            guard let index = self.files.firstIndex(where: { $0.id == id }) else { return }
                             self.files[index].status = .processing
                         }
                     },
@@ -179,34 +199,61 @@ final class ContentViewModel {
                             self?.log.append(message, level: level)
                         }
                     })
-                let results = try await processor.run(inputs: inputs)
+                let batch = try await processor.run(inputs: inputs)
 
-                for result in results {
+                for result in batch.successes {
                     if let id = result.id,
                        let index = files.firstIndex(where: { $0.id == id }) {
                         files[index].status = .processed(outputURL: result.output)
                     }
                 }
 
-                // Generate output waveforms and stats
-                for result in results {
+                for failure in batch.failures {
+                    if let index = files.firstIndex(where: { $0.id == failure.id }) {
+                        files[index].status = .error(failure.message)
+                    }
+                }
+
+                resetStuckProcessingRows()
+
+                for result in batch.successes {
                     if let id = result.id {
                         generateOutputWaveform(id: id, url: result.output)
                         analyzeOutputFile(id: id, url: result.output)
                     }
                 }
 
-                await NotificationService.showCompletionNotification(fileCount: results.count)
+                if batch.failures.isEmpty {
+                    await NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
+                } else if batch.successes.isEmpty {
+                    alertMessage = "Processing failed. Open the Console tab for details."
+                } else {
+                    alertMessage = "\(batch.successes.count) file\(batch.successes.count == 1 ? "" : "s") processed, \(batch.failures.count) failed. See Console for details."
+                    await NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
+                }
             } catch is CancellationError {
-                // User cancelled — no alert needed
+                // User cancelled — cancelProcessing() already restored row state
             } catch {
                 logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
                 log.append("✗ \(error.localizedDescription)", level: .info)
+                resetStuckProcessingRows()
                 alertMessage = "Processing failed. Open the Console tab for details."
             }
 
             isProcessing = false
             processingTask = nil
+        }
+    }
+
+    /// Safety net — no row should remain `.processing` once a batch finishes.
+    private func resetStuckProcessingRows() {
+        for i in files.indices {
+            guard case .processing = files[i].status else { continue }
+            if let stats = files[i].analysisStats {
+                files[i].status = .ready(stats)
+            } else {
+                files[i].status = .error("Processing interrupted")
+            }
         }
     }
 

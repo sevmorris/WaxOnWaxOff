@@ -65,6 +65,17 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Environment:** macOS 14.0+ (Sonoma); Native Apple Silicon and Intel support.
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
+## Building from Source
+
+```bash
+git clone https://github.com/sevmorris/WaxOnWaxOff.git
+cd WaxOnWaxOff
+./scripts/fetch-ffmpeg.sh   # downloads pinned ffmpeg/ffprobe (~100 MB)
+open WaxOnWaxOff.xcodeproj
+```
+
+FFmpeg binaries are stored as [GitHub release assets](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/ffmpeg-deps-8.0-arm64), not in git. Xcode also runs `scripts/fetch-ffmpeg.sh` automatically before each build. See `Vendor/README.md` for checksums and update instructions.
+
 ## Technical Origin
 I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and internal per-channel RNNoise on the analysis pass for measurement accuracy on noisy recordings — reflects deliberate choices, not defaults.
 

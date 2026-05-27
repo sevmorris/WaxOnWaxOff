@@ -12,6 +12,17 @@ struct JobResult: Sendable {
     }
 }
 
+struct WaxOnJobFailure: Sendable {
+    let id: UUID
+    let message: String
+}
+
+/// Per-file outcomes from a WaxOn batch — one file failing does not abort the rest.
+struct WaxOnBatchRunResult: Sendable {
+    let successes: [JobResult]
+    let failures: [WaxOnJobFailure]
+}
+
 enum ProcessingError: LocalizedError {
     case invalidInput
     case tempDirectoryFailed

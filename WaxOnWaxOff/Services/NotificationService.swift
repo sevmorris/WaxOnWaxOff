@@ -2,7 +2,8 @@ import Foundation
 import UserNotifications
 
 enum NotificationService {
-    static func showCompletionNotification(fileCount: Int) async {
+    static func showCompletionNotification(mode: AppMode, fileCount: Int) async {
+        guard fileCount > 0 else { return }
         let center = UNUserNotificationCenter.current()
 
         do {
@@ -18,7 +19,7 @@ enum NotificationService {
             }
 
             let content = UNMutableNotificationContent()
-            content.title = "WaxOn Processing Complete"
+            content.title = mode == .waxOn ? "WaxOn Processing Complete" : "WaxOff Delivery Complete"
             content.body = "Successfully processed \(fileCount) file\(fileCount == 1 ? "" : "s")"
             content.sound = .default
 

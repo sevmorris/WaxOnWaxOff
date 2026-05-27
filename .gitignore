@@ -10,5 +10,9 @@ xcuserdata/
 # DMG artifacts
 *.dmg
 
+# Bundled FFmpeg binaries (downloaded via scripts/fetch-ffmpeg.sh)
+WaxOnWaxOff/ffmpeg
+WaxOnWaxOff/ffprobe
+
 # Claude
 .claude/

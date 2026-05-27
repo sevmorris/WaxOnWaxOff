@@ -43,7 +43,7 @@ cleanup() {
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 step "Preflight checks"
-for cmd in xcodebuild hdiutil gh git codesign xcrun; do
+for cmd in xcodebuild hdiutil gh git codesign xcrun curl; do
     command -v $cmd &>/dev/null || fail "'$cmd' not found in PATH"
 done
 ok "Tools present"
@@ -78,6 +78,18 @@ else
     git commit -m "Bump version to $VERSION"
     ok "Committed version bump"
 fi
+
+step "Bumping build number"
+BUILD_NUM=$(grep 'CURRENT_PROJECT_VERSION = ' "$PROJECT/project.pbxproj" | head -1 | grep -o '[0-9][0-9]*')
+NEXT_BUILD=$((BUILD_NUM + 1))
+sed -i '' "s/CURRENT_PROJECT_VERSION = ${BUILD_NUM};/CURRENT_PROJECT_VERSION = ${NEXT_BUILD};/g" \
+    "$PROJECT/project.pbxproj"
+ok "Build number ${BUILD_NUM} → ${NEXT_BUILD}"
+
+step "Fetching FFmpeg binaries"
+chmod +x "$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
+"$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
+ok "FFmpeg present"
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 step "Building (clean, Release)"
@@ -216,10 +228,11 @@ gh release create "$TAG" "$DMG" \
     --notes "$RELEASE_NOTES"
 ok "Release published"
 
-# ── Remove old releases ───────────────────────────────────────────────────────
-step "Removing old releases"
+# ── Remove old releases (keep the ${KEEP_RELEASES} most recent) ───────────────
+KEEP_RELEASES=5
+step "Removing old releases (keeping ${KEEP_RELEASES} most recent)"
 OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
-    --jq '.[].tagName' | grep -v "^${TAG}$" || true)
+    --jq '.[].tagName' | tail -n +$((KEEP_RELEASES + 1)) || true)
 if [[ -z "$OLD_TAGS" ]]; then
     ok "No old releases to remove"
 else

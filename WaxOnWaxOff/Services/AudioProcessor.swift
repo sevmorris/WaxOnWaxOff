@@ -10,6 +10,9 @@ actor AudioProcessor {
     let onFileStarted: (@Sendable (UUID) -> Void)?
     let onLog: (@Sendable (String, LogLevel) -> Void)?
 
+    /// Output paths claimed by in-flight jobs in the current batch.
+    private var reservedOutputPaths: Set<String> = []
+
     init(settings: WaxOnSettings,
          onFileStarted: (@Sendable (UUID) -> Void)? = nil,
          onLog: (@Sendable (String, LogLevel) -> Void)? = nil) {
@@ -18,14 +21,25 @@ actor AudioProcessor {
         self.onLog = onLog
     }
 
-    func run(inputs: [JobInput]) async throws -> [JobResult] {
-        guard !inputs.isEmpty else { return [] }
+    private enum JobOutcome: Sendable {
+        case success(JobResult)
+        case failure(WaxOnJobFailure)
+        case cancelled
+    }
+
+    func run(inputs: [JobInput]) async throws -> WaxOnBatchRunResult {
+        guard !inputs.isEmpty else {
+            return WaxOnBatchRunResult(successes: [], failures: [])
+        }
+
+        reservedOutputPaths.removeAll(keepingCapacity: true)
 
         let tools = try await FFmpegManager.shared.ensureTools()
         let maxConcurrent = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
 
-        return try await withThrowingTaskGroup(of: JobResult?.self) { group in
-            var results: [JobResult] = []
+        return try await withThrowingTaskGroup(of: JobOutcome.self) { group in
+            var successes: [JobResult] = []
+            var failures: [WaxOnJobFailure] = []
             var index = 0
 
             func addNext() {
@@ -33,9 +47,23 @@ actor AudioProcessor {
                 let input = inputs[index]
                 index += 1
                 group.addTask {
-                    try Task.checkCancellation()
-                    self.onFileStarted?(input.id)
-                    return try await self.processOne(input.url, id: input.id, tools: tools)
+                    do {
+                        try Task.checkCancellation()
+                        self.onFileStarted?(input.id)
+                        guard let result = try await self.processOne(input.url, id: input.id, tools: tools) else {
+                            return .failure(WaxOnJobFailure(
+                                id: input.id,
+                                message: ProcessingError.outputMissing.errorDescription ?? "No output produced"
+                            ))
+                        }
+                        return .success(result)
+                    } catch is CancellationError {
+                        return .cancelled
+                    } catch {
+                        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                        self.onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
+                        return .failure(WaxOnJobFailure(id: input.id, message: message))
+                    }
                 }
             }
 
@@ -43,14 +71,20 @@ actor AudioProcessor {
                 addNext()
             }
 
-            for try await result in group {
-                if let result {
-                    results.append(result)
+            for try await outcome in group {
+                switch outcome {
+                case .success(let result):
+                    successes.append(result)
+                case .failure(let failure):
+                    failures.append(failure)
+                case .cancelled:
+                    group.cancelAll()
+                    throw CancellationError()
                 }
                 addNext()
             }
 
-            return results
+            return WaxOnBatchRunResult(successes: successes, failures: failures)
         }
     }
 
@@ -65,9 +99,10 @@ actor AudioProcessor {
         let stem = input.deletingPathExtension().lastPathComponent
         let filename = input.lastPathComponent
         let limitAmp = pow(10.0, -1.0 / 20.0)
-        let outDir = bestOutputDir(for: input)
-        let outName = "\(stem)-\(rateTag)waxon.wav"
-        let finalURL = outDir.appendingPathComponent(outName)
+        let outDir = OutputDirectory.waxOnOutputDirectory(for: input, settings: settings) { [self] message in
+            self.onLog?("⚠ \(message)", .info)
+        }
+        let (finalURL, outName) = allocateWaxOnOutput(stem: stem, rateTag: rateTag, input: input, outDir: outDir)
 
         let work = try makeTemp(prefix: "waxon_\(rateTag)_")
         defer { try? fm.removeItem(at: work) }
@@ -84,7 +119,7 @@ actor AudioProcessor {
         let outputChannelCount: String = isStereo ? "2" : "1"
 
         onLog?("▶ \(filename)", .info)
-        let inputChannelCount = (try? await getChannelCount(exe: tools.ffprobe, url: input)) ?? 0
+        let inputChannelCount = try await getChannelCount(exe: tools.ffprobe, url: input)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
         let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
         let hpFreq = settings.highPassEnabled ? 80 : 20
@@ -179,7 +214,7 @@ actor AudioProcessor {
             if let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
                 let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
                 onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
-                let escapedNrModel = ffmpegFilterEscape(modelURL.path)
+                let escapedNrModel = FFmpegRunner.filterEscape(modelURL.path)
                 // arnndn is fixed at 48 kHz internally. Writing the temp file at 48 kHz
                 // avoids a 44.1 → 48 → 44.1 round-trip that costs CPU for nothing — this
                 // file is only consumed by loudnorm pass 1, which doesn't care about rate.
@@ -297,6 +332,42 @@ actor AudioProcessor {
         return JobResult(id: id, input: input, output: finalURL)
     }
 
+    /// Pick a unique WaxOn output filename within this batch. Adds a short path
+    /// tag when multiple sources would otherwise collide on `{stem}-{rate}waxon.wav`.
+    private func allocateWaxOnOutput(
+        stem: String,
+        rateTag: String,
+        input: URL,
+        outDir: URL
+    ) -> (url: URL, name: String) {
+        let suffix = "\(rateTag)waxon.wav"
+        let baseName = "\(stem)-\(suffix)"
+        let baseURL = outDir.appendingPathComponent(baseName)
+
+        if !reservedOutputPaths.contains(baseURL.path) {
+            reservedOutputPaths.insert(baseURL.path)
+            return (baseURL, baseName)
+        }
+
+        let tag = Self.shortPathTag(for: input.path)
+        var name = "\(stem)-\(tag)-\(suffix)"
+        var url = outDir.appendingPathComponent(name)
+        if reservedOutputPaths.contains(url.path) {
+            name = "\(stem)-\(tag)-\(UUID().uuidString.prefix(4))-\(suffix)"
+            url = outDir.appendingPathComponent(name)
+        }
+        reservedOutputPaths.insert(url.path)
+        return (url, name)
+    }
+
+    private nonisolated static func shortPathTag(for path: String) -> String {
+        var hash: UInt64 = 5381
+        for byte in path.utf8 {
+            hash = ((hash << 5) &+ hash) &+ UInt64(byte)
+        }
+        return String(format: "%06x", hash & 0xFFFFFF)
+    }
+
     private func makeTemp(prefix: String) throws -> URL {
         let dir = FileManager.waxonTempDirectory
             .appendingPathComponent(prefix + UUID().uuidString.prefix(8), isDirectory: true)
@@ -308,17 +379,6 @@ actor AudioProcessor {
         return dir
     }
 
-    /// Escape a string for safe use inside an FFmpeg filtergraph value.
-    /// Handles the five characters the filtergraph parser treats as syntax.
-    private nonisolated func ffmpegFilterEscape(_ s: String) -> String {
-        s.replacingOccurrences(of: "\\", with: "\\\\")
-         .replacingOccurrences(of: "'",  with: "\\'")
-         .replacingOccurrences(of: ":",  with: "\\:")
-         .replacingOccurrences(of: "[",  with: "\\[")
-         .replacingOccurrences(of: "]",  with: "\\]")
-    }
-
-    // Maps 0.0 (gentle) → 1.0 (aggressive) to dynaudnorm parameters.
     // Shorter frames and tighter Gaussian smoothing = more responsive leveling.
     // No t (silence threshold): an active threshold causes severe attenuation at
     // speech-to-silence transitions because the Gaussian window interpolates
@@ -378,27 +438,5 @@ actor AudioProcessor {
             throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse channel count")
         }
         return n
-    }
-
-    private func bestOutputDir(for input: URL) -> URL {
-        let fm = FileManager.default
-
-        if let customPath = settings.outputDirectoryPath {
-            let customURL = URL(fileURLWithPath: customPath, isDirectory: true)
-            if fm.isWritableFile(atPath: customURL.path) { return customURL }
-            onLog?("⚠ Custom output directory not writable (\(customPath)), falling back.", .info)
-        }
-
-        let here = input.deletingLastPathComponent()
-        if fm.isWritableFile(atPath: here.path) { return here }
-
-        onLog?("⚠ Source directory not writable, falling back to ~/Music/WaxOnWaxOff.", .info)
-        let music = fm.homeDirectoryForCurrentUser.appendingPathComponent("Music/WaxOnWaxOff", isDirectory: true)
-        if (try? fm.createDirectory(at: music, withIntermediateDirectories: true)) != nil {
-            return music
-        }
-
-        onLog?("⚠ ~/Music/WaxOnWaxOff unavailable, falling back to Desktop.", .info)
-        return fm.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true)
     }
 }

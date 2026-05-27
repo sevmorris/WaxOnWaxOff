@@ -34,6 +34,10 @@ final class DeliveryViewModel {
         self.settings = WaxOffSettings.load()
     }
 
+    var isAnyFileAnalyzing: Bool {
+        files.contains { if case .analyzing = $0.status { return true }; return false }
+    }
+
     // MARK: - File Management
 
     func addFiles(_ urls: [URL]) {
@@ -114,6 +118,26 @@ final class DeliveryViewModel {
             return
         }
 
+        let readyFiles = files.filter {
+            if case .ready = $0.status { return true }
+            return false
+        }
+        guard !readyFiles.isEmpty else {
+            alertMessage = "No files are ready to process — wait for analysis to finish or fix errors first."
+            return
+        }
+
+        let outputDirectories = readyFiles.map {
+            OutputDirectory.waxOffOutputDirectory(for: $0.url, settings: settings)
+        }
+        if let reason = DiskSpaceChecker.waxOffBatchBlockedReason(
+            inputURLs: readyFiles.map(\.url),
+            outputDirectories: outputDirectories
+        ) {
+            alertMessage = reason
+            return
+        }
+
         isProcessing = true
         log.clear()
 
@@ -135,6 +159,8 @@ final class DeliveryViewModel {
                 guard case .ready = file.status else { return nil }
                 return file.id
             }
+
+            var batchSuccessCount = 0
 
             for fileID in readyFileIDs {
                 guard !Task.isCancelled else { break }
@@ -167,8 +193,10 @@ final class DeliveryViewModel {
                        let primaryURL = outputURLs.first {
                         files[idx].status = .processed(outputURL: primaryURL)
                         generateOutputWaveform(id: fileID, url: primaryURL)
+                        batchSuccessCount += 1
                     }
                 } catch is CancellationError {
+                    restoreProcessingRows()
                     break
                 } catch {
                     log.append("✗ \(error.localizedDescription)", level: .info)
@@ -178,8 +206,11 @@ final class DeliveryViewModel {
                 }
             }
 
-            let successCount = files.filter { $0.isProcessed }.count
-            await NotificationService.showCompletionNotification(fileCount: successCount)
+            restoreProcessingRows()
+
+            if batchSuccessCount > 0 {
+                await NotificationService.showCompletionNotification(mode: .waxOff, fileCount: batchSuccessCount)
+            }
 
             isProcessing = false
             deliveryPhase = nil
@@ -190,6 +221,21 @@ final class DeliveryViewModel {
     func cancelProcessing() {
         processingTask?.cancel()
         processingTask = nil
+        isProcessing = false
+        deliveryPhase = nil
+        restoreProcessingRows()
+    }
+
+    /// Return `.processing` rows to a re-runnable state after cancel or interruption.
+    private func restoreProcessingRows() {
+        for i in files.indices {
+            guard case .processing = files[i].status else { continue }
+            if let stats = files[i].analysisStats {
+                files[i].status = .ready(stats)
+            } else {
+                files[i].status = .pending
+            }
+        }
     }
 
     // MARK: - Presets

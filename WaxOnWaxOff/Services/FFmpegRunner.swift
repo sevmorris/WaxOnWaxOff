@@ -27,10 +27,24 @@ enum FFmpegRunner {
     }
 
     /// Capture stdout — used for ffprobe, which writes its output to stdout.
-    /// Exit code is not checked; callers must validate the returned string.
     static func captureStdout(exe: String, args: [String]) async throws -> String {
-        let (_, stdout) = try await launch(exe: exe, args: args, capture: .stdout)
+        let (exitCode, stdout) = try await launch(exe: exe, args: args, capture: .stdout)
+        if exitCode != 0 {
+            throw ProcessingError.ffmpegFailed(
+                code: exitCode,
+                message: stdout.isEmpty ? "Exit code \(exitCode)" : stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
         return stdout
+    }
+
+    /// Escape a string for safe use inside an FFmpeg filtergraph value.
+    nonisolated static func filterEscape(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\")
+         .replacingOccurrences(of: "'",  with: "\\'")
+         .replacingOccurrences(of: ":",  with: "\\:")
+         .replacingOccurrences(of: "[",  with: "\\[")
+         .replacingOccurrences(of: "]",  with: "\\]")
     }
 
     // MARK: - Loudnorm Parsing
