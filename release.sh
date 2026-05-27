@@ -94,8 +94,8 @@ ok "FFmpeg present"
 # ── Build ─────────────────────────────────────────────────────────────────────
 step "Building (clean, Release)"
 rm -rf "$DERIVED_DATA"
-rm -rf ~/Library/Caches/com.apple.dt.Xcode* 2>/dev/null || true
-rm -rf ~/Library/Developer/Xcode/DerivedData/ModuleCache* 2>/dev/null || true
+rm -rf ~/Library/Caches/com.apple.dt.Xcode*(N) 2>/dev/null || true
+rm -rf ~/Library/Developer/Xcode/DerivedData/ModuleCache*(N) 2>/dev/null || true
 ok "Xcode caches cleared"
 xcodebuild \
     -project "$PROJECT" \
@@ -202,7 +202,7 @@ fi
 # ── Tag and push ──────────────────────────────────────────────────────────────
 step "Tagging and pushing"
 git tag "$TAG"
-git push
+git push -u origin main
 git push origin "$TAG"
 ok "Pushed $TAG"
 
