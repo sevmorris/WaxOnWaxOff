@@ -1,5 +1,16 @@
 import SwiftUI
 
+// Orange/cream palette — matches docs/index.html and the app accent so the help
+// window reads as part of the same product, not a generic system document.
+/// Warm dark background (#1A1816) — same as the landing page.
+private let helpSurface   = Color(red: 0x1A/255, green: 0x18/255, blue: 0x16/255)
+/// Cream body text (#F2EAD8) — readable on the dark warm surface.
+private let helpText      = Color(red: 0xF2/255, green: 0xEA/255, blue: 0xD8/255)
+/// Orange accent (#D4520A) — section headings, matches app accent.
+private let helpAccent    = Color(red: 0xD4/255, green: 0x52/255, blue: 0x0A/255)
+/// Muted tan for subtitle / definition detail.
+private let helpSecondary = Color(red: 0x9C/255, green: 0x8A/255, blue: 0x6A/255)
+
 struct HelpView: View {
     var body: some View {
         ScrollView {
@@ -119,9 +130,11 @@ struct HelpView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("If WaxOn/WaxOff saves you time, consider buying me a coffee.")
+                        .foregroundColor(helpText)
                         .fixedSize(horizontal: false, vertical: true)
                     Link("ko-fi.com/sevmo", destination: URL(string: "https://ko-fi.com/sevmo")!)
                         .font(.body)
+                        .foregroundColor(helpAccent)
                 }
 
                 Spacer()
@@ -129,6 +142,8 @@ struct HelpView: View {
             .padding(30)
         }
         .frame(width: 580, height: 720)
+        .background(helpSurface)
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Components
@@ -137,9 +152,10 @@ struct HelpView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("WaxOn/WaxOff Help")
                 .font(.largeTitle.bold())
+                .foregroundColor(helpText)
             Text("Podcast Audio Prep for macOS")
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundColor(helpSecondary)
         }
     }
 
@@ -152,20 +168,23 @@ struct HelpView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.title2.bold())
+                .foregroundColor(helpAccent)
             content()
         }
     }
 
     private func text(_ string: String) -> some View {
         Text(string)
+            .foregroundColor(helpText)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private func code(_ string: String) -> some View {
         Text(string)
             .font(.system(.body, design: .monospaced))
+            .foregroundColor(helpText)
             .padding(8)
-            .background(.quaternary)
+            .background(Color(red: 0x24/255, green: 0x20/255, blue: 0x18/255))
             .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
@@ -175,8 +194,10 @@ struct HelpView: View {
                 HStack(alignment: .top, spacing: 8) {
                     Text("\(index + 1).")
                         .font(.body.bold())
+                        .foregroundColor(helpAccent)
                         .frame(width: 20, alignment: .trailing)
                     Text(item)
+                        .foregroundColor(helpText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -191,8 +212,9 @@ struct HelpView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(term)
                 .font(.body.bold())
+                .foregroundColor(helpText)
             Text(detail)
-                .foregroundStyle(.secondary)
+                .foregroundColor(helpSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.bottom, 4)
