@@ -446,6 +446,10 @@
   <a href="#waxoff-design">WaxOff Design</a>
   <a href="#formats">Output Formats</a>
   <a href="#dithering">Dithering</a>
+  <a class="section-head" href="#">Reference</a>
+  <a href="#analysis-vs-processing">Analysis vs Processing</a>
+  <a href="#defaults">Defaults &amp; Parameters</a>
+  <a href="#edge-cases">Edge Cases</a>
   <a href="#summary">Summary</a>
   <a class="nav-footer" href="https://ko-fi.com/sevmo" target="_blank" rel="noopener">☕ Buy me a coffee</a>
 </nav>
@@ -456,10 +460,10 @@
   <div class="hero" id="intro">
     <h1>Theory of Operation</h1>
     <p>WaxOn and WaxOff address opposite ends of the podcast production workflow.</p>
-    <p style="margin-top: 12px;"><strong>WaxOn</strong> is an ingest preprocessor. It takes raw recordings — directly from a microphone or recording interface — and prepares them for editing: high-pass filtering, phase rotation, optional leveling, loudness normalization, and true-peak limiting. The goal is recordings that arrive in your DAW at consistent, manageable levels with their dynamic character intact. WaxOn is not a mastering tool; it is a staging tool.</p>
+    <p style="margin-top: 12px;"><strong>WaxOn</strong> is an ingest preprocessor. It takes raw recordings — directly from a microphone or recording interface — and prepares them for editing. The pipeline always applies a high-pass filter (20 Hz floor minimum; 80 Hz when enabled) and a fixed −1.0 dBTP true-peak limiter. Phase rotation, dynamic leveling, and loudness normalization are optional — see <a href="#defaults">Defaults &amp; Parameters</a>. The goal is recordings that arrive in your DAW at consistent, manageable levels with their dynamic character intact. WaxOn is not a mastering tool; it is a staging tool.</p>
     <p style="margin-top: 12px;"><strong>WaxOff</strong> is a broadcast delivery tool. It takes a finished, edited mix and prepares it for distribution: loudness normalization to a delivery target and true-peak ceiling enforcement for safe streaming ingest. The goal is a delivery file that passes platform normalization cleanly and sounds consistent across episodes.</p>
-    <p style="margin-top: 12px;">Both modes are built on the same core DSP stages — EBU R128 loudness measurement, two-pass linear normalization, and oversampled true-peak limiting — combined with mode-specific tools: dynamic normalization (dynaudnorm, WaxOn only) and a dedicated pre-encode limiter for WaxOff's MP3 path. WaxOn also uses RNNoise internally during the loudnorm analysis pass to improve measurement accuracy on noisy recordings — not as a user-facing stage, but as an implementation detail of the two-pass normalization. Every stage is deliberately ordered. The algorithms interact, and the ordering decisions are not arbitrary.</p>
-    <p style="margin-top: 12px;">This document explains each stage: what it does, how it works, and why it is placed where it is. The Signal Chains section gives the processing order at a glance. The following sections cover each algorithm in depth — the shared normalization and limiting concepts first, then the WaxOn processing stages in signal-chain order, then the design rationale for each mode, and finally the output format decisions.</p>
+    <p style="margin-top: 12px;">Both modes are built on the same core DSP stages — EBU R128 loudness measurement, two-pass linear normalization, and oversampled true-peak limiting — combined with mode-specific tools: dynamic normalization (<code>dynaudnorm</code>, WaxOn only) and a dedicated pre-encode limiter for WaxOff's MP3 path. When WaxOn's Loudness Norm toggle is on, RNNoise runs internally during the loudnorm analysis pass only to improve measurement accuracy on noisy recordings — not as a user-facing stage, but as an implementation detail of the two-pass normalization. Every stage is deliberately ordered. The algorithms interact, and the ordering decisions are not arbitrary.</p>
+    <p style="margin-top: 12px;">This document explains each stage: what it does, how it works, and why it is placed where it is. The Signal Chains section gives the processing order at a glance. The following sections cover each algorithm in depth — the shared normalization and limiting concepts first, then the WaxOn processing stages in signal-chain order, then the design rationale for each mode, output format decisions, and reference sections on <a href="#analysis-vs-processing">analysis vs processing</a>, <a href="#defaults">defaults</a>, and <a href="#edge-cases">edge cases</a>.</p>
     <p style="margin-top: 12px; color: var(--muted); font-size: 0.9rem;">This document assumes familiarity with basic audio concepts (dBFS, sample rate, dynamic range). It is written for audio engineers, developers, and technically curious users who want to understand the <em>why</em>, not just the <em>what</em>.</p>
   </div>
 
@@ -470,22 +474,22 @@
     <h3>WaxOn</h3>
     <div class="chain">
       <div class="chain-row">
-        <div class="chain-node">High-Pass Filter</div>
+        <div class="chain-node">High-Pass Filter<br><span style="font-size:0.75rem;font-weight:400;">20 Hz floor; 80 Hz when on</span></div>
         <div class="chain-arrow">→</div>
-        <div class="chain-node">Channel Select<br><span style="font-size:0.75rem;font-weight:400;">mono only</span></div>
+        <div class="chain-node">Channel / Downmix<br><span style="font-size:0.75rem;font-weight:400;">mono: L/R or downmix · stereo: pass-through</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node">Resample<br><span style="font-size:0.75rem;font-weight:400;">to target rate</span></div>
         <div class="chain-arrow">→</div>
-        <div class="chain-node optional">Dynamic Leveling<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm bidirectional</span></div>
+        <div class="chain-node optional">Dynamic Leveling<br><span style="font-size:0.75rem;font-weight:400;">dynaudnorm</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Resample</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--muted);">Dashed border = optional stage. RNNoise is applied internally during the Loudnorm analysis pass only; it does not appear in the main signal chain. Output: 24-bit WAV.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Solid border = always runs. Dashed border = optional stage (Phase Rotation and Dynamic Leveling default on/off respectively; Loudnorm defaults off). RNNoise runs only when Loudnorm is enabled — on a temporary copy during pass 1 analysis, after all prior stages; it does not touch the output signal. The final limiter always runs at a fixed −1.0 dBTP ceiling. Output: 24-bit WAV.</p>
 
     <h3>WaxOff</h3>
     <div class="chain">
@@ -499,7 +503,7 @@
         <div class="chain-node optional">Encode MP3<br><span style="font-size:0.75rem;font-weight:400;">2× oversample limiter</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--muted);">Phase rotation runs in both the analysis and render passes so the loudnorm TP measurement matches the output waveform. The WAV-path limiter is a backstop for inter-sample peaks loudnorm's linear mode missed; on most material it doesn't engage. Dashed nodes are optional. Output: 24-bit WAV and/or MP3.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Phase rotation runs in both the analysis and render passes so the loudnorm TP measurement matches the output waveform. Loudnorm is skipped when pass 1 detects silence or near-silence. The WAV-path limiter is a backstop for inter-sample peaks loudnorm's linear mode missed; on most material it doesn't engage. Dashed nodes are optional. Output: 24-bit WAV and/or MP3.</p>
 
   </section>
 
@@ -562,7 +566,8 @@
 
     <h3>Loudness Range (LRA)</h3>
     <p>LRA measures the spread between loud and quiet sections of a program (its macro-dynamics) in Loudness Units. It is computed as the difference between the 95th and 10th percentiles of the short-term loudness distribution (after gating). EBU R128 does not mandate a specific LRA target but recommends keeping it below 18 LU for broadcast.</p>
-    <p>Both modes pass an LRA value to the <code>loudnorm</code> filter. WaxOn hardcodes LRA=20 (effectively unconstrained, no dynamic processing). WaxOff defaults to LRA=9, which sits in the typical podcast delivery range (6–10 LU) — loose enough to preserve a well-balanced mix but tight enough to constrain occasional overly-dynamic material for car and headphone listening. Lower values compress more aggressively; higher values relax the constraint.</p>
+    <p>Both modes pass an LRA value to the <code>loudnorm</code> filter. In <strong>dynamic mode</strong> (<code>linear=false</code>), the LRA target controls how aggressively the filter constrains macro-dynamics — lower values compress more, higher values relax the constraint. Neither mode uses dynamic mode for pass 2: both WaxOn and WaxOff set <code>linear=true</code>, which applies a single constant gain offset and preserves the source's macro-dynamics regardless of the LRA parameter.</p>
+    <p>WaxOn hardcodes <code>LRA=20</code> (a permissive value used with linear mode so loudnorm acts purely as level adjustment). WaxOff passes <code>LRA=9</code> by default (<code>WaxOffSettings.lra</code>, no UI control) — this value is required by the filter string but does <em>not</em> constrain delivery dynamics in linear mode. Pass 1 still <em>measures</em> and logs <code>input_lra</code>, which is useful for assessing how dynamic a mix is before delivery.</p>
   </section>
 
   <!-- Two-Pass -->
@@ -698,7 +703,7 @@
 
     <details class="callout callout-impl">
       <summary><span class="callout-cat">Under the Hood</span> Training and the Model File</summary>
-      <p>The bundled model (<code>bd.rnnn</code> from the <a href="https://github.com/GregorR/rnnoise-models">rnnoise-models repository</a>) was trained on a large corpus of speech (multiple speakers, multiple languages, multiple recording conditions) mixed with a wide variety of noise types: HVAC, traffic, crowd noise, fan hum, electrical interference, and broadband pink and white noise. The model learns to identify which spectral components correspond to voice and which correspond to noise, using temporal context (the GRU's hidden state) to distinguish steady-state noise from transient speech components.</p>
+      <p>The bundled model (resource name <code>rnnoise</code>, rnnoise-nu format) is derived from community-trained weights in the <a href="https://github.com/GregorR/rnnoise-models">rnnoise-models repository</a>. It was trained on a large corpus of speech (multiple speakers, multiple languages, multiple recording conditions) mixed with a wide variety of noise types: HVAC, traffic, crowd noise, fan hum, electrical interference, and broadband pink and white noise. The model learns to identify which spectral components correspond to voice and which correspond to noise, using temporal context (the GRU's hidden state) to distinguish steady-state noise from transient speech components.</p>
       <p>Training required both clean speech recordings and noise-only recordings, which were artificially mixed at various signal-to-noise ratios. The network learned the difference between speech-shaped energy and noise-shaped energy across thousands of examples. Because the training data was multilingual and broad-spectrum, the resulting model generalizes well across different speakers, accents, and recording conditions without any per-speaker adaptation.</p>
     </details>
 
@@ -725,15 +730,15 @@
 [R]arnndn=m=/path/to/model[Rnr];
 [Lnr][Rnr]join=inputs=2:channel_layout=stereo</code></pre>
     </details>
-    <p>Each channel receives its own fully independent denoiser instance with its own recurrent state, initialized cleanly. The model processes each as a standard mono stream — the format it was trained on — and the results are predictable and balanced. The remaining filter chain (high-pass, phase rotation, resample) runs on the rejoined stereo signal.</p>
-    <p>For <strong>mono output</strong>, the issue does not arise. The pipeline's first FFmpeg stage already extracts the selected channel via <code>pan</code> (alongside the high-pass and phase-rotation filters), so the audio reaching the loudnorm analysis pass is already a single channel. The simple <code>-af "arnndn=m=…"</code> chain runs over that mono signal — one denoiser instance, one stream — with no per-channel state divergence to worry about.</p>
+    <p>Each channel receives its own fully independent denoiser instance with its own recurrent state, initialized cleanly. The model processes each as a standard mono stream — the format it was trained on — and the results are predictable and balanced. NR-for-measurement runs on the <strong>already-processed intermediate</strong> (after high-pass, channel handling, phase rotation, resample, and optional dynamic leveling) — not at ingest. Only the loudnorm pass-1 analysis reads that NR'd temp copy; pass 2 and all subsequent stages operate on the unmodified intermediate.</p>
+    <p>For <strong>mono output</strong>, the issue does not arise. The pipeline's first FFmpeg stage already extracts the selected channel via <code>pan</code> (or downmixes multichannel sources) alongside the high-pass and phase-rotation filters, so the audio reaching the NR-for-measurement step is already a single channel. The simple <code>-af "arnndn=m=…"</code> chain runs over that mono signal — one denoiser instance, one stream — with no per-channel state divergence to worry about.</p>
     <p>The same per-channel split is applied in the <a href="#nr-measurement">NR-for-measurement</a> analysis paths.</p>
 
     <details class="callout callout-impl">
       <summary><span class="callout-cat">Under the Hood</span> FFmpeg Implementation</summary>
       <p>The <code>arnndn</code> filter in FFmpeg wraps the RNNoise library. It requires an external model file provided via the <code>m=</code> parameter:</p>
       <pre><code>arnndn=m=/path/to/model</code></pre>
-      <p>The model file is bundled in the app's resources directory. WaxOn locates it at runtime using <code>Bundle.main.url(forResource:withExtension:)</code> and passes the resolved path to FFmpeg. In the analysis pass, for mono output the filter runs on the temp copy via a simple <code>-af</code> chain. For stereo output, a <code>-filter_complex</code> graph splits, denoises, and rejoins the channels as described above.</p>
+      <p>The model file is bundled in the app as a resource named <code>rnnoise</code> (no file extension). WaxOn locates it at runtime using <code>Bundle.main.url(forResource: "rnnoise", withExtension: nil)</code> and passes the resolved path to FFmpeg. In the analysis pass, for mono output the filter runs on the temp copy via a simple <code>-af</code> chain. For stereo output, a <code>-filter_complex</code> graph splits, denoises, and rejoins the channels as described above. If the model cannot be loaded, loudnorm proceeds without NR-for-measurement and a warning is logged.</p>
       <p>Processing latency for <code>arnndn</code> is negligible for batch processing purposes. The network processes audio in 10 ms frames. For a 60-minute recording, the total added processing time is a few seconds on Apple Silicon.</p>
     </details>
   </section>
@@ -753,7 +758,7 @@
     <p>The net effect: noisy files measure louder than their speech content actually is. When loudness normalization targets a specific LUFS value, the gain applied is less than the speech needs. The speech ends up under target.</p>
 
     <h3>Estimation Method</h3>
-    <p>The analyzer divides the audio into non-overlapping 400 ms blocks (the same block size used for LUFS gating) and computes the mono RMS of each block. The noise floor estimate is the <strong>10th percentile</strong> of these block RMS values, converted to dBFS.</p>
+    <p>The analyzer divides the audio into non-overlapping 400 ms blocks (the same block size used for LUFS gating). For FLOOR only, each block is first summed to mono and passed through an <strong>80 Hz Butterworth high-pass filter</strong> — matching WaxOn's typical HPF-on processing path — so rumble and HVAC below 80 Hz do not inflate the estimate. The noise floor is the <strong>10th percentile</strong> of these filtered block RMS values, converted to dBFS. RMS, peak, crest factor, and LUFS stats use unfiltered audio.</p>
     <p>The 10th percentile was chosen because it represents the quietest 10% of the file's blocks. For speech recordings, the quietest blocks are the pauses, breaths, and gaps where the microphone is capturing only the ambient environment. The 10th percentile is more robust than the absolute minimum (which might catch a single anomalously quiet block) while still reflecting the true background level rather than the speech level.</p>
     <p>At least 5 blocks are required for a meaningful estimate (about 2 seconds of audio). Shorter files show no FLOOR stat.</p>
 
@@ -761,7 +766,7 @@
     <p>The FLOOR stat is color-coded in the stats panel:</p>
     <ul>
       <li><strong>Normal (no color)</strong>: noise floor below −50 dBFS. Unlikely to affect loudness measurements meaningfully.</li>
-      <li><strong>Orange (above −50 dBFS)</strong>: the noise floor may be contributing to the integrated loudness measurement. Speech targets may be slightly undershot. WaxOn's internal NR-for-measurement pass will help accuracy; the noise in the output itself is unaffected.</li>
+      <li><strong>Orange (above −50 dBFS)</strong>: the noise floor may be contributing to the integrated loudness measurement. Speech targets may be slightly undershot. When Loudness Norm is enabled, WaxOn's internal NR-for-measurement pass will help accuracy; the noise in the output itself is unaffected.</li>
       <li><strong>Red (above −40 dBFS)</strong>: the noise floor is high enough to significantly skew loudness measurements. At this level, the noise is almost certainly audible to listeners as well. Consider dedicated noise reduction in iZotope RX or similar before processing in WaxOn.</li>
     </ul>
     <p>Files with an orange or red noise floor also show a ⚠️ warning badge in the file list.</p>
@@ -771,7 +776,7 @@
   <section id="nr-measurement">
     <h2>NR-for-Measurement</h2>
 
-    <p>When Loudness Norm is enabled, WaxOn runs RNNoise on a <em>temporary copy</em> of the audio for the loudnorm analysis pass (pass 1) only. The normalization pass (pass 2) and all subsequent stages operate on the original, unmodified audio. This ensures that loudness measurements reflect the speech content rather than the noise floor, without altering the output.</p>
+    <p>When Loudness Norm is enabled, WaxOn runs RNNoise on a <em>temporary copy</em> of the post-filtering intermediate (after high-pass, channel handling, phase rotation, resample, and optional dynamic leveling) for the loudnorm analysis pass (pass 1) only. The normalization pass (pass 2) and all subsequent stages operate on the unmodified intermediate — not the NR'd copy. This ensures that loudness measurements reflect the speech content rather than the noise floor, without altering the output.</p>
 
     <h3>Why This Works</h3>
     <p>The two-pass loudnorm process measures the file's integrated loudness in pass 1, then applies a single linear gain offset in pass 2. The gain offset is determined entirely by the pass 1 measurement. If pass 1 measures a noise-inflated loudness (file appears louder than the speech actually is), the computed gain will be too small, and speech will land under target.</p>
@@ -851,7 +856,7 @@
   <!-- Dynamic Leveling -->
   <section id="dynamic-leveling">
     <h2>Dynamic Leveling</h2>
-    <p>Dynamic Leveling is an optional WaxOn processing stage that uses FFmpeg's <code>dynaudnorm</code> filter in bidirectional mode to even out level differences across a recording. It can both attenuate loud sections and boost quiet ones. It runs after filtering and before loudness normalization.</p>
+    <p>Dynamic Leveling is an optional WaxOn processing stage that uses FFmpeg's <code>dynaudnorm</code> filter to even out level differences across a recording. It can both attenuate loud sections and boost quiet ones. It runs after filtering and before loudness normalization. Clips shorter than 2 seconds skip this stage entirely.</p>
 
     <h3>The Problem It Solves</h3>
     <p>Dynamic Leveling handles recordings where level variation is structural — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. You need to lift the quiet material and tame the loud material simultaneously.</p>
@@ -875,7 +880,7 @@
 
     <h3>Mirror-Padding Boundary Fix</h3>
     <p>The Gaussian-weighted gain computation in <code>dynaudnorm</code> produces boundary artifacts at both ends of the file. The naive workaround of padding with silence does not solve this: <code>dynaudnorm</code> assigns silent frames a gain of 1.0 (silence-threshold behavior), and those unity-gain values get averaged into the smoothing window at the audio/silence boundary, pulling the smoothed gain down and producing an audible ramp into the real audio.</p>
-    <p>The actual fix is <strong>mirror padding</strong>: prepend a reversed copy of the first 16 seconds of audio, append a reversed copy of the last 16 seconds. The smoothing window now sees real audio with matching gain values on both sides of the boundary, so the smoothed gain at the edge matches what it would be in the middle of the file. After processing, the padding is trimmed off with <code>atrim</code> and the output matches the original duration. For clips shorter than 16 seconds, the pad length is capped at the clip's length.</p>
+    <p>The actual fix is <strong>mirror padding</strong>: prepend a reversed copy of the first 16 seconds of audio, append a reversed copy of the last 16 seconds. The smoothing window now sees real audio with matching gain values on both sides of the boundary, so the smoothed gain at the edge matches what it would be in the middle of the file. After processing, the padding is trimmed off with <code>atrim</code> and the output matches the original duration. For clips shorter than 16 seconds, the pad length is capped at the clip's length. If file duration cannot be determined, mirror padding is skipped and a warning is logged.</p>
   </section>
 
   <!-- WaxOn Design -->
@@ -885,27 +890,30 @@
     <h3>Stage Order</h3>
     <p>The WaxOn pipeline stage order is deliberate:</p>
     <ol>
-      <li><strong>High-pass filter first</strong>: Subsonic content below 80 Hz is removed before any gain stage processes it. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't musically useful.</li>
-      <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. The loudnorm analysis then also measures the real output signal.</li>
+      <li><strong>High-pass filter first</strong>: A high-pass at 80 Hz (when enabled) or 20 Hz (DC floor when off) runs before any gain stage. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't perceptually meaningful.</li>
+      <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. Multichannel sources (&gt;2 ch) downmix to mono with a warning. Stereo output passes both channels through unchanged. The loudnorm analysis then also measures the real output signal.</li>
       <li><strong>Phase rotation before normalization</strong>: Reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
-      <li><strong>Dynamic leveling before normalization</strong>: Bidirectional leveling runs after filtering. Bringing the overall level balance closer to even before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the material rather than being skewed by large quiet sections or loud outliers.</li>
-      <li><strong>Limiter last</strong>: After any loudness normalization, with oversampling to catch true peaks.</li>
+      <li><strong>Dynamic leveling before normalization</strong>: Dynamic leveling runs after filtering. Bringing the overall level balance closer to even before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the material rather than being skewed by large quiet sections or loud outliers.</li>
+      <li><strong>Limiter last (always on)</strong>: After any optional loudness normalization, with 2× oversampling to catch true peaks. The ceiling is fixed at −1.0 dBTP — not user-configurable in WaxOn (unlike WaxOff's true-peak knob).</li>
     </ol>
 
+    <h3>Factory Defaults</h3>
+    <p>WaxOn's factory defaults bias toward a safe ingest path: High Pass and Phase Rotation on, Dynamic Leveling and Loudness Norm off. The built-in <strong>Edit Prep</strong> preset enables Loudness Norm at −30 LUFS for batch ingest. See <a href="#defaults">Defaults &amp; Parameters</a> for the full list of UI-exposed settings.</p>
+
     <h3>LRA=20 in WaxOn Loudnorm</h3>
-    <p>WaxOn's loudnorm hardcodes <code>LRA=20</code>. The LRA parameter tells the loudnorm filter how aggressively to constrain the dynamic range; lower values apply more dynamic compression. At LRA=20, the filter applies essentially no dynamic processing. It acts as a pure linear gain offset.</p>
-    <p>This is intentional for ingest. WaxOn is a pre-editing tool. You want your recordings to arrive at your DAW at consistent levels, but with their original dynamic character intact. Any dynamic processing at this stage would fight against the compression and automation you'll apply during editing. LRA=20 ensures loudnorm does exactly one thing in WaxOn: level adjustment.</p>
+    <p>WaxOn's loudnorm hardcodes <code>LRA=20</code>. Combined with <code>linear=true</code> in pass 2, loudnorm applies a single constant gain offset — no macro-dynamic compression. The LRA value is a permissive filter parameter; the linear mode is what guarantees dynamics preservation.</p>
+    <p>This is intentional for ingest. WaxOn is a pre-editing tool. You want your recordings to arrive at your DAW at consistent levels, but with their original dynamic character intact. Any dynamic processing at this stage would fight against the compression and automation you'll apply during editing.</p>
 
     <h3>Default Loudnorm Target: −30 LUFS</h3>
-    <p>−30 LUFS is conservative by design. At this level, even a recording with significant dynamic range and a crest factor of 20 dB will have peaks well below −10 dBFS, giving the limiter ample headroom. The goal is to bring different recordings to a <em>consistent</em> level for editing, not to hit a delivery target. −30 LUFS leaves plenty of room for the final mix to breathe.</p>
+    <p>−30 LUFS is the default target when Loudness Norm is enabled (factory default: off). At this level, even a recording with significant dynamic range and a crest factor of 20 dB will have peaks well below −10 dBFS, giving the limiter ample headroom. The goal is to bring different recordings to a <em>consistent</em> level for editing, not to hit a delivery target. −30 LUFS leaves plenty of room for the final mix to breathe. The UI range is −35 to −16 LUFS in 1 LU steps.</p>
 
     <h3>Loudnorm TP and Limiter Ceiling</h3>
-    <p>Both the loudnorm <code>TP</code> parameter and the alimiter <code>limit</code> are set to −1.0 dBTP. These are not redundant:</p>
+    <p>When Loudness Norm is enabled, both the loudnorm <code>TP</code> parameter and the final alimiter <code>limit</code> are set to −1.0 dBTP — fixed, not user-adjustable in WaxOn. These are not redundant:</p>
     <ul>
       <li>Loudnorm's <code>TP</code> influences its internal gain calculation. It tries to avoid exceeding the ceiling, but this is a soft target.</li>
       <li>The alimiter is the hard ceiling. It guarantees no output sample (at 2× sample rate) exceeds the limit.</li>
     </ul>
-    <p>Setting both to the same value means loudnorm and the limiter are working toward the same goal. If loudnorm succeeds, the limiter barely engages. If loudnorm slightly overshoots, the limiter catches it. The two stages are complementary, not redundant.</p>
+    <p>Setting both to the same value means loudnorm and the limiter are working toward the same goal. If loudnorm succeeds, the limiter barely engages. If loudnorm slightly overshoots, the limiter catches it. The two stages are complementary, not redundant. When Loudness Norm is off, only the limiter applies gain control — still at the fixed −1.0 dBTP ceiling.</p>
   </section>
 
   <!-- WaxOff Design -->
@@ -918,11 +926,12 @@
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
 
-    <h3>Fixed LRA=9 (with hidden override)</h3>
-    <p>WaxOff sets <code>LRA=9</code> on the loudnorm filter. The value is configurable in code — <code>WaxOffSettings.lra</code>, default 9.0 — but no UI control exposes it, so in normal use it's a fixed value. For delivery, some macro-dynamic constraint is appropriate: a podcast episode should have a consistent loudness profile throughout, and most podcasts are consumed on earbuds, laptop speakers, or in cars where wide macro-dynamics push quiet passages below ambient noise and loud passages over the listening comfort threshold. 9 LU sits in the typical podcast delivery range (6–10 LU) — loose enough to preserve a well-balanced mix's natural dynamics, tight enough to constrain occasional overly-dynamic material.</p>
-    <p>The loudnorm filter with LRA=9 applies gentle, program-level gain changes (not sample-by-sample compression). The effect is less aggressive than any compressor you would have used during editing.</p>
+    <h3>LRA=9 (measured, not constrained)</h3>
+    <p>WaxOff passes <code>LRA=9</code> to the <code>loudnorm</code> filter string. The value lives in <code>WaxOffSettings.lra</code> (default 9.0) but has no UI control — it is not user-configurable in normal use.</p>
+    <p>Because WaxOff always uses <code>linear=true</code> for pass 2, this LRA target does <strong>not</strong> apply macro-dynamic compression at delivery. Pass 2 is a single linear gain offset; the mix's loud/quiet spread is preserved. Pass 1 still measures and reports <code>input_lra</code>, which appears in the processing log — useful for checking whether a finished mix sits in a typical podcast range (roughly 6–10 LU for well-balanced speech content). If dynamic loudnorm normalization were ever needed, it would require <code>linear=false</code>; WaxOff deliberately does not use that mode.</p>
 
     <h3>Delivery Targets</h3>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px;">Platform targets below are approximate as of early 2026 — verify against current host and platform documentation before optimizing for a single service.</p>
     <table class="compare-table">
       <thead>
         <tr>
@@ -1040,6 +1049,180 @@
     <p><strong>For MP3 output, dithering is inapplicable for a separate reason.</strong> MP3 encoding applies its own psychoacoustic quantization. The codec analyzes the signal using a masking model and allocates bits to spectral bands according to audibility thresholds. The quantization step sizes used by the MP3 encoder are orders of magnitude coarser than one LSB of 16-bit PCM. Any TPDF dither noise added before encoding would be completely absorbed into the codec's own quantization decisions. It contributes nothing and changes nothing. Adding dither before a lossy encoder is like whispering into a jackhammer.</p>
   </section>
 
+  <!-- Analysis vs Processing -->
+  <section id="analysis-vs-processing">
+    <h2>Analysis vs Processing</h2>
+
+    <p>The file stats panel (RMS, Peak, Crest, LUFS, FLOOR) and the FFmpeg processing pipeline both implement ITU-R BS.1770 concepts, but they are separate code paths and are not guaranteed to match exactly.</p>
+
+    <h3>Stats Panel: Native Analyzer</h3>
+    <p>When you drop a file into WaxOn or WaxOff, the app analyzes it with an in-process Swift implementation (<code>AudioAnalyzer</code>): K-weighting coefficients computed via the bilinear transform at the file's sample rate, 400 ms / 75%-overlap gating for LUFS, and the 10th-percentile noise-floor estimate described in <a href="#noise-floor">Noise Floor Estimation</a>. This runs once at load time and costs no extra FFmpeg passes.</p>
+
+    <h3>Processing: FFmpeg Loudnorm</h3>
+    <p>Actual normalization uses FFmpeg's <code>loudnorm</code> filter in a two-pass pipeline. Pass 1 may optionally run on an RNNoise-processed temp copy (WaxOn only, when Loudness Norm is enabled). The gain applied in pass 2 is derived from FFmpeg's measurements, not from the stats panel values.</p>
+
+    <h3>Why They Can Differ</h3>
+    <ul>
+      <li><strong>Different implementations</strong>: pyloudnorm-aligned Swift analyzer vs FFmpeg's loudnorm — both BS.1770-compliant, but not bit-identical.</li>
+      <li><strong>NR-for-measurement</strong>: WaxOn's processing pass 1 may measure a denoised copy; the stats panel always measures the original file.</li>
+      <li><strong>Pre-processing in WaxOff</strong>: WaxOff's loudnorm analysis includes the 200 Hz allpass; the stats panel does not apply phase rotation before measuring LUFS.</li>
+      <li><strong>FLOOR vs LUFS</strong>: FLOOR uses 80 Hz high-pass filtered mono blocks; LUFS in the stats panel uses unfiltered K-weighted audio.</li>
+    </ul>
+    <p>Use the stats panel to compare files and spot problems (hot peaks, high noise floor, low LUFS). Trust the processing log's <code>measured:</code> line for what loudnorm actually computed.</p>
+  </section>
+
+  <!-- Defaults & Parameters -->
+  <section id="defaults">
+    <h2>Defaults &amp; Parameters</h2>
+
+    <p>Which stages run, and which knobs are exposed, differs between WaxOn and WaxOff.</p>
+
+    <h3>WaxOn</h3>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Setting</th>
+          <th>UI range</th>
+          <th>Factory default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>High Pass</td>
+          <td>On (80 Hz) · Off (20 Hz DC floor)</td>
+          <td>On</td>
+        </tr>
+        <tr>
+          <td>Phase Rotation</td>
+          <td>On · Off</td>
+          <td>On</td>
+        </tr>
+        <tr>
+          <td>Dynamic Leveling</td>
+          <td>On · Off</td>
+          <td>Off</td>
+        </tr>
+        <tr>
+          <td>Strength</td>
+          <td>Gentle → Aggressive (8 steps)</td>
+          <td>Medium (0.5)</td>
+        </tr>
+        <tr>
+          <td>Loudness Norm</td>
+          <td>On · Off</td>
+          <td>Off</td>
+        </tr>
+        <tr>
+          <td>Target LUFS</td>
+          <td>−35 to −16 (1 LU steps)</td>
+          <td>−30</td>
+        </tr>
+        <tr>
+          <td>Sample Rate</td>
+          <td>44.1 kHz · 48 kHz</td>
+          <td>44.1 kHz</td>
+        </tr>
+        <tr>
+          <td>Output</td>
+          <td>Mono · Stereo</td>
+          <td>Mono</td>
+        </tr>
+        <tr>
+          <td>Channel (mono)</td>
+          <td>Left · Right</td>
+          <td>Left</td>
+        </tr>
+        <tr>
+          <td>True peak / limiter</td>
+          <td>—</td>
+          <td>Fixed −1.0 dBTP (not adjustable)</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.85rem;color:var(--muted);">User manual: <a href="index.html#waxon-settings">WaxOn Settings</a> · Built-in <strong>Edit Prep</strong> preset enables Loudness Norm at −30 LUFS.</p>
+
+    <h3>WaxOff</h3>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Setting</th>
+          <th>UI range</th>
+          <th>Factory default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Target LUFS</td>
+          <td>−24 to −14 (1 LU steps)</td>
+          <td>−18</td>
+        </tr>
+        <tr>
+          <td>True Peak</td>
+          <td>−3.0 to −0.5 dBTP (0.5 dB steps)</td>
+          <td>−1.0 dBTP</td>
+        </tr>
+        <tr>
+          <td>Output</td>
+          <td>WAV · MP3 · Both</td>
+          <td>Both</td>
+        </tr>
+        <tr>
+          <td>MP3 Bitrate</td>
+          <td>128 · 160 · 192 kbps CBR</td>
+          <td>160 kbps</td>
+        </tr>
+        <tr>
+          <td>WAV Sample Rate</td>
+          <td>44.1 kHz · 48 kHz</td>
+          <td>44.1 kHz</td>
+        </tr>
+        <tr>
+          <td>Phase rotation</td>
+          <td>—</td>
+          <td>Always on (200 Hz allpass)</td>
+        </tr>
+        <tr>
+          <td>LRA</td>
+          <td>—</td>
+          <td>9 LU in code only; no effect in linear mode</td>
+        </tr>
+        <tr>
+          <td>Output channels</td>
+          <td>—</td>
+          <td>Always stereo (mono upmixed to dual-mono)</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.85rem;color:var(--muted);">MP3 is always encoded at 44.1 kHz stereo regardless of the WAV sample rate setting.</p>
+  </section>
+
+  <!-- Edge Cases -->
+  <section id="edge-cases">
+    <h2>Edge Cases &amp; Limits</h2>
+
+    <h3>Silent or Near-Silent Input</h3>
+    <p>When <code>loudnorm</code> pass 1 reports non-finite measurements (<code>-inf</code>, <code>inf</code>, or NaN) — typical for silence or near-silence — pass 2 is skipped in both modes. WaxOn passes the pre-loudnorm audio to the limiter; WaxOff still applies phase rotation and the brick-wall limiter but skips loudnorm gain. A warning is logged.</p>
+
+    <h3>Short Clips</h3>
+    <ul>
+      <li><strong>Dynamic Leveling</strong>: skipped entirely for clips under 2 seconds.</li>
+      <li><strong>Noise floor (FLOOR stat)</strong>: requires at least 5 complete 400 ms blocks (~2 seconds); shorter files show no FLOOR value.</li>
+      <li><strong>Mirror padding</strong>: pad length caps at clip duration when under 16 seconds; clips shorter than dynaudnorm's smoothing radius log an approximate-boundary warning.</li>
+    </ul>
+
+    <h3>Multichannel Input (&gt;2 channels)</h3>
+    <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output passes all channels through unchanged up to the output channel count setting.</p>
+
+    <h3>Missing RNNoise Model</h3>
+    <p>If the bundled <code>rnnoise</code> resource cannot be loaded, WaxOn skips NR-for-measurement and runs loudnorm analysis on the unmodified intermediate. Processing continues; a warning notes that measurement may be noise-biased.</p>
+
+    <h3>Batch Output Collisions</h3>
+    <p>WaxOn output names follow <code>{stem}-{rate}waxon.wav</code>. When multiple source files in one batch would collide, a short path-hash suffix is inserted before the rate tag. See the <a href="index.html#waxon-output">user manual</a> for output naming and directory fallbacks.</p>
+
+    <h3>Batch Concurrency</h3>
+    <p>WaxOn processes multiple files in parallel, capped at <code>max(2, CPU cores ÷ 2)</code>. WaxOff processes one file at a time per user action.</p>
+  </section>
+
   <!-- Summary -->
   <section id="summary">
     <h2>Summary</h2>
@@ -1066,15 +1249,23 @@
         </tr>
         <tr>
           <td>NR-for-measurement (WaxOn)</td>
-          <td>Loudnorm analysis always runs on a temporary RNNoise-processed copy to prevent broadband noise from inflating the loudness measurement. The output signal is unaffected. Speech hits the target LUFS more accurately.</td>
+          <td>When Loudness Norm is enabled, pass 1 runs on a temporary RNNoise-processed copy (after all prior stages) to prevent broadband noise from inflating the measurement. Pass 2 and the output signal are unaffected.</td>
         </tr>
         <tr>
           <td>Noise floor estimation</td>
-          <td>10th percentile of per-block RMS identifies background noise level. Color-coded warnings alert users when noise may affect loudness accuracy.</td>
+          <td>10th percentile of 80 Hz HPF mono block RMS identifies background noise level. Color-coded warnings alert users when noise may affect loudness accuracy.</td>
         </tr>
         <tr>
-          <td>LRA=20 in WaxOn</td>
-          <td>Ingest preprocessing should not touch dynamics; loudnorm acts as pure level adjustment</td>
+          <td>LRA=20 in WaxOn / LRA=9 in WaxOff</td>
+          <td>Filter parameters passed to loudnorm; with <code>linear=true</code> in pass 2, neither constrains macro-dynamics — only integrated loudness is adjusted</td>
+        </tr>
+        <tr>
+          <td>Fixed −1.0 dBTP limiter (WaxOn)</td>
+          <td>Always-on true-peak ceiling at EBU R128 standard level; not user-adjustable (contrast with WaxOff's configurable TP knob)</td>
+        </tr>
+        <tr>
+          <td>Stats panel vs FFmpeg loudnorm</td>
+          <td>Separate BS.1770 implementations; use stats for comparison, processing log for actual normalization measurements</td>
         </tr>
         <tr>
           <td>2× oversampled alimiter (WaxOn)</td>

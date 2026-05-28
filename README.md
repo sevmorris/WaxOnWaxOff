@@ -24,7 +24,7 @@
 
 The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
 
-- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, EBU R128 normalization with dynamics fully preserved. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder without collision (e.g., `interview-44kwaxon-1dB.wav`).
+- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional EBU R128 normalization (dynamics fully preserved), and fixed true-peak limiting. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder (e.g., `interview-44kwaxon.wav`).
 - **WaxOff** runs after you bounce. It takes your finished mix to broadcast-compliant delivery — EBU R128 to target LUFS, true peak ceiling, WAV and/or MP3 output.
 
 **Local processing:** No upload, no subscription, no audio leaving your machine. Transparent, inspectable signal chain.
@@ -38,20 +38,20 @@ The app runs in two stages that map onto the two moments in podcast production w
 ## I. WaxOn — Signal Conditioning (Prep)
 *Use on raw recordings prior to non-destructive editing.*
 
-* **High-Pass Filter:** Configurable cutoff (Off–90 Hz) for HVAC/handling noise removal. DC offset always removed.
-* **Dynamic Leveling:** Optional bidirectional `dynaudnorm` with adjustable aggressiveness (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
-* **Loudness Normalization:** Two-pass EBU R128 linear gain (dynamics fully preserved).
+* **High-Pass Filter:** On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.
+* **Dynamic Leveling:** Optional `dynaudnorm` with adjustable aggressiveness (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
+* **Loudness Normalization:** Optional two-pass EBU R128 linear gain (dynamics fully preserved; default off).
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
-* **Peak Control:** 2× oversampled true peak limiting (−1 to −3 dB ceiling).
-* **Phase Alignment:** 200 Hz allpass filter to reduce peak asymmetry and maximize headroom.
+* **Peak Control:** Always-on 2× oversampled true peak limiting at fixed −1.0 dBTP.
+* **Phase Alignment:** Optional 200 Hz allpass filter to reduce peak asymmetry and maximize headroom (default on).
 
-**Output Logic:** `{name}-{rate}waxon{ceiling}.wav` (24-bit; ceiling is e.g. `-1dB`)
+**Output Logic:** `{name}-{44k|48k}waxon.wav` (24-bit)
 
 ## II. WaxOff — Broadcast Delivery
 *Use on finished mixes to ensure broadcast compliance.*
 
 * **EBU R128 Normalization:** Two-pass analysis + linear gain; no dynamic compression.
-* **True Peak Management:** Configurable ceiling (−3.0 to −0.1 dBTP).
+* **True Peak Management:** Configurable ceiling (−3.0 to −0.5 dBTP).
 * **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
 
 **Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
@@ -77,7 +77,7 @@ open WaxOnWaxOff.xcodeproj
 FFmpeg binaries are stored as [GitHub release assets](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/ffmpeg-deps-8.0-arm64), not in git. Xcode also runs `scripts/fetch-ffmpeg.sh` automatically before each build. See `Vendor/README.md` for checksums and update instructions.
 
 ## Technical Origin
-I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and internal per-channel RNNoise on the analysis pass for measurement accuracy on noisy recordings — reflects deliberate choices, not defaults.
+I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and internal per-channel RNNoise on the loudnorm analysis pass (WaxOn, when Loudness Norm is enabled) for measurement accuracy on noisy recordings — reflects deliberate choices, not defaults.
 
 ---
 

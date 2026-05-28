@@ -31,23 +31,24 @@ struct HelpView: View {
                 }
                 section("WaxOn — Quick Start") {
                     steps([
-                        "Set sample rate, output channels, and ceiling in the Settings strip.",
+                        "Set sample rate and output channels in Settings; toggles and knobs are in the control bar.",
                         "Drag audio files onto the window (or the file list).",
                         "Click Process. Output files appear alongside the originals."
                     ])
                 }
                 section("WaxOn — Output Naming") {
-                    code("{original-name}-{samplerate}waxon{ceiling}.wav")
-                    text("Example: interview-44kwaxon-1dB.wav")
+                    code("{original-name}-{44k|48k}waxon.wav")
+                    text("Example: interview-44kwaxon.wav")
                 }
                 section("WaxOn — Processing Pipeline") {
                     numberedList([
-                        "High-pass filter at the chosen cutoff (default 80 Hz) — removes rumble, HVAC hum, and handling noise.",
-                        "Channel selection (mono mode only) — extracts the left or right channel.",
+                        "High-pass filter — On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.",
+                        "Channel handling — mono extracts left/right (or downmixes multichannel sources); stereo passes both channels through.",
+                        "Optional phase rotation — 200 Hz allpass (default on).",
                         "Resampling to the target sample rate.",
-                        "Dynamic leveling (if enabled) — bidirectional dynamic normalization for panel recordings and multi-voice sources. Lifts quiet voices and tames loud ones. Not recommended for solo voice. Aggressiveness controls frame size and max gain.",
-                        "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain. No dynamic compression; dynamics are fully preserved.",
-                        "Brick-wall limiting — 2× oversampled true peak control at the chosen ceiling."
+                        "Dynamic leveling (if enabled) — dynaudnorm for panel recordings and multi-voice sources. Not recommended for solo voice.",
+                        "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain. Pass 1 may use internal RNNoise for measurement accuracy only.",
+                        "Brick-wall limiting — always on; 2× oversampled true peak control at fixed −1.0 dBTP."
                     ])
                     text("Output: 24-bit WAV.")
                 }
@@ -55,10 +56,9 @@ struct HelpView: View {
                     definition("Sample Rate", "44.1 kHz or 48 kHz. Match your DAW project setting.")
                     definition("Output", "Mono or Stereo. Mono extracts a single channel; Stereo passes both channels through unchanged.")
                     definition("Channel", "Left or Right — which channel to extract in Mono mode.")
-                    definition("Ceiling", "Brick-wall limiter ceiling: −3, −2, or −1 dB. Controls the maximum true peak of the output.")
-                    definition("High Pass", "High-pass filter cutoff frequency. Default 80 Hz, range 20–90 Hz. At 20 Hz the filter acts as a DC blocker only — use for sources with significant bass content that a higher cutoff would thin.")
-                    definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. Uses 200 Hz to target the proximity-effect range common in close-miked voice sources. On by default.")
-                    definition("Dynamic Leveling", "Enables bidirectional dynamic normalization (dynaudnorm). Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews where voices are at inconsistent levels — not for regular solo voice use. Aggressiveness controls how quickly and strongly the leveling responds.")
+                    definition("High Pass", "On (80 Hz) removes rumble and proximity-effect bass; Off uses a 20 Hz DC floor only. DC offset is always removed.")
+                    definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. On by default.")
+                    definition("Dynamic Leveling", "Enables dynaudnorm. Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews — not for regular solo voice use. Aggressiveness controls how quickly and strongly the leveling responds.")
                     definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and limiting are applied.")
                     definition("Target", "Integrated loudness target when Loudness Norm is on. Default −30 LUFS, range −35 to −16 LUFS. Lower values leave more headroom for editing.")
                     definition("Output Dir", "Where processed files are saved. Defaults to the same folder as the source.")
@@ -97,7 +97,7 @@ struct HelpView: View {
                     definition("Sample Rate", "44.1 kHz or 48 kHz for the output WAV (and MP3 source).")
                     definition("Output", "WAV only, MP3 only, or both. WAV is always 24-bit PCM.")
                     definition("MP3 Bitrate", "CBR bitrate for MP3 output: 128, 160, or 192 kbps. Grayed out when Output is WAV only.")
-                    definition("True Peak", "Maximum true peak ceiling: −3.0 to −0.1 dBTP. −1.0 dBTP is the standard for podcast streaming platforms.")
+                    definition("True Peak", "Maximum true peak ceiling: −3.0 to −0.5 dBTP. −1.0 dBTP is the standard for podcast streaming platforms.")
                     definition("Target LUFS", "Integrated loudness target: −24 to −14 LUFS. −18 LUFS is the podcast standard; −16 LUFS gives a louder result.")
                     definition("Output Dir", "Where output files are saved. Defaults to the same folder as the source.")
                 }

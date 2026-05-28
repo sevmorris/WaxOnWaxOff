@@ -461,13 +461,13 @@
           <span class="mode-label mode-label-on">WaxOn</span>
           <h2>Ingest Prep</h2>
           <p class="mode-when">Use before you edit</p>
-          <p>Conditions guest recordings and raw captures for ingest. Cleans the signal and outputs a normalized 24-bit WAV ready for your DAW.</p>
+          <p>Conditions guest recordings and raw captures for ingest. High-pass filtering, optional leveling and loudness normalization, and always-on true-peak limiting — outputs a 24-bit WAV ready for your DAW.</p>
           <ul>
-            <li>High-pass filter (Off–90 Hz) — DC offset always removed</li>
-            <li>Phase rotation — 200 Hz allpass for crest factor reduction</li>
-            <li>Dynamic leveling for panel &amp; multi-voice</li>
-            <li>Two-pass EBU R128 loudness normalization</li>
-            <li>2× oversampled true peak limiting</li>
+            <li>High-pass filter — On (80 Hz) · Off (20 Hz DC floor)</li>
+            <li>Phase rotation — optional 200 Hz allpass (default on)</li>
+            <li>Dynamic leveling — optional, for panel &amp; multi-voice</li>
+            <li>Two-pass EBU R128 loudness normalization — optional (default off)</li>
+            <li>2× oversampled true peak limiting — fixed −1.0 dBTP</li>
           </ul>
         </div>
         <div class="mode-card">
@@ -477,7 +477,7 @@
           <p>Takes your finished mix to broadcast-compliant delivery. EBU R128 normalization, true peak control, and MP3 encoding in one step.</p>
           <ul>
             <li>Two-pass EBU R128 — linear gain, no compression</li>
-            <li>Configurable true peak ceiling (−3.0 to −0.1 dBTP)</li>
+            <li>Configurable true peak ceiling (−3.0 to −0.5 dBTP)</li>
             <li>24-bit WAV, CBR MP3, or both simultaneously</li>
             <li>Built-in presets: Podcast Standard, Loud, WAV Only</li>
             <li>Custom preset save &amp; recall</li>
@@ -542,4 +542,3 @@
 
 </body>
 </html>
-html>
