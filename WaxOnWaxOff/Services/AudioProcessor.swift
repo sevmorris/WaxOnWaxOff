@@ -255,34 +255,30 @@ actor AudioProcessor {
             ])
 
             guard let lnDict = FFmpegRunner.parseLoudnormJSON(from: analysisOutput),
-                  let inputI      = lnDict["input_i"],
-                  let inputTP     = lnDict["input_tp"],
-                  let inputLRA    = lnDict["input_lra"],
-                  let inputThresh = lnDict["input_thresh"],
-                  let targetOffset = lnDict["target_offset"] else {
+                  let measurements = LoudnormMeasurements(json: lnDict.mapValues { $0 as Any }) else {
                 throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
             }
 
             // Silent / near-silent inputs cause loudnorm to emit -inf or inf.
             // Pass 2 rejects those values with "Result too large", so skip the
             // normalization step and pass the audio through to the limiter as-is.
-            let measuredFinite =
-                (Double(inputI)?.isFinite ?? false) &&
-                (Double(inputTP)?.isFinite ?? false) &&
-                (Double(inputLRA)?.isFinite ?? false) &&
-                (Double(inputThresh)?.isFinite ?? false) &&
-                (Double(targetOffset)?.isFinite ?? false)
-
-            if !measuredFinite {
+            if !measurements.isFinite {
                 onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
                 limiterInput = postDynLevelURL
             } else {
-                onLog?("  measured: \(inputI) LUFS  |  TP \(inputTP) dBTP  |  LRA \(inputLRA) LU", .info)
-                onLog?("  target: \(target) LUFS  |  offset \(targetOffset) dB  |  thresh \(inputThresh) LUFS", .verbose)
+                onLog?("  \(measurements.formattedSummary)", .info)
+                onLog?(String(format: "  target: %.0f LUFS  |  offset %.2f dB  |  thresh %.1f LUFS",
+                              target, measurements.targetOffset, measurements.inputThresh), .verbose)
+                if abs(measurements.targetOffset) > 12.0 {
+                    onLog?(String(format: "⚠ Large gain change (%+.1f dB) — verify the source level and output before delivery.",
+                                  measurements.targetOffset), .info)
+                }
+                onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
+                              measurements.targetOffset, measurements.inputI, target), .info)
                 onLog?("  loudnorm: normalizing…", .verbose)
 
                 let normURL = work.appendingPathComponent("\(stem)_norm.wav")
-                let normAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:measured_I=\(inputI):measured_TP=\(inputTP):measured_LRA=\(inputLRA):measured_thresh=\(inputThresh):offset=\(targetOffset):linear=true"
+                let normAf = measurements.linearPassFilter(targetLUFS: target, truePeakDB: tp, lra: 20)
 
                 try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
                     "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
@@ -385,7 +381,10 @@ actor AudioProcessor {
         let gRaw = Int(31.0 - amount * 16.0)        // gaussian: 31 → 15
         let g = gRaw % 2 == 0 ? gRaw - 1 : gRaw    // must be odd
         let m = 2.0 + amount * 4.0                  // max gain factor: 2x → 6x (+6 to +15 dB)
-        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m))"
+        // c=0 (channel-coupling off) keeps stereo gain decisions decoupled —
+        // the default in modern FFmpeg, but pinned explicitly so behavior
+        // stays stable across FFmpeg upgrades.
+        return "dynaudnorm=f=\(f):g=\(g):p=0.95:m=\(String(format: "%.1f", m)):c=0"
     }
 
     // Builds a filter_complex that mirror-pads the audio with reversed copies of the

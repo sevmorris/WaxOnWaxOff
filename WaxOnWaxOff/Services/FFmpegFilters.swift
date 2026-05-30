@@ -9,10 +9,14 @@ enum FFmpegFilters {
         "aresample=\(rate):filter_size=512:cutoff=0.97:phase_shift=10"
     }
 
-    /// Escape a value for FFmpeg `-metadata key=value` arguments.
+    /// Sanitize a value passed to FFmpeg as `-metadata key=value`. We pass
+    /// metadata via `Process.arguments` (no shell), so the only characters we
+    /// actually need to defuse are `=` (would re-split the pair) and embedded
+    /// newlines (corrupt single-line tag formats like MP3 ID3). Backslashes
+    /// are preserved — substituting them with `/` would silently rewrite
+    /// titles like "Episode 12\3" to "Episode 12/3".
     nonisolated static func metadataValue(_ value: String) -> String {
         value
-            .replacingOccurrences(of: "\\", with: "/")
             .replacingOccurrences(of: "=", with: "-")
             .replacingOccurrences(of: "\n", with: " ")
     }

@@ -1,94 +1,22 @@
 import Foundation
-import Observation
 
 private extension UUID {
+    /// Used only for hardcoded built-in-preset IDs declared at file scope.
+    /// These are constants in source — a malformed literal here means a typo
+    /// in a future commit, not a runtime data problem; the precondition turns
+    /// such a typo into a hard launch crash rather than silently allocating
+    /// random UUIDs that would invalidate users' selectedPresetID on disk.
     init(knownValid string: String) {
         guard let uuid = UUID(uuidString: string) else {
-            preconditionFailure("Invalid built-in UUID constant: \(string)")
+            preconditionFailure("Built-in preset UUID literal is malformed (commit typo, not a runtime issue): \(string)")
         }
         self = uuid
     }
 }
 
-// MARK: - WaxOffPresetStore
+struct WaxOffPreset: Identifiable, Codable, Equatable, PresetCodable {
+    typealias StoredSettings = WaxOffSettings
 
-@Observable
-final class WaxOffPresetStore {
-    var presets: [WaxOffPreset] = []
-    var selectedPresetID: UUID?
-
-    private let userDefaultsKey = "WaxOffUserPresets"
-    private let selectedPresetKey = "WaxOffSelectedPresetID"
-
-    init() {
-        loadPresets()
-        if let idString = UserDefaults.standard.string(forKey: selectedPresetKey),
-           let id = UUID(uuidString: idString) {
-            selectedPresetID = id
-        }
-    }
-
-    var allPresets: [WaxOffPreset] {
-        WaxOffPreset.builtIn + presets
-    }
-
-    var selectedPreset: WaxOffPreset? {
-        guard let id = selectedPresetID else { return nil }
-        return allPresets.first { $0.id == id }
-    }
-
-    func savePreset(_ preset: WaxOffPreset) {
-        presets.append(preset)
-        persist()
-        selectPreset(preset.id)
-    }
-
-    func deletePreset(_ preset: WaxOffPreset) {
-        presets.removeAll { $0.id == preset.id }
-        if selectedPresetID == preset.id { selectPreset(nil) }
-        persist()
-    }
-
-    func updatePreset(id: UUID, name: String?, settings: WaxOffSettings?) {
-        guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
-        if let name {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
-            presets[index].name = trimmed
-        }
-        if let settings {
-            presets[index].settings = settings
-        }
-        persist()
-    }
-
-    func selectPreset(_ id: UUID?) {
-        selectedPresetID = id
-        if let id {
-            UserDefaults.standard.set(id.uuidString, forKey: selectedPresetKey)
-        } else {
-            UserDefaults.standard.removeObject(forKey: selectedPresetKey)
-        }
-    }
-
-    func isBuiltIn(_ preset: WaxOffPreset) -> Bool {
-        WaxOffPreset.builtIn.contains { $0.id == preset.id }
-    }
-
-    private func loadPresets() {
-        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey) else { return }
-        presets = (try? JSONDecoder().decode([WaxOffPreset].self, from: data)) ?? []
-    }
-
-    private func persist() {
-        guard let data = try? JSONEncoder().encode(presets) else { return }
-        UserDefaults.standard.set(data, forKey: userDefaultsKey)
-    }
-}
-
-// MARK: -
-
-struct WaxOffPreset: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
     var settings: WaxOffSettings
@@ -138,4 +66,3 @@ struct WaxOffPreset: Identifiable, Codable, Equatable {
         )
     ]
 }
-

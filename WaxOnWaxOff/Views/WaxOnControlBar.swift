@@ -159,15 +159,6 @@ struct WaxOnControlBar: View {
         }
     }
 
-    private func captionText(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .multilineTextAlignment(.center)
-            .lineLimit(3)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
     private var barDivider: some View {
         Rectangle()
             .fill(Color.primary.opacity(0.1))

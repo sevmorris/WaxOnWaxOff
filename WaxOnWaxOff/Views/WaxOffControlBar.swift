@@ -14,7 +14,8 @@ struct WaxOffControlBar: View {
                     get: { (viewModel.settings.truePeak - (-3.0)) / (-0.5 - (-3.0)) },
                     set: { viewModel.settings.truePeak = (($0 * (-0.5 - (-3.0)) + (-3.0)) * 2).rounded() / 2 }
                 ),
-                step: 1.0 / 5.0
+                step: 1.0 / 5.0,
+                help: "Maximum true peak for the WAV output. The MP3 pre-encode limiter automatically tracks 1 dB below this value to absorb the inter-sample peak overshoot lossy decoders introduce — set this to −1.0 and the decoded MP3 lands at or below −1.0 dBTP."
             )
 
             barDivider
@@ -26,7 +27,8 @@ struct WaxOffControlBar: View {
                     get: { (viewModel.settings.targetLUFS - (-24)) / (-14 - (-24)) },
                     set: { viewModel.settings.targetLUFS = ($0 * (-14 - (-24)) + (-24)).rounded() }
                 ),
-                step: 1.0 / 10.0
+                step: 1.0 / 10.0,
+                help: "Integrated loudness target for the delivery output. −18 LUFS is the typical podcast standard; lower values leave more headroom, higher values sound louder on platforms that don't normalize on playback."
             )
 
             Spacer()
@@ -41,7 +43,7 @@ struct WaxOffControlBar: View {
         }
     }
 
-    private func knobCell(label: String, valueLabel: String, value: Binding<Double>, step: Double) -> some View {
+    private func knobCell(label: String, valueLabel: String, value: Binding<Double>, step: Double, help: String) -> some View {
         VStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 9, weight: .semibold))
@@ -61,6 +63,7 @@ struct WaxOffControlBar: View {
         }
         .padding(.horizontal, 28)
         .frame(height: 170)
+        .help(help)
     }
 
     private var barDivider: some View {

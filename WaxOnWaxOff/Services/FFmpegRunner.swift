@@ -101,7 +101,7 @@ enum FFmpegRunner {
 
     private enum CaptureTarget { case stderr, stdout }
 
-    private static let processTimeoutSeconds: Int = 900
+    nonisolated static let processTimeoutSeconds: Int = 900
 
     private static func launch(
         exe: String,
@@ -190,17 +190,19 @@ enum FFmpegRunner {
 
 /// Lock-guarded "did the watchdog fire?" flag, safe to read on the termination
 /// queue and write on the dispatch queue that runs the timeout work item.
+/// Everything is `nonisolated` because the dispatch queues that touch it are
+/// outside the MainActor default isolation.
 private final class TimeoutFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var fired = false
+    nonisolated private let lock = NSLock()
+    nonisolated(unsafe) private var fired = false
 
-    func set() {
+    nonisolated func set() {
         lock.lock()
         fired = true
         lock.unlock()
     }
 
-    var didFire: Bool {
+    nonisolated var didFire: Bool {
         lock.lock()
         defer { lock.unlock() }
         return fired

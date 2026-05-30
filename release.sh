@@ -216,8 +216,8 @@ else
     REMOTE="origin"
     BRANCH=$(git branch --show-current)
 fi
-git push -u "$REMOTE" "HEAD:$BRANCH"
-git push "$REMOTE" "$TAG"
+git push -u "$REMOTE" "HEAD:$BRANCH" || fail "Failed to push branch to $REMOTE/$BRANCH"
+git push "$REMOTE" "$TAG" || fail "Failed to push tag $TAG to $REMOTE (branch was pushed; tag is local only)"
 ok "Pushed $TAG to $REMOTE/$BRANCH"
 
 # ── GitHub release ────────────────────────────────────────────────────────────

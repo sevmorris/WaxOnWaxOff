@@ -1,94 +1,21 @@
 import Foundation
-import Observation
 
 private extension UUID {
+    /// See `Preset.swift` for the rationale — these literals are constants in
+    /// source, so a malformed string is a commit-time typo, not a runtime
+    /// issue. Crashing loudly is preferable to allocating random UUIDs that
+    /// would invalidate users' selectedPresetID on disk.
     init(knownValid string: String) {
         guard let uuid = UUID(uuidString: string) else {
-            preconditionFailure("Invalid built-in UUID constant: \(string)")
+            preconditionFailure("Built-in preset UUID literal is malformed (commit typo, not a runtime issue): \(string)")
         }
         self = uuid
     }
 }
 
-// MARK: - WaxOnPresetStore
+struct WaxOnPreset: Identifiable, Codable, Equatable, PresetCodable {
+    typealias StoredSettings = WaxOnSettings
 
-@Observable
-final class WaxOnPresetStore {
-    var presets: [WaxOnPreset] = []
-    var selectedPresetID: UUID?
-
-    private let userDefaultsKey = "WaxOnUserPresets"
-    private let selectedPresetKey = "WaxOnSelectedPresetID"
-
-    init() {
-        loadPresets()
-        if let idString = UserDefaults.standard.string(forKey: selectedPresetKey),
-           let id = UUID(uuidString: idString) {
-            selectedPresetID = id
-        }
-    }
-
-    var allPresets: [WaxOnPreset] {
-        WaxOnPreset.builtIn + presets
-    }
-
-    var selectedPreset: WaxOnPreset? {
-        guard let id = selectedPresetID else { return nil }
-        return allPresets.first { $0.id == id }
-    }
-
-    func savePreset(_ preset: WaxOnPreset) {
-        presets.append(preset)
-        persist()
-        selectPreset(preset.id)
-    }
-
-    func deletePreset(_ preset: WaxOnPreset) {
-        presets.removeAll { $0.id == preset.id }
-        if selectedPresetID == preset.id { selectPreset(nil) }
-        persist()
-    }
-
-    func updatePreset(id: UUID, name: String?, settings: WaxOnSettings?) {
-        guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
-        if let name {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
-            presets[index].name = trimmed
-        }
-        if let settings {
-            presets[index].settings = settings
-        }
-        persist()
-    }
-
-    func selectPreset(_ id: UUID?) {
-        selectedPresetID = id
-        if let id {
-            UserDefaults.standard.set(id.uuidString, forKey: selectedPresetKey)
-        } else {
-            UserDefaults.standard.removeObject(forKey: selectedPresetKey)
-        }
-    }
-
-    func isBuiltIn(_ preset: WaxOnPreset) -> Bool {
-        WaxOnPreset.builtIn.contains { $0.id == preset.id }
-    }
-
-    private func loadPresets() {
-        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey) else { return }
-        presets = (try? JSONDecoder().decode([WaxOnPreset].self, from: data)) ?? []
-    }
-
-    private func persist() {
-        guard let data = try? JSONEncoder().encode(presets) else { return }
-        UserDefaults.standard.set(data, forKey: userDefaultsKey)
-    }
-}
-
-// MARK: -
-
-struct WaxOnPreset: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
     var settings: WaxOnSettings
@@ -130,7 +57,6 @@ struct WaxOnPreset: Identifiable, Codable, Equatable {
                 loudnormTarget: -23.0,
                 highPassEnabled: true
             )
-        ),
+        )
     ]
 }
-

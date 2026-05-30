@@ -35,6 +35,19 @@ final class FFmpegRunnerTests: XCTestCase {
         XCTAssertNil(FFmpegRunner.parseLoudnormJSON(from: "no json here"))
     }
 
+    /// When the `[Parsed_loudnorm_` anchor isn't present, the parser falls back
+    /// to "first `{` in stderr". Locks the current contract so a future FFmpeg
+    /// log format change doesn't silently regress this path.
+    func testParseLoudnormJSONFallsBackToFirstBraceWithoutPrefix() {
+        let stderr = """
+        ffmpeg version 8.0 banner
+        { "input_i": "-22.0", "input_tp": "-1.5", "input_lra": "5", "input_thresh": "-32", "target_offset": "4" }
+        """
+        let dict = FFmpegRunner.parseLoudnormJSON(from: stderr)
+        XCTAssertEqual(dict?["input_i"], "-22.0")
+        XCTAssertEqual(dict?["target_offset"], "4")
+    }
+
     func testFilterEscapeHandlesSyntaxCharacters() {
         XCTAssertEqual(FFmpegRunner.filterEscape("path/to/file"), "path/to/file")
         XCTAssertEqual(FFmpegRunner.filterEscape("a:b"), "a\\:b")

@@ -39,14 +39,17 @@ enum WaveformGenerator {
         let samplesPerBucket = max(1, totalFrames / targetSamples)
         let actualBuckets = (totalFrames + samplesPerBucket - 1) / samplesPerBucket
 
-        // Accumulate stats per bucket incrementally
+        // Accumulate stats per bucket incrementally. One row per source channel
+        // — for mono that's a single row, for stereo two. The mixed-down
+        // `peaks` array is always produced; `channelPeaks` lets the stereo
+        // waveform view draw L/R lanes when channelCount > 1.
         var bucketSums = [Float](repeating: 0, count: actualBuckets)
         var bucketPeaks = [Float](repeating: 0, count: actualBuckets)
         var bucketCounts = [Int](repeating: 0, count: actualBuckets)
-        // LOW-2: only allocate per-channel peaks for multi-channel files
-        var channelBucketPeaks = channels > 1
-            ? [[Float]](repeating: [Float](repeating: 0, count: actualBuckets), count: channels)
-            : [[Float]](repeating: [Float](repeating: 0, count: actualBuckets), count: 1)
+        var channelBucketPeaks = [[Float]](
+            repeating: [Float](repeating: 0, count: actualBuckets),
+            count: max(channels, 1)
+        )
 
         // Read in chunks to avoid loading the entire file into RAM
         let chunkSize: AVAudioFrameCount = 32768

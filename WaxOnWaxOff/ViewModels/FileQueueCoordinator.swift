@@ -120,6 +120,11 @@ final class FileQueueCoordinator {
             if let stats = files[i].analysisStats {
                 files[i].status = .ready(stats)
             } else {
+                // Defensive: a row that reached `.processing` should always
+                // have stats snapshotted (the Process button is disabled while
+                // `isAnyFileAnalyzing`). This branch only fires if a bug lets a
+                // row slip through pre-analysis — keep the visible error so
+                // it's noticed in QA rather than silently dropping to .pending.
                 files[i].status = .error(interruptedMessage)
             }
         }

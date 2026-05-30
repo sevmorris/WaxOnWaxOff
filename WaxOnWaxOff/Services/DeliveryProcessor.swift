@@ -1,44 +1,5 @@
 import Foundation
 
-// MARK: - Loudnorm Measurements
-
-struct LoudnormMeasurements: Sendable {
-    var inputI: Double
-    var inputTP: Double
-    var inputLRA: Double
-    var inputThresh: Double
-    var targetOffset: Double
-
-    nonisolated init?(json: [String: Any]) {
-        guard let inputI = Self.parseNumber(json["input_i"]),
-              let inputTP = Self.parseNumber(json["input_tp"]),
-              let inputLRA = Self.parseNumber(json["input_lra"]),
-              let inputThresh = Self.parseNumber(json["input_thresh"]),
-              let targetOffset = Self.parseNumber(json["target_offset"])
-        else { return nil }
-        self.inputI = inputI
-        self.inputTP = inputTP
-        self.inputLRA = inputLRA
-        self.inputThresh = inputThresh
-        self.targetOffset = targetOffset
-    }
-
-    /// Silent or near-silent inputs cause `loudnorm` to emit -inf / inf for
-    /// some measurements. Pass 2 rejects those values with "Result too large",
-    /// so callers must check before plumbing measurements into the linear-mode
-    /// filter string.
-    nonisolated var isFinite: Bool {
-        inputI.isFinite && inputTP.isFinite && inputLRA.isFinite &&
-            inputThresh.isFinite && targetOffset.isFinite
-    }
-
-    private nonisolated static func parseNumber(_ value: Any?) -> Double? {
-        if let num = value as? Double { return num }
-        if let str = value as? String { return Double(str) }
-        return nil
-    }
-}
-
 // MARK: - Batch types
 
 struct DeliveryJobInput: Sendable {
@@ -181,8 +142,14 @@ actor DeliveryProcessor {
         onLog?("  loudnorm: analyzing…", .verbose)
         let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings)
         if let m = measurements {
-            onLog?("  measured: \(String(format: "%.1f", m.inputI)) LUFS  |  TP \(String(format: "%.1f", m.inputTP)) dBTP  |  LRA \(String(format: "%.1f", m.inputLRA)) LU", .info)
-            onLog?("  offset: \(String(format: "%.2f", m.targetOffset)) dB  |  thresh \(String(format: "%.1f", m.inputThresh)) LUFS", .verbose)
+            onLog?("  \(m.formattedSummary)", .info)
+            onLog?(String(format: "  offset: %.2f dB  |  thresh %.1f LUFS", m.targetOffset, m.inputThresh), .verbose)
+            if abs(m.targetOffset) > 12.0 {
+                onLog?(String(format: "⚠ Large gain change (%+.1f dB) — verify the source level and output before delivery.",
+                              m.targetOffset), .info)
+            }
+            onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
+                          m.targetOffset, m.inputI, settings.targetLUFS), .info)
         } else {
             onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
         }
@@ -334,16 +301,11 @@ actor DeliveryProcessor {
         // are available — silent inputs skip it to avoid pass-2 errors.
         var filterChain = "allpass=f=200:t=q:w=0.707"
         if let m = measurements {
-            let lufs = formatNumber(settings.targetLUFS)
-            let tp   = String(format: "%.1f", settings.truePeak)
-            let lra  = formatNumber(settings.lra)
-            filterChain += ",loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra)"
-            filterChain += ":measured_I=\(m.inputI)"
-            filterChain += ":measured_TP=\(m.inputTP)"
-            filterChain += ":measured_LRA=\(m.inputLRA)"
-            filterChain += ":measured_thresh=\(m.inputThresh)"
-            filterChain += ":offset=\(m.targetOffset)"
-            filterChain += ":linear=true"
+            filterChain += "," + m.linearPassFilter(
+                targetLUFS: settings.targetLUFS,
+                truePeakDB: settings.truePeak,
+                lra: settings.lra
+            )
         }
 
         // Brick-wall limiter as a safety backstop for inter-sample peaks that

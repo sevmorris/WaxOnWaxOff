@@ -147,13 +147,7 @@ struct ManagedPresetRow: Identifiable {
     let name: String
 }
 
-extension WaxOnPresetStore {
-    var managedRows: [ManagedPresetRow] {
-        presets.map { ManagedPresetRow(id: $0.id, name: $0.name) }
-    }
-}
-
-extension WaxOffPresetStore {
+extension PresetStore {
     var managedRows: [ManagedPresetRow] {
         presets.map { ManagedPresetRow(id: $0.id, name: $0.name) }
     }
