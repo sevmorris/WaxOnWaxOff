@@ -8,9 +8,16 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-14
+    # Project uses objectVersion 77 (Xcode 16+). macos-14 ships Xcode 15.4,
+    # which cannot open this pbxproj format.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
 
       - name: Fetch FFmpeg
         run: ./scripts/fetch-ffmpeg.sh
