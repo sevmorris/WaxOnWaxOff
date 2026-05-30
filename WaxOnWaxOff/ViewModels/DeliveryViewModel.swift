@@ -15,6 +15,8 @@ final class DeliveryViewModel {
     var isProcessing = false
     var deliveryPhase: String? = nil
     var alertMessage: String?
+    var showWaxoffWarning = false
+    private var pendingWaxoffFiles: [URL] = []
     var presetStore = WaxOffPresetStore()
     var log = ProcessingLog()
 
@@ -38,9 +40,32 @@ final class DeliveryViewModel {
     }
 
     func addFiles(_ urls: [URL]) {
-        alertMessage = fileQueue.addFiles(urls) { count in
-            "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format."
-        }
+        alertMessage = fileQueue.addFiles(
+            urls,
+            skippedFormatMessage: { count in
+                "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format."
+            },
+            beforeCommit: { valid in
+                if valid.contains(where: OutputNaming.looksLikeWaxOffDelivery) {
+                    self.pendingWaxoffFiles = valid
+                    self.showWaxoffWarning = true
+                    return false
+                }
+                return true
+            }
+        )
+    }
+
+    func confirmWaxoffWarning() {
+        let toAdd = pendingWaxoffFiles
+        pendingWaxoffFiles = []
+        showWaxoffWarning = false
+        fileQueue.commitFiles(toAdd)
+    }
+
+    func dismissWaxoffWarning() {
+        pendingWaxoffFiles = []
+        showWaxoffWarning = false
     }
 
     func removeSelected() { fileQueue.removeSelected() }

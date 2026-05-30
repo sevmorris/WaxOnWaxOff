@@ -1,6 +1,21 @@
 import Foundation
 
 enum OutputNaming {
+    /// WaxOn prep outputs: `{name}-{44k|48k}waxon.wav`
+    nonisolated static func looksLikeWaxOnPrep(_ url: URL) -> Bool {
+        let base = url.deletingPathExtension().lastPathComponent
+        return base.range(of: #"\d{2}kwaxon"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    /// WaxOff delivery outputs: `{name}-lev{target}LUFS.{wav,mp3}` (target includes sign).
+    nonisolated static func looksLikeWaxOffDelivery(_ url: URL) -> Bool {
+        let base = url.deletingPathExtension().lastPathComponent
+        return base.range(
+            of: #"-lev-?\d+(\.\d+)?LUFS"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
     /// Short hash tag when multiple inputs would collide on the same output basename.
     nonisolated static func shortPathTag(for path: String) -> String {
         var hash: UInt64 = 5381

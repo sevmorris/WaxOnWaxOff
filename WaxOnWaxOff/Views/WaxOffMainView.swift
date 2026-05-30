@@ -65,6 +65,15 @@ struct WaxOffMainView: View {
         } message: {
             Text(viewModel.alertMessage ?? "")
         }
+        .alert("Already Delivered?", isPresented: Binding(
+            get: { viewModel.showWaxoffWarning },
+            set: { if !$0 { viewModel.dismissWaxoffWarning() } }
+        )) {
+            Button("Add Anyway") { viewModel.confirmWaxoffWarning() }
+            Button("Cancel", role: .cancel) { viewModel.dismissWaxoffWarning() }
+        } message: {
+            Text("One or more files appear to have already been processed by WaxOff. Running delivery again may over-limit or drift from your target loudness.")
+        }
     }
 
     private var headerView: some View {

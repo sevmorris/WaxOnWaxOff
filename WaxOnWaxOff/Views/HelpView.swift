@@ -34,10 +34,12 @@ struct HelpView: View {
 
                 section("WaxOn — Raw Recording Prep") {
                     text("""
-                    Use WaxOn on raw recordings before editing. It cleans up the signal — \
+                    Use WaxOn on raw recordings before editing. It conditions the signal — \
                     removing low-frequency rumble, controlling peak level, and optionally \
                     normalizing loudness — and outputs a clean 24-bit WAV ready to drop \
-                    into Logic Pro or any other editor.
+                    into Logic Pro or any other editor. It does not denoise the exported \
+                    file; RNNoise is used only inside the loudness analysis path when \
+                    Loudness Norm is on (see the online Theory of Operation).
                     """)
                 }
                 section("WaxOn — Quick Start") {

@@ -27,4 +27,19 @@ final class WaxOffSettingsTests: XCTestCase {
 
         XCTAssertEqual(WaxOffSettings.load().lra, 7.0)
     }
+
+    func testLooksLikeWaxOffDeliveryMatchesOutputNaming() {
+        let delivered = URL(fileURLWithPath: "/tmp/episode-lev-18LUFS.wav")
+        let raw = URL(fileURLWithPath: "/tmp/interview.wav")
+        let waxon = URL(fileURLWithPath: "/tmp/guest-44kwaxon.wav")
+
+        XCTAssertTrue(OutputNaming.looksLikeWaxOffDelivery(delivered))
+        XCTAssertFalse(OutputNaming.looksLikeWaxOffDelivery(raw))
+        XCTAssertFalse(OutputNaming.looksLikeWaxOffDelivery(waxon))
+    }
+
+    func testLooksLikeWaxOnPrep() {
+        XCTAssertTrue(OutputNaming.looksLikeWaxOnPrep(URL(fileURLWithPath: "/tmp/a-48kwaxon.wav")))
+        XCTAssertFalse(OutputNaming.looksLikeWaxOnPrep(URL(fileURLWithPath: "/tmp/a-lev-18LUFS.wav")))
+    }
 }

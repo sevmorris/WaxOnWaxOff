@@ -15,7 +15,9 @@
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html">Theory of Operation</a>
 </p>
 
-**WaxOn/WaxOff** solves a specific problem: you receive a guest recording that's quiet, uneven, or sitting in a bed of room noise, and you need a clean, normalized WAV before you open your session. No import-normalize-export dance. No sending audio to a cloud service.
+**WaxOn/WaxOff** solves a specific problem: you receive a guest recording that's quiet, uneven, or poorly leveled, and you need a consistent prep WAV before you open your session—or a finished mix normalized to your delivery spec. No import-normalize-export dance. No sending audio to a cloud service.
+
+WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, optional EBU R128 gain, true-peak limiting). It does **not** apply spectral noise reduction to the output file. When Loudness Norm is enabled, RNNoise runs only on an internal analysis pass so loudness measurement isn't skewed by room tone—not as a user-facing denoise stage. For plosives, clicks, and heavy noise, use a repair tool (e.g. iZotope RX) before WaxOn.
 
 <p align="center">
   <img src="docs/images/waxon-waveform.png" width="49%" alt="WaxOn processing — waveform view" />
@@ -40,7 +42,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 
 * **High-Pass Filter:** On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.
 * **Dynamic Leveling:** Optional `dynaudnorm` with adjustable aggressiveness (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
-* **Loudness Normalization:** Optional two-pass EBU R128 linear gain (dynamics fully preserved; default off).
+* **Loudness Normalization:** Optional two-pass EBU R128 linear gain (dynamics fully preserved; default off). RNNoise may run on an analysis-only temp when this is on—see [Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html)—not on the exported WAV.
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** Always-on 2× oversampled true peak limiting at fixed −1.0 dBTP.
 * **Phase Alignment:** Optional 200 Hz allpass filter to reduce peak asymmetry and maximize headroom (default on).
@@ -64,6 +66,9 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Concurrency:** Adaptive batch processing — scales with available CPU cores.
 * **Environment:** macOS 14.0+ (Sonoma) on **Apple Silicon (M-series) Macs** (arm64). Intel Macs are not supported.
 * **Dependencies:** Bundled FFmpeg; no external installation required.
+
+### Security model
+The app ships with **App Sandbox disabled** so it can launch the bundled `ffmpeg` and `ffprobe` binaries via `Process()` (sandboxed apps cannot exec non-sandboxed helpers). That means the app can read and write anywhere your user account can once you grant a path through drag-and-drop or the file picker—same trust model as a typical command-line tool. Download builds from the [official releases](https://github.com/sevmorris/WaxOnWaxOff/releases) only; `release.sh` codesigns and notarizes the DMG. See `WaxOnWaxOff/WaxOnWaxOff.entitlements` for the documented rationale.
 
 ## Building from Source
 

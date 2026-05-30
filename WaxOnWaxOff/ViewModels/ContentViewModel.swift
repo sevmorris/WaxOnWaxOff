@@ -53,7 +53,7 @@ final class ContentViewModel {
                 "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, ogg, opus, caf, wma, aac, mp4, mov."
             },
             beforeCommit: { valid in
-                if valid.contains(where: { $0.lastPathComponent.localizedCaseInsensitiveContains("-waxon") }) {
+                if valid.contains(where: OutputNaming.looksLikeWaxOnPrep) {
                     self.pendingWaxonFiles = valid
                     self.showWaxonWarning = true
                     return false
