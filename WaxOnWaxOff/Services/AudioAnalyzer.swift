@@ -41,11 +41,12 @@ enum AudioAnalyzer {
         }
     }
 
-    static func analyze(url: URL) async throws -> AudioStats {
+    /// - Parameter noiseFloorHighPassHz: HPF for noise-floor blocks — use 80 when WaxOn HPF is on, 20 when off.
+    static func analyze(url: URL, noiseFloorHighPassHz: Double = 80) async throws -> AudioStats {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let stats = try performAnalysis(url: url)
+                    let stats = try performAnalysis(url: url, noiseFloorHighPassHz: noiseFloorHighPassHz)
                     continuation.resume(returning: stats)
                 } catch {
                     continuation.resume(throwing: error)
@@ -54,7 +55,7 @@ enum AudioAnalyzer {
         }
     }
 
-    private static func performAnalysis(url: URL) throws -> AudioStats {
+    private static func performAnalysis(url: URL, noiseFloorHighPassHz: Double) throws -> AudioStats {
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ProcessingError.analysisError("File does not exist")
         }
@@ -87,11 +88,9 @@ enum AudioAnalyzer {
             // ITU-R BS.1770 K-weighting filter coefficients for this sample rate
             let kw = KWeightCoeffs(sampleRate: sr)
 
-            // 80 Hz Butterworth HPF for the noise-floor mono path. Matches WaxOn's
-            // HPF stage so the displayed noise floor reflects what survives after
-            // rumble/HVAC is removed during processing. Doesn't touch peak, overall
-            // RMS, or LUFS — those still see the unfiltered audio.
-            let nfHp = NoiseFloorHPF(sampleRate: sr)
+            // Butterworth HPF for the noise-floor mono path. Matches WaxOn's HPF stage
+            // (80 Hz on, 20 Hz DC floor when off). Doesn't touch peak, RMS, or LUFS.
+            let nfHp = NoiseFloorHPF(sampleRate: sr, cutoffHz: noiseFloorHighPassHz)
             var nfHpW1: Double = 0
             var nfHpW2: Double = 0
 
@@ -162,7 +161,7 @@ enum AudioAnalyzer {
                     let doubleMono = Double(monoSample)
                     sumSquares += doubleMono * doubleMono
 
-                    // 80 Hz HPF on mono path before noise-floor accumulation
+                    // HPF on mono path before noise-floor accumulation
                     let nfFiltered = nfHp.process(doubleMono, w1: &nfHpW1, w2: &nfHpW2)
                     nfBlockMonoSumSq += nfFiltered * nfFiltered
 
@@ -277,15 +276,13 @@ enum AudioAnalyzer {
     }
 }
 
-/// 2nd-order Butterworth high-pass biquad at 80 Hz. Used by the analyzer to
-/// match WaxOn's HPF stage when estimating the noise floor — keeps low-frequency
-/// rumble (HVAC, traffic, table thumps) out of the displayed RMS so the user
-/// isn't warned about content the processing chain will already remove.
+/// 2nd-order Butterworth high-pass biquad. Used by the analyzer to match WaxOn's
+/// HPF stage when estimating the noise floor.
 private struct NoiseFloorHPF {
     let b0, b1, b2, a1, a2: Double
 
-    init(sampleRate: Double) {
-        let f0 = 80.0
+    init(sampleRate: Double, cutoffHz: Double) {
+        let f0 = max(20.0, cutoffHz)
         let K = tan(.pi * f0 / sampleRate)
         let Ksq = K * K
         let Q = 1.0 / 2.0.squareRoot()  // Butterworth

@@ -21,7 +21,7 @@ struct WaxOffControlBar: View {
 
             knobCell(
                 label: "TARGET LUFS",
-                valueLabel: "\(Int(viewModel.settings.targetLUFS)) LUFS",
+                valueLabel: "\(viewModel.settings.targetLUFSString) LUFS",
                 value: Binding(
                     get: { (viewModel.settings.targetLUFS - (-24)) / (-14 - (-24)) },
                     set: { viewModel.settings.targetLUFS = ($0 * (-14 - (-24)) + (-24)).rounded() }

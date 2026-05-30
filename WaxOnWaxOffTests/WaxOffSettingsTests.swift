@@ -1,6 +1,7 @@
 import XCTest
 @testable import WaxOnWaxOff
 
+@MainActor
 final class WaxOffSettingsTests: XCTestCase {
     private let storageKey = "WaxOffSettings"
 

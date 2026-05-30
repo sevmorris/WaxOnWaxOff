@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch FFmpeg
+        run: ./scripts/fetch-ffmpeg.sh
+
+      - name: Build and test
+        run: |
+          xcodebuild \
+            -project WaxOnWaxOff.xcodeproj \
+            -scheme WaxOnWaxOff \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            test

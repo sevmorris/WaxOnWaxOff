@@ -18,9 +18,14 @@ final class WaxOnPresetStore {
     var selectedPresetID: UUID?
 
     private let userDefaultsKey = "WaxOnUserPresets"
+    private let selectedPresetKey = "WaxOnSelectedPresetID"
 
     init() {
         loadPresets()
+        if let idString = UserDefaults.standard.string(forKey: selectedPresetKey),
+           let id = UUID(uuidString: idString) {
+            selectedPresetID = id
+        }
     }
 
     var allPresets: [WaxOnPreset] {
@@ -35,12 +40,22 @@ final class WaxOnPresetStore {
     func savePreset(_ preset: WaxOnPreset) {
         presets.append(preset)
         persist()
+        selectPreset(preset.id)
     }
 
     func deletePreset(_ preset: WaxOnPreset) {
         presets.removeAll { $0.id == preset.id }
-        if selectedPresetID == preset.id { selectedPresetID = nil }
+        if selectedPresetID == preset.id { selectPreset(nil) }
         persist()
+    }
+
+    func selectPreset(_ id: UUID?) {
+        selectedPresetID = id
+        if let id {
+            UserDefaults.standard.set(id.uuidString, forKey: selectedPresetKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: selectedPresetKey)
+        }
     }
 
     func isBuiltIn(_ preset: WaxOnPreset) -> Bool {

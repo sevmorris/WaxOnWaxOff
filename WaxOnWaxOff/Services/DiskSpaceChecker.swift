@@ -77,7 +77,8 @@ enum DiskSpaceChecker {
         for (url, dir) in zip(inputURLs, outputDirectories) {
             let inputBytes = fileSize(at: url) ?? largestInput
             let key = dir.path
-            requiredPerDirectory[key, default: outputHeadroomBytes] += inputBytes * 2
+            // WAV + MP3 “Both” can exceed 2× input size (PCM + compressed).
+            requiredPerDirectory[key, default: outputHeadroomBytes] += inputBytes * 3
         }
 
         for (path, required) in requiredPerDirectory {

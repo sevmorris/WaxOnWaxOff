@@ -39,9 +39,103 @@ struct LoudnormMeasurements: Sendable {
     }
 }
 
+// MARK: - Batch types
+
+struct DeliveryJobInput: Sendable {
+    let id: UUID
+    let url: URL
+}
+
+struct DeliveryJobResult: Sendable {
+    let id: UUID
+    let outputURLs: [URL]
+}
+
+struct DeliveryJobFailure: Sendable {
+    let id: UUID
+    let message: String
+}
+
+struct DeliveryBatchRunResult: Sendable {
+    let successes: [DeliveryJobResult]
+    let failures: [DeliveryJobFailure]
+}
+
+private enum DeliveryJobOutcome: Sendable {
+    case success(DeliveryJobResult)
+    case failure(DeliveryJobFailure)
+    case cancelled
+}
+
 // MARK: - DeliveryProcessor
 
 actor DeliveryProcessor {
+
+    func run(
+        inputs: [DeliveryJobInput],
+        settings: WaxOffSettings,
+        onFileStarted: (@Sendable (UUID) -> Void)? = nil,
+        onPhase: (@Sendable (UUID, String) -> Void)? = nil,
+        onLog: (@Sendable (String, LogLevel) -> Void)? = nil
+    ) async throws -> DeliveryBatchRunResult {
+        guard !inputs.isEmpty else {
+            return DeliveryBatchRunResult(successes: [], failures: [])
+        }
+
+        let tools = try await FFmpegManager.shared.ensureTools()
+        let maxConcurrent = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
+
+        return try await withThrowingTaskGroup(of: DeliveryJobOutcome.self) { group in
+            var successes: [DeliveryJobResult] = []
+            var failures: [DeliveryJobFailure] = []
+            var index = 0
+
+            func addNext() {
+                guard index < inputs.count else { return }
+                let input = inputs[index]
+                index += 1
+                group.addTask {
+                    do {
+                        try Task.checkCancellation()
+                        onFileStarted?(input.id)
+                        let outputs = try await self.process(
+                            url: input.url,
+                            settings: settings,
+                            tools: tools,
+                            onPhase: { phase in onPhase?(input.id, phase) },
+                            onLog: onLog
+                        )
+                        return .success(DeliveryJobResult(id: input.id, outputURLs: outputs))
+                    } catch is CancellationError {
+                        return .cancelled
+                    } catch {
+                        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                        onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
+                        return .failure(DeliveryJobFailure(id: input.id, message: message))
+                    }
+                }
+            }
+
+            for _ in 0..<min(maxConcurrent, inputs.count) {
+                addNext()
+            }
+
+            for try await outcome in group {
+                switch outcome {
+                case .success(let result):
+                    successes.append(result)
+                case .failure(let failure):
+                    failures.append(failure)
+                case .cancelled:
+                    group.cancelAll()
+                    throw CancellationError()
+                }
+                addNext()
+            }
+
+            return DeliveryBatchRunResult(successes: successes, failures: failures)
+        }
+    }
 
     func process(
         url: URL,
@@ -49,14 +143,21 @@ actor DeliveryProcessor {
         onPhase: (@Sendable (String) -> Void)? = nil,
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
     ) async throws -> [URL] {
-        let paths = try await FFmpegManager.shared.ensureTools()
-        let ffmpeg = paths.ffmpeg
+        let tools = try await FFmpegManager.shared.ensureTools()
+        return try await process(url: url, settings: settings, tools: tools, onPhase: onPhase, onLog: onLog)
+    }
 
-        let outputDir: URL
-        if let customPath = settings.outputDirectoryPath {
-            outputDir = URL(fileURLWithPath: customPath)
-        } else {
-            outputDir = url.deletingLastPathComponent()
+    private func process(
+        url: URL,
+        settings: WaxOffSettings,
+        tools: FFmpegManager.Paths,
+        onPhase: (@Sendable (String) -> Void)? = nil,
+        onLog: (@Sendable (String, LogLevel) -> Void)? = nil
+    ) async throws -> [URL] {
+        let ffmpeg = tools.ffmpeg
+
+        let outputDir = OutputDirectory.waxOffOutputDirectory(for: url, settings: settings) { message in
+            onLog?("⚠ \(message)", .info)
         }
 
         let stem = url.deletingPathExtension().lastPathComponent

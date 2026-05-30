@@ -215,10 +215,10 @@ actor AudioProcessor {
                 let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
                 onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
                 let escapedNrModel = FFmpegRunner.filterEscape(modelURL.path)
-                // arnndn is fixed at 48 kHz internally. Writing the temp file at 48 kHz
-                // avoids a 44.1 → 48 → 44.1 round-trip that costs CPU for nothing — this
-                // file is only consumed by loudnorm pass 1, which doesn't care about rate.
-                let nrSampleRate = "48000"
+                // arnndn runs at 48 kHz internally; write the NR temp at the output rate so
+                // loudnorm pass 1 measures the same sample rate as pass 2 (required for
+                // valid two-pass measured_I / offset values on 44.1 kHz exports).
+                let nrSampleRate = "\(sr)"
                 if isStereo {
                     let nrFc = [
                         "[0:a]channelsplit=channel_layout=stereo[L][R]",

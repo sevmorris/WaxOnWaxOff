@@ -8,10 +8,12 @@ private let logger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", catego
 @Observable
 @MainActor
 final class ContentViewModel {
-    var files: [FileItem] = []
-    var selectedFileIDs: Set<UUID> = []
+    let fileQueue = FileQueueCoordinator()
     var settings: WaxOnSettings {
-        didSet { settings.save() }
+        didSet {
+            settings.save()
+            syncNoiseFloorHPF()
+        }
     }
     var isProcessing = false
     var alertMessage: String?
@@ -21,59 +23,51 @@ final class ContentViewModel {
     var log = ProcessingLog()
     private var processingTask: Task<Void, Never>?
     private var processingCancelled = false
-    private var analysisTasks: [UUID: Task<Void, Never>] = [:]
-    private var analysisInfoTasks: [UUID: Task<Void, Never>] = [:]
-    private var waveformTasks: [UUID: Task<Void, Never>] = [:]
-    private var outputWaveformTasks: [UUID: Task<Void, Never>] = [:]
 
-    private static let validExtensions: Set<String> = [
-        "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
-        "mp4", "mov"
-    ]
+    var files: [FileItem] {
+        get { fileQueue.files }
+        set { fileQueue.files = newValue }
+    }
+    var selectedFileIDs: Set<UUID> {
+        get { fileQueue.selectedFileIDs }
+        set { fileQueue.selectedFileIDs = newValue }
+    }
+    var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
     init() {
         self.settings = WaxOnSettings.load()
+        syncNoiseFloorHPF()
+        if let preset = presetStore.selectedPreset {
+            settings = preset.settings
+        }
     }
 
-    var isAnyFileAnalyzing: Bool {
-        files.contains { if case .analyzing = $0.status { return true }; return false }
+    private func syncNoiseFloorHPF() {
+        fileQueue.noiseFloorHighPassHz = settings.highPassEnabled ? 80 : 20
     }
 
     func addFiles(_ urls: [URL]) {
-        let expanded = urls.flatMap { expandFolder($0) }
-        let valid = expanded.filter { Self.validExtensions.contains($0.pathExtension.lowercased()) }
-        let badFormat = expanded.count - valid.count
-
-        if badFormat > 0 {
-            alertMessage = "\(badFormat) file\(badFormat == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, ogg, opus, caf, wma, aac, mp4, mov."
-        }
-
-        if valid.contains(where: { $0.lastPathComponent.localizedCaseInsensitiveContains("-waxon") }) {
-            pendingWaxonFiles = valid
-            showWaxonWarning = true
-            return
-        }
-
-        commitFiles(valid)
-    }
-
-    private func expandFolder(_ url: URL) -> [URL] {
-        guard url.hasDirectoryPath else { return [url] }
-        guard let enumerator = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return [] }
-        return enumerator.compactMap { $0 as? URL }.filter {
-            (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-        }
+        alertMessage = fileQueue.addFiles(
+            urls,
+            skippedFormatMessage: { count in
+                "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, ogg, opus, caf, wma, aac, mp4, mov."
+            },
+            beforeCommit: { valid in
+                if valid.contains(where: { $0.lastPathComponent.localizedCaseInsensitiveContains("-waxon") }) {
+                    self.pendingWaxonFiles = valid
+                    self.showWaxonWarning = true
+                    return false
+                }
+                return true
+            }
+        )
     }
 
     func confirmWaxonWarning() {
         let toAdd = pendingWaxonFiles
         pendingWaxonFiles = []
         showWaxonWarning = false
-        commitFiles(toAdd)
+        fileQueue.commitFiles(toAdd)
     }
 
     func dismissWaxonWarning() {
@@ -81,57 +75,14 @@ final class ContentViewModel {
         showWaxonWarning = false
     }
 
-    private func commitFiles(_ urls: [URL]) {
-        let newFiles = urls.map { FileItem(url: $0) }
-        files.append(contentsOf: newFiles)
-        for file in newFiles {
-            analyzeFile(file)
-            generateWaveform(file)
-            analyzeFileInfo(file)
-        }
-    }
-
-    func removeSelected() {
-        cancelAnalysisTasks(for: selectedFileIDs)
-        files.removeAll { selectedFileIDs.contains($0.id) }
-        selectedFileIDs.removeAll()
-    }
-
-    func clearAll() {
-        cancelAnalysisTasks(for: Set(files.map { $0.id }))
-        files.removeAll()
-        selectedFileIDs.removeAll()
-    }
-
-    func removeFiles(at offsets: IndexSet) {
-        let deletedIDs = Set(offsets.map { files[$0].id })
-        cancelAnalysisTasks(for: deletedIDs)
-        files.remove(atOffsets: offsets)
-        selectedFileIDs.subtract(deletedIDs)
-    }
-
-    private func cancelAnalysisTasks(for ids: Set<UUID>) {
-        for id in ids {
-            analysisTasks[id]?.cancel()
-            analysisInfoTasks[id]?.cancel()
-            waveformTasks[id]?.cancel()
-            outputWaveformTasks[id]?.cancel()
-            analysisTasks.removeValue(forKey: id)
-            analysisInfoTasks.removeValue(forKey: id)
-            waveformTasks.removeValue(forKey: id)
-            outputWaveformTasks.removeValue(forKey: id)
-        }
-    }
-
-    func moveFiles(from source: IndexSet, to destination: Int) {
-        files.move(fromOffsets: source, toOffset: destination)
-    }
-
-    // MARK: - Presets
+    func removeSelected() { fileQueue.removeSelected() }
+    func clearAll() { fileQueue.clearAll() }
+    func removeFiles(at offsets: IndexSet) { fileQueue.removeFiles(at: offsets) }
+    func moveFiles(from source: IndexSet, to destination: Int) { fileQueue.moveFiles(from: source, to: destination) }
 
     func applyPreset(_ preset: WaxOnPreset) {
         settings = preset.settings
-        presetStore.selectedPresetID = preset.id
+        presetStore.selectPreset(preset.id)
     }
 
     func saveCurrentAsPreset(name: String) {
@@ -141,7 +92,6 @@ final class ContentViewModel {
     func process() {
         guard !files.isEmpty else { return }
 
-        // Validate custom output directory upfront before any processing starts
         if let customPath = settings.outputDirectoryPath,
            !FileManager.default.isWritableFile(atPath: customPath) {
             alertMessage = "Output directory is not writable: \(customPath)"
@@ -173,15 +123,9 @@ final class ContentViewModel {
         isProcessing = true
         processingCancelled = false
         log.clear()
+        fileQueue.snapshotReadyStats()
 
         let currentSettings = settings
-
-        // Snapshot stats so they survive the status transition
-        for i in files.indices {
-            if case .ready(let stats) = files[i].status {
-                files[i].analysisStats = stats
-            }
-        }
 
         processingTask = Task {
             do {
@@ -214,12 +158,12 @@ final class ContentViewModel {
                     }
                 }
 
-                resetStuckProcessingRows()
+                fileQueue.restoreProcessingRows()
 
                 for result in batch.successes {
                     if let id = result.id {
-                        generateOutputWaveform(id: id, url: result.output)
-                        analyzeOutputFile(id: id, url: result.output)
+                        fileQueue.generateOutputWaveform(id: id, url: result.output)
+                        fileQueue.analyzeOutputFile(id: id, url: result.output)
                     }
                 }
 
@@ -236,7 +180,7 @@ final class ContentViewModel {
             } catch {
                 logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
                 log.append("✗ \(error.localizedDescription)", level: .info)
-                resetStuckProcessingRows()
+                fileQueue.restoreProcessingRows()
                 alertMessage = "Processing failed. Open the Console tab for details."
             }
 
@@ -245,105 +189,11 @@ final class ContentViewModel {
         }
     }
 
-    /// Safety net — no row should remain `.processing` once a batch finishes.
-    private func resetStuckProcessingRows() {
-        for i in files.indices {
-            guard case .processing = files[i].status else { continue }
-            if let stats = files[i].analysisStats {
-                files[i].status = .ready(stats)
-            } else {
-                files[i].status = .error("Processing interrupted")
-            }
-        }
-    }
-
     func cancelProcessing() {
         processingCancelled = true
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
-        for i in files.indices {
-            if case .processing = files[i].status {
-                if let stats = files[i].analysisStats {
-                    files[i].status = .ready(stats)
-                } else {
-                    files[i].status = .pending
-                }
-            }
-        }
-    }
-
-    private func analyzeFileInfo(_ file: FileItem) {
-        let task = Task {
-            if let info = try? await AudioAnalyzer.info(url: file.url),
-               let idx = files.firstIndex(where: { $0.id == file.id }) {
-                files[idx].fileInfo = info
-            }
-            analysisInfoTasks.removeValue(forKey: file.id)
-        }
-        analysisInfoTasks[file.id] = task
-    }
-
-    private func analyzeFile(_ file: FileItem) {
-        guard let index = files.firstIndex(where: { $0.id == file.id }) else { return }
-        files[index].status = .analyzing
-
-        let task = Task {
-            do {
-                let stats = try await AudioAnalyzer.analyze(url: file.url)
-                if let currentIndex = files.firstIndex(where: { $0.id == file.id }) {
-                    files[currentIndex].status = .ready(stats)
-                }
-            } catch {
-                if let currentIndex = files.firstIndex(where: { $0.id == file.id }) {
-                    files[currentIndex].status = .error(error.localizedDescription)
-                }
-            }
-            analysisTasks.removeValue(forKey: file.id)
-        }
-        analysisTasks[file.id] = task
-    }
-
-    private func generateWaveform(_ file: FileItem) {
-        let task = Task {
-            do {
-                let waveform = try await WaveformGenerator.generate(url: file.url)
-                if let currentIndex = files.firstIndex(where: { $0.id == file.id }) {
-                    files[currentIndex].waveform = waveform
-                }
-            } catch {
-                // Non-critical — file is still processable without a waveform
-                logger.debug("Waveform generation failed for \(file.url.lastPathComponent, privacy: .private): \(error.localizedDescription, privacy: .public)")
-            }
-            waveformTasks.removeValue(forKey: file.id)
-        }
-        waveformTasks[file.id] = task
-    }
-
-    private func analyzeOutputFile(id: UUID, url: URL) {
-        Task {
-            async let stats = try? AudioAnalyzer.analyze(url: url)
-            async let info = try? AudioAnalyzer.info(url: url)
-            let (s, i) = await (stats, info)
-            if let currentIndex = files.firstIndex(where: { $0.id == id }) {
-                if let s { files[currentIndex].outputStats = s }
-                if let i { files[currentIndex].outputFileInfo = i }
-            }
-        }
-    }
-
-    private func generateOutputWaveform(id: UUID, url: URL) {
-        let task = Task {
-            do {
-                let waveform = try await WaveformGenerator.generate(url: url)
-                if let currentIndex = files.firstIndex(where: { $0.id == id }) {
-                    files[currentIndex].outputWaveform = waveform
-                }
-            } catch {
-                logger.debug("Output waveform generation failed for \(url.lastPathComponent, privacy: .private): \(error.localizedDescription, privacy: .public)")
-            }
-            outputWaveformTasks.removeValue(forKey: id)
-        }
-        outputWaveformTasks[id] = task
+        fileQueue.restoreProcessingRowsAfterCancel()
     }
 }

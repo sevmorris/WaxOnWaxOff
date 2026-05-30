@@ -784,6 +784,7 @@
     <p>The noise floor in the original file does come along for the ride. It is amplified by the same gain as the speech. But the philosophy here is pragmatic: WaxOn is a prep tool for DAW editing. If the noise is bad enough to matter, it will be treated in the DAW (or in a dedicated NR tool like RX). Getting the speech to the right level for editing is the higher priority.</p>
 
     <p>For stereo output, the NR-for-measurement paths use the same <a href="#rnnoise">per-channel split</a>: stereo is split into independent mono channels, each denoised separately, then rejoined before the loudnorm analysis. This ensures consistent, balanced noise removal for accurate measurement regardless of channel layout.</p>
+    <p>The NR temporary file is written at the <strong>output sample rate</strong> (44.1 or 48 kHz), not a fixed 48 kHz, so loudnorm pass-1 measurements match the rate of pass 2 — required for valid two-pass <code>measured_I</code> / <code>offset</code> values on 44.1 kHz exports.</p>
 
     <h3>Cost</h3>
     <p>NR-for-measurement adds one additional FFmpeg pass per loudnorm analysis (running RNNoise on the intermediate audio to a temporary file). For a typical podcast recording on Apple Silicon, this adds a few seconds. The temporary NR'd files are created in the working directory and deleted automatically after processing.</p>

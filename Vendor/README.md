@@ -2,7 +2,7 @@
 
 ## FFmpeg / ffprobe
 
-WaxOnWaxOff bundles static FFmpeg 8.0 binaries for macOS arm64. They are **not** stored in git (~100 MB combined). Instead:
+WaxOnWaxOff bundles static FFmpeg 8.0 binaries for macOS **arm64 (Apple Silicon only)**. They are **not** stored in git (~100 MB combined). Instead:
 
 - Checksums and the release tag live in `ffmpeg-manifest.env`
 - `scripts/fetch-ffmpeg.sh` downloads verified binaries from the pinned GitHub release

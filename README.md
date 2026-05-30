@@ -62,7 +62,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Waveform Audit:** Real-time waveform preview with dB scaling.
 * **Metadata Stats:** RMS, Peak, Crest Factor, Integrated LUFS, and Floor estimation.
 * **Concurrency:** Adaptive batch processing — scales with available CPU cores.
-* **Environment:** macOS 14.0+ (Sonoma); Native Apple Silicon and Intel support.
+* **Environment:** macOS 14.0+ (Sonoma) on **Apple Silicon (M-series) Macs** (arm64). Intel Macs are not supported.
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
 ## Building from Source

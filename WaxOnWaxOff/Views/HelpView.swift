@@ -19,9 +19,9 @@ struct HelpView: View {
 
                 section("Overview") {
                     text("""
-                    WaxOn/WaxOff is a two-mode podcast audio tool for macOS. Both modes \
-                    share the same drag-and-drop file workflow, waveform viewer, and stats \
-                    panel — they differ in what they do to your audio.
+                    WaxOn/WaxOff is a two-mode podcast audio tool for macOS on Apple Silicon \
+                    (M-series) Macs. Both modes share the same drag-and-drop file workflow, \
+                    waveform viewer, and stats panel — they differ in what they do to your audio.
                     """)
                     text("""
                     Switch modes at any time using the WaxOn | WaxOff buttons in the top \

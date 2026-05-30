@@ -53,7 +53,10 @@ struct FileInfoStatsView: View {
                           valueColor: stats.map { peakColor($0.peak) } ?? .primary,
                           help: "Orange: near-clip (≥ −3 dBFS)  •  Red: clipping (≥ 0 dBFS)")
                 statBlock("CREST", stats.map { String(format: "%.1f dB",   $0.crest) } ?? "---")
-                statBlock("LUFS",  stats.map { String(format: "%.1f",      $0.lufs)  } ?? "---")
+                statBlock(showingOutput ? "LUFS" : "LUFS (src)", stats.map { String(format: "%.1f", $0.lufs) } ?? "---",
+                          help: showingOutput
+                            ? "Integrated loudness (ITU-R BS.1770) of the processed file."
+                            : "Integrated loudness of the source file before WaxOn/WaxOff processing.")
                 if let nf = stats?.noiseFloor {
                     statBlock("FLOOR", String(format: "%.1f dBFS", nf),
                               valueColor: noiseFloorColor(nf),

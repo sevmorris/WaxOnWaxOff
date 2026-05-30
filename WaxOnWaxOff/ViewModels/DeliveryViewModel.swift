@@ -8,8 +8,7 @@ private let logger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", catego
 @Observable
 @MainActor
 final class DeliveryViewModel {
-    var files: [FileItem] = []
-    var selectedFileIDs: Set<UUID> = []
+    let fileQueue = FileQueueCoordinator()
     var settings: WaxOffSettings {
         didSet { settings.save() }
     }
@@ -20,94 +19,43 @@ final class DeliveryViewModel {
     var log = ProcessingLog()
 
     private var processingTask: Task<Void, Never>?
-    private var analysisTasks: [UUID: Task<Void, Never>] = [:]
-    private var analysisInfoTasks: [UUID: Task<Void, Never>] = [:]
-    private var waveformTasks: [UUID: Task<Void, Never>] = [:]
-    private var outputWaveformTasks: [UUID: Task<Void, Never>] = [:]
 
-    private static let validExtensions: Set<String> = [
-        "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
-        "mp4", "mov"
-    ]
+    var files: [FileItem] {
+        get { fileQueue.files }
+        set { fileQueue.files = newValue }
+    }
+    var selectedFileIDs: Set<UUID> {
+        get { fileQueue.selectedFileIDs }
+        set { fileQueue.selectedFileIDs = newValue }
+    }
+    var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
     init() {
         self.settings = WaxOffSettings.load()
+        if let preset = presetStore.selectedPreset {
+            settings = preset.settings
+        }
     }
-
-    var isAnyFileAnalyzing: Bool {
-        files.contains { if case .analyzing = $0.status { return true }; return false }
-    }
-
-    // MARK: - File Management
 
     func addFiles(_ urls: [URL]) {
-        let expanded = urls.flatMap { expandFolder($0) }
-        let valid = expanded.filter { Self.validExtensions.contains($0.pathExtension.lowercased()) }
-        let rejected = expanded.count - valid.count
-
-        if rejected > 0 {
-            alertMessage = "\(rejected) file\(rejected == 1 ? "" : "s") skipped — unsupported format."
-        }
-
-        let newFiles = valid.map { FileItem(url: $0) }
-        files.append(contentsOf: newFiles)
-
-        for file in newFiles {
-            analyzeFile(file)
-            generateWaveform(file)
-            analyzeFileInfo(file)
+        alertMessage = fileQueue.addFiles(urls) { count in
+            "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format."
         }
     }
 
-    private func expandFolder(_ url: URL) -> [URL] {
-        guard url.hasDirectoryPath else { return [url] }
-        guard let enumerator = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return [] }
-        return enumerator.compactMap { $0 as? URL }.filter {
-            (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-        }
+    func removeSelected() { fileQueue.removeSelected() }
+    func clearAll() { fileQueue.clearAll() }
+    func removeFiles(at offsets: IndexSet) { fileQueue.removeFiles(at: offsets) }
+    func moveFiles(from source: IndexSet, to destination: Int) { fileQueue.moveFiles(from: source, to: destination) }
+
+    func applyPreset(_ preset: WaxOffPreset) {
+        settings = preset.settings
+        presetStore.selectPreset(preset.id)
     }
 
-    func removeSelected() {
-        cancelAnalysisTasks(for: selectedFileIDs)
-        files.removeAll { selectedFileIDs.contains($0.id) }
-        selectedFileIDs.removeAll()
+    func saveCurrentAsPreset(name: String) {
+        presetStore.savePreset(WaxOffPreset(name: name, settings: settings))
     }
-
-    func clearAll() {
-        cancelAnalysisTasks(for: Set(files.map { $0.id }))
-        files.removeAll()
-        selectedFileIDs.removeAll()
-    }
-
-    func removeFiles(at offsets: IndexSet) {
-        let deletedIDs = Set(offsets.map { files[$0].id })
-        cancelAnalysisTasks(for: deletedIDs)
-        files.remove(atOffsets: offsets)
-        selectedFileIDs.subtract(deletedIDs)
-    }
-
-    func moveFiles(from source: IndexSet, to destination: Int) {
-        files.move(fromOffsets: source, toOffset: destination)
-    }
-
-    private func cancelAnalysisTasks(for ids: Set<UUID>) {
-        for id in ids {
-            analysisTasks[id]?.cancel()
-            analysisInfoTasks[id]?.cancel()
-            waveformTasks[id]?.cancel()
-            outputWaveformTasks[id]?.cancel()
-            analysisTasks.removeValue(forKey: id)
-            analysisInfoTasks.removeValue(forKey: id)
-            waveformTasks.removeValue(forKey: id)
-            outputWaveformTasks.removeValue(forKey: id)
-        }
-    }
-
-    // MARK: - Processing
 
     func process() {
         guard !files.isEmpty else { return }
@@ -127,8 +75,8 @@ final class DeliveryViewModel {
             return
         }
 
-        let outputDirectories = readyFiles.map {
-            OutputDirectory.waxOffOutputDirectory(for: $0.url, settings: settings)
+        let outputDirectories = readyFiles.map { file in
+            OutputDirectory.waxOffOutputDirectory(for: file.url, settings: settings)
         }
         if let reason = DiskSpaceChecker.waxOffBatchBlockedReason(
             inputURLs: readyFiles.map(\.url),
@@ -140,76 +88,70 @@ final class DeliveryViewModel {
 
         isProcessing = true
         log.clear()
+        fileQueue.snapshotReadyStats()
 
         let currentSettings = settings
-
-        // Snapshot stats so they survive the status transition
-        for i in files.indices {
-            if case .ready(let stats) = files[i].status {
-                files[i].analysisStats = stats
-            }
-        }
+        let inputs = readyFiles.map { DeliveryJobInput(id: $0.id, url: $0.url) }
 
         processingTask = Task {
-            let processor = DeliveryProcessor()
+            do {
+                let processor = DeliveryProcessor()
+                let batch = try await processor.run(
+                    inputs: inputs,
+                    settings: currentSettings,
+                    onFileStarted: { [weak self] id in
+                        Task { @MainActor [weak self] in
+                            guard let self,
+                                  let idx = self.files.firstIndex(where: { $0.id == id }) else { return }
+                            self.files[idx].status = .processing
+                        }
+                    },
+                    onPhase: { [weak self] id, phase in
+                        Task { @MainActor [weak self] in
+                            guard let self,
+                                  self.files.contains(where: { $0.id == id && $0.status == .processing }) else { return }
+                            self.deliveryPhase = phase
+                        }
+                    },
+                    onLog: { [weak self] message, level in
+                        Task { @MainActor [weak self] in
+                            self?.log.append(message, level: level)
+                        }
+                    }
+                )
 
-            // CRITICAL-1: snapshot ready file IDs before any await so index mutations
-            // during async processing don't corrupt the loop or cause out-of-bounds access.
-            let readyFileIDs = files.compactMap { file -> UUID? in
-                guard case .ready = file.status else { return nil }
-                return file.id
-            }
-
-            var batchSuccessCount = 0
-
-            for fileID in readyFileIDs {
-                guard !Task.isCancelled else { break }
-
-                // Re-check: file may have been removed while we awaited the previous one
-                guard let file = files.first(where: { $0.id == fileID }),
-                      case .ready = file.status else { continue }
-
-                if let idx = files.firstIndex(where: { $0.id == fileID }) {
-                    files[idx].status = .processing
+                for result in batch.successes {
+                    if let idx = files.firstIndex(where: { $0.id == result.id }),
+                       let primaryURL = result.outputURLs.first {
+                        files[idx].status = .processed(outputURL: primaryURL)
+                        fileQueue.generateOutputWaveform(id: result.id, url: primaryURL)
+                    }
                 }
 
-                do {
-                    let outputURLs = try await processor.process(
-                        url: file.url,
-                        settings: currentSettings,
-                        onPhase: { [weak self] phase in
-                            Task { @MainActor [weak self] in
-                                self?.deliveryPhase = phase
-                            }
-                        },
-                        onLog: { [weak self] message, level in
-                            Task { @MainActor [weak self] in
-                                self?.log.append(message, level: level)
-                            }
-                        }
-                    )
-
-                    if let idx = files.firstIndex(where: { $0.id == fileID }),
-                       let primaryURL = outputURLs.first {
-                        files[idx].status = .processed(outputURL: primaryURL)
-                        generateOutputWaveform(id: fileID, url: primaryURL)
-                        batchSuccessCount += 1
-                    }
-                } catch is CancellationError {
-                    restoreProcessingRows()
-                    break
-                } catch {
-                    log.append("✗ \(error.localizedDescription)", level: .info)
-                    if let idx = files.firstIndex(where: { $0.id == fileID }) {
+                for failure in batch.failures {
+                    if let idx = files.firstIndex(where: { $0.id == failure.id }) {
                         files[idx].status = .error("Processing failed — see Console")
                     }
+                    log.append("✗ \(failure.message)", level: .info)
                 }
-            }
 
-            restoreProcessingRows()
+                fileQueue.restoreProcessingRows()
 
-            if batchSuccessCount > 0 {
-                await NotificationService.showCompletionNotification(mode: .waxOff, fileCount: batchSuccessCount)
+                if !batch.successes.isEmpty {
+                    await NotificationService.showCompletionNotification(
+                        mode: .waxOff,
+                        fileCount: batch.successes.count
+                    )
+                } else if !batch.failures.isEmpty {
+                    alertMessage = "Processing failed. Open the Console tab for details."
+                }
+            } catch is CancellationError {
+                fileQueue.restoreProcessingRowsAfterCancel()
+            } catch {
+                logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
+                log.append("✗ \(error.localizedDescription)", level: .info)
+                fileQueue.restoreProcessingRows()
+                alertMessage = "Processing failed. Open the Console tab for details."
             }
 
             isProcessing = false
@@ -223,92 +165,6 @@ final class DeliveryViewModel {
         processingTask = nil
         isProcessing = false
         deliveryPhase = nil
-        restoreProcessingRows()
-    }
-
-    /// Return `.processing` rows to a re-runnable state after cancel or interruption.
-    private func restoreProcessingRows() {
-        for i in files.indices {
-            guard case .processing = files[i].status else { continue }
-            if let stats = files[i].analysisStats {
-                files[i].status = .ready(stats)
-            } else {
-                files[i].status = .pending
-            }
-        }
-    }
-
-    // MARK: - Presets
-
-    func applyPreset(_ preset: WaxOffPreset) {
-        settings = preset.settings
-        presetStore.selectedPresetID = preset.id
-    }
-
-    func saveCurrentAsPreset(name: String) {
-        presetStore.savePreset(WaxOffPreset(name: name, settings: settings))
-    }
-
-    // MARK: - Private
-
-    private func analyzeFileInfo(_ file: FileItem) {
-        let task = Task {
-            if let info = try? await AudioAnalyzer.info(url: file.url),
-               let idx = files.firstIndex(where: { $0.id == file.id }) {
-                files[idx].fileInfo = info
-            }
-            analysisInfoTasks.removeValue(forKey: file.id)
-        }
-        analysisInfoTasks[file.id] = task
-    }
-
-    private func analyzeFile(_ file: FileItem) {
-        guard let index = files.firstIndex(where: { $0.id == file.id }) else { return }
-        files[index].status = .analyzing
-
-        let task = Task {
-            do {
-                let stats = try await AudioAnalyzer.analyze(url: file.url)
-                if let idx = files.firstIndex(where: { $0.id == file.id }) {
-                    files[idx].status = .ready(stats)
-                }
-            } catch {
-                if let idx = files.firstIndex(where: { $0.id == file.id }) {
-                    files[idx].status = .error(error.localizedDescription)
-                }
-            }
-            analysisTasks.removeValue(forKey: file.id)
-        }
-        analysisTasks[file.id] = task
-    }
-
-    private func generateWaveform(_ file: FileItem) {
-        let task = Task {
-            do {
-                let waveform = try await WaveformGenerator.generate(url: file.url)
-                if let idx = files.firstIndex(where: { $0.id == file.id }) {
-                    files[idx].waveform = waveform
-                }
-            } catch {
-                logger.debug("Waveform generation failed for \(file.url.lastPathComponent, privacy: .private): \(error.localizedDescription, privacy: .public)")
-            }
-            waveformTasks.removeValue(forKey: file.id)
-        }
-        waveformTasks[file.id] = task
-    }
-
-    private func generateOutputWaveform(id: UUID, url: URL) {
-        let task = Task {
-            do {
-                let waveform = try await WaveformGenerator.generate(url: url)
-                if let idx = files.firstIndex(where: { $0.id == id }) {
-                    files[idx].outputWaveform = waveform
-                }
-            } catch {
-                logger.debug("Output waveform generation failed for \(url.lastPathComponent, privacy: .private): \(error.localizedDescription, privacy: .public)")
-            }
-            outputWaveformTasks.removeValue(forKey: id)
-        }
-        outputWaveformTasks[id] = task
+        fileQueue.restoreProcessingRowsAfterCancel()
     }
 }
