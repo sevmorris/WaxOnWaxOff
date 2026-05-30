@@ -206,11 +206,17 @@ fi
 step "Tagging and pushing"
 git tag "$TAG"
 # Resolve the tracked remote/branch so this works from any branch (e.g. a
-# worktree branch whose name differs from its upstream).
-UPSTREAM=$(git rev-parse --abbrev-ref '@{upstream}')
-REMOTE="${UPSTREAM%%/*}"
-BRANCH="${UPSTREAM#*/}"
-git push "$REMOTE" "HEAD:$BRANCH"
+# worktree branch whose name differs from its upstream). Fall back to
+# `origin` + current branch when no upstream is configured; `-u` sets it
+# on first push so subsequent runs resolve cleanly.
+if UPSTREAM=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null); then
+    REMOTE="${UPSTREAM%%/*}"
+    BRANCH="${UPSTREAM#*/}"
+else
+    REMOTE="origin"
+    BRANCH=$(git branch --show-current)
+fi
+git push -u "$REMOTE" "HEAD:$BRANCH"
 git push "$REMOTE" "$TAG"
 ok "Pushed $TAG to $REMOTE/$BRANCH"
 
