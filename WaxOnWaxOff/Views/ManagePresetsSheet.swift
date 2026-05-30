@@ -141,14 +141,3 @@ private struct ManagePresetsShell: View {
         onRename(id, name)
     }
 }
-
-struct ManagedPresetRow: Identifiable {
-    let id: UUID
-    let name: String
-}
-
-extension PresetStore {
-    var managedRows: [ManagedPresetRow] {
-        presets.map { ManagedPresetRow(id: $0.id, name: $0.name) }
-    }
-}

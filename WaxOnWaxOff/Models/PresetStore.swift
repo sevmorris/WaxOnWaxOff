@@ -2,13 +2,12 @@ import Foundation
 import Observation
 
 /// Shared shape for WaxOn and WaxOff presets — both modes store a named
-/// snapshot of mode-specific settings keyed by UUID. The associated type
-/// captures the per-mode settings struct so the generic store stays type-safe
-/// (no `Any` boxing through UserDefaults).
-///
-/// Requirements are `nonisolated` because the project default actor isolation
-/// is MainActor; without that override they collide with Identifiable's
-/// (nonisolated) `id` requirement.
+/// snapshot of mode-specific settings keyed by UUID.
+struct ManagedPresetRow: Identifiable {
+    let id: UUID
+    let name: String
+}
+
 protocol PresetCodable: Identifiable, Codable, Equatable where ID == UUID {
     associatedtype StoredSettings: Codable & Equatable
     nonisolated var id: UUID { get }
@@ -16,54 +15,75 @@ protocol PresetCodable: Identifiable, Codable, Equatable where ID == UUID {
     nonisolated var settings: StoredSettings { get set }
 }
 
-/// Generic UserDefaults-backed store for WaxOn / WaxOff presets. Built-in
-/// presets are passed in at construction (and are never persisted); user
-/// presets sit on top and round-trip via JSON. The two mode-specific stores
-/// are `typealias`-shaped on top of this so existing call sites compile
-/// unchanged.
-@Observable
-@MainActor
-final class PresetStore<P: PresetCodable> {
-    var presets: [P] = []
-    var selectedPresetID: UUID?
+// MARK: - Persistence helpers
 
-    @ObservationIgnored private let userDefaultsKey: String
-    @ObservationIgnored private let selectedPresetKey: String
-    @ObservationIgnored private let builtIn: [P]
+private enum PresetPersistence {
+    static func load<P: PresetCodable>(key: String) -> [P] {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([P].self, from: data)) ?? []
+    }
 
-    init(userDefaultsKey: String, selectedPresetKey: String, builtIn: [P]) {
-        self.userDefaultsKey = userDefaultsKey
-        self.selectedPresetKey = selectedPresetKey
-        self.builtIn = builtIn
-        loadPresets()
-        if let idString = UserDefaults.standard.string(forKey: selectedPresetKey),
-           let id = UUID(uuidString: idString) {
-            selectedPresetID = id
+    static func save<P: PresetCodable>(_ presets: [P], key: String) {
+        guard let data = try? JSONEncoder().encode(presets) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    static func loadSelectedID(key: String) -> UUID? {
+        guard let idString = UserDefaults.standard.string(forKey: key),
+              let id = UUID(uuidString: idString) else { return nil }
+        return id
+    }
+
+    static func saveSelectedID(_ id: UUID?, key: String) {
+        if let id {
+            UserDefaults.standard.set(id.uuidString, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
         }
     }
+}
 
-    var allPresets: [P] {
-        builtIn + presets
+// MARK: - WaxOn
+
+/// UserDefaults-backed WaxOn preset store. Split from a generic type so Release
+/// builds avoid a Swift 6.2 optimizer crash in `@Observable` generic `deinit`.
+@Observable
+@MainActor
+final class WaxOnPresetStore {
+    var presets: [WaxOnPreset] = []
+    var selectedPresetID: UUID?
+
+    private let builtIn = WaxOnPreset.builtIn
+
+    init() {
+        presets = PresetPersistence.load(key: "WaxOnUserPresets")
+        selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOnSelectedPresetID")
     }
 
-    var selectedPreset: P? {
+    var allPresets: [WaxOnPreset] { builtIn + presets }
+
+    var selectedPreset: WaxOnPreset? {
         guard let id = selectedPresetID else { return nil }
         return allPresets.first { $0.id == id }
     }
 
-    func savePreset(_ preset: P) {
+    var managedRows: [ManagedPresetRow] {
+        presets.map { ManagedPresetRow(id: $0.id, name: $0.name) }
+    }
+
+    func savePreset(_ preset: WaxOnPreset) {
         presets.append(preset)
         persist()
         selectPreset(preset.id)
     }
 
-    func deletePreset(_ preset: P) {
+    func deletePreset(_ preset: WaxOnPreset) {
         presets.removeAll { $0.id == preset.id }
         if selectedPresetID == preset.id { selectPreset(nil) }
         persist()
     }
 
-    func updatePreset(id: UUID, name: String?, settings: P.StoredSettings?) {
+    func updatePreset(id: UUID, name: String?, settings: WaxOnSettings?) {
         guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
         if let name {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -78,49 +98,79 @@ final class PresetStore<P: PresetCodable> {
 
     func selectPreset(_ id: UUID?) {
         selectedPresetID = id
-        if let id {
-            UserDefaults.standard.set(id.uuidString, forKey: selectedPresetKey)
-        } else {
-            UserDefaults.standard.removeObject(forKey: selectedPresetKey)
-        }
+        PresetPersistence.saveSelectedID(id, key: "WaxOnSelectedPresetID")
     }
 
-    func isBuiltIn(_ preset: P) -> Bool {
+    func isBuiltIn(_ preset: WaxOnPreset) -> Bool {
         builtIn.contains { $0.id == preset.id }
     }
 
-    private func loadPresets() {
-        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey) else { return }
-        presets = (try? JSONDecoder().decode([P].self, from: data)) ?? []
+    private func persist() {
+        PresetPersistence.save(presets, key: "WaxOnUserPresets")
+    }
+}
+
+// MARK: - WaxOff
+
+@Observable
+@MainActor
+final class WaxOffPresetStore {
+    var presets: [WaxOffPreset] = []
+    var selectedPresetID: UUID?
+
+    private let builtIn = WaxOffPreset.builtIn
+
+    init() {
+        presets = PresetPersistence.load(key: "WaxOffUserPresets")
+        selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOffSelectedPresetID")
+    }
+
+    var allPresets: [WaxOffPreset] { builtIn + presets }
+
+    var selectedPreset: WaxOffPreset? {
+        guard let id = selectedPresetID else { return nil }
+        return allPresets.first { $0.id == id }
+    }
+
+    var managedRows: [ManagedPresetRow] {
+        presets.map { ManagedPresetRow(id: $0.id, name: $0.name) }
+    }
+
+    func savePreset(_ preset: WaxOffPreset) {
+        presets.append(preset)
+        persist()
+        selectPreset(preset.id)
+    }
+
+    func deletePreset(_ preset: WaxOffPreset) {
+        presets.removeAll { $0.id == preset.id }
+        if selectedPresetID == preset.id { selectPreset(nil) }
+        persist()
+    }
+
+    func updatePreset(id: UUID, name: String?, settings: WaxOffSettings?) {
+        guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
+        if let name {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            presets[index].name = trimmed
+        }
+        if let settings {
+            presets[index].settings = settings
+        }
+        persist()
+    }
+
+    func selectPreset(_ id: UUID?) {
+        selectedPresetID = id
+        PresetPersistence.saveSelectedID(id, key: "WaxOffSelectedPresetID")
+    }
+
+    func isBuiltIn(_ preset: WaxOffPreset) -> Bool {
+        builtIn.contains { $0.id == preset.id }
     }
 
     private func persist() {
-        guard let data = try? JSONEncoder().encode(presets) else { return }
-        UserDefaults.standard.set(data, forKey: userDefaultsKey)
-    }
-}
-
-// MARK: - Mode-specific stores
-
-typealias WaxOnPresetStore = PresetStore<WaxOnPreset>
-typealias WaxOffPresetStore = PresetStore<WaxOffPreset>
-
-extension PresetStore where P == WaxOnPreset {
-    convenience init() {
-        self.init(
-            userDefaultsKey: "WaxOnUserPresets",
-            selectedPresetKey: "WaxOnSelectedPresetID",
-            builtIn: WaxOnPreset.builtIn
-        )
-    }
-}
-
-extension PresetStore where P == WaxOffPreset {
-    convenience init() {
-        self.init(
-            userDefaultsKey: "WaxOffUserPresets",
-            selectedPresetKey: "WaxOffSelectedPresetID",
-            builtIn: WaxOffPreset.builtIn
-        )
+        PresetPersistence.save(presets, key: "WaxOffUserPresets")
     }
 }
