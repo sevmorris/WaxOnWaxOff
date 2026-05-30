@@ -1,5 +1,16 @@
 import Foundation
 
+enum OutputNaming {
+    /// Short hash tag when multiple inputs would collide on the same output basename.
+    nonisolated static func shortPathTag(for path: String) -> String {
+        var hash: UInt64 = 5381
+        for byte in path.utf8 {
+            hash = ((hash << 5) &+ hash) &+ UInt64(byte)
+        }
+        return String(format: "%06x", hash & 0xFFFFFF)
+    }
+}
+
 enum OutputDirectory {
     /// Resolve where a WaxOn output WAV should land — mirrors AudioProcessor fallback chain.
     static func waxOnOutputDirectory(

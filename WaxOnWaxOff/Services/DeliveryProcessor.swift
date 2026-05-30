@@ -71,6 +71,9 @@ private enum DeliveryJobOutcome: Sendable {
 
 actor DeliveryProcessor {
 
+    /// Output paths claimed by in-flight jobs in the current batch.
+    private var reservedOutputPaths: Set<String> = []
+
     func run(
         inputs: [DeliveryJobInput],
         settings: WaxOffSettings,
@@ -81,6 +84,8 @@ actor DeliveryProcessor {
         guard !inputs.isEmpty else {
             return DeliveryBatchRunResult(successes: [], failures: [])
         }
+
+        reservedOutputPaths.removeAll(keepingCapacity: true)
 
         let tools = try await FFmpegManager.shared.ensureTools()
         let maxConcurrent = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
@@ -161,8 +166,9 @@ actor DeliveryProcessor {
         }
 
         let stem = url.deletingPathExtension().lastPathComponent
-        let outputStem = "\(stem)-lev\(formatNumber(settings.targetLUFS))LUFS"
-        let lufs = formatNumber(settings.targetLUFS)
+        let lufsTag = formatNumber(settings.targetLUFS)
+        let outputStem = allocateOutputStem(stem: stem, lufsTag: lufsTag, input: url, outDir: outputDir)
+        let lufs = lufsTag
         let tp = String(format: "%.1f", settings.truePeak)
         let lra = formatNumber(settings.lra)
 
@@ -256,6 +262,28 @@ actor DeliveryProcessor {
 
     // MARK: - Private
 
+    /// Pick a unique output stem within this batch when multiple sources share the same name and LUFS tag.
+    private func allocateOutputStem(stem: String, lufsTag: String, input: URL, outDir: URL) -> String {
+        let suffix = "lev\(lufsTag)LUFS"
+        let baseStem = "\(stem)-\(suffix)"
+        let baseKey = outDir.appendingPathComponent("\(baseStem).wav").path
+
+        if !reservedOutputPaths.contains(baseKey) {
+            reservedOutputPaths.insert(baseKey)
+            return baseStem
+        }
+
+        let tag = OutputNaming.shortPathTag(for: input.path)
+        var uniqueStem = "\(stem)-\(tag)-\(suffix)"
+        var uniqueKey = outDir.appendingPathComponent("\(uniqueStem).wav").path
+        if reservedOutputPaths.contains(uniqueKey) {
+            uniqueStem = "\(stem)-\(tag)-\(UUID().uuidString.prefix(4))-\(suffix)"
+            uniqueKey = outDir.appendingPathComponent("\(uniqueStem).wav").path
+        }
+        reservedOutputPaths.insert(uniqueKey)
+        return uniqueStem
+    }
+
     /// Whole numbers render without a decimal ("9"), fractions render with one ("9.5").
     /// Used for both display strings and FFmpeg filter parameters — `loudnorm`
     /// accepts either form.
@@ -323,9 +351,9 @@ actor DeliveryProcessor {
         // TP setting; on most material the limiter doesn't engage.
         let limitAmp = pow(10.0, settings.truePeak / 20.0)
         let oversampleSr = settings.sampleRate * 2
-        filterChain += ",aresample=\(oversampleSr)"
+        filterChain += ",\(FFmpegFilters.aresample(to: oversampleSr))"
         filterChain += ",alimiter=limit=\(String(format: "%.6f", limitAmp)):attack=5:release=50:level=disabled"
-        filterChain += ",aresample=\(settings.sampleRate)"
+        filterChain += ",\(FFmpegFilters.aresample(to: settings.sampleRate))"
 
         let args = [
             "-hide_banner", "-nostats", "-y",
@@ -357,11 +385,12 @@ actor DeliveryProcessor {
         let mp3SampleRate = 44100
         let oversampleSr = mp3SampleRate * 2
         let preEncodeFilter = [
-            "aresample=\(oversampleSr)",
+            FFmpegFilters.aresample(to: oversampleSr),
             "alimiter=limit=\(String(format: "%.6f", limitAmp)):attack=1:release=20:level=disabled",
-            "aresample=\(mp3SampleRate)"
+            FFmpegFilters.aresample(to: mp3SampleRate)
         ].joined(separator: ",")
 
+        let title = input.deletingPathExtension().lastPathComponent
         let args = [
             "-hide_banner", "-nostats", "-y",
             "-i", input.path,
@@ -370,6 +399,7 @@ actor DeliveryProcessor {
             "-b:a", "\(settings.mp3Bitrate)k",
             "-ar", String(mp3SampleRate),
             "-ac", "2",
+            "-metadata", "title=\(FFmpegFilters.metadataValue(title))",
             "-f", "mp3",
             output.path
         ]

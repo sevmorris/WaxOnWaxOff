@@ -127,7 +127,7 @@ actor AudioProcessor {
 
         let step1Af: String
         if isStereo {
-            step1Af = "highpass=f=\(hpFreq),\(phaseFilter)aresample=\(sr)"
+            step1Af = "highpass=f=\(hpFreq),\(phaseFilter)\(FFmpegFilters.aresample(to: sr))"
         } else {
             // For >2 channel sources (5.1, 7.1, ambisonic), the user's Left/Right
             // selection picks input channel 0 or 1 — which on a 5.1 stem skips
@@ -141,7 +141,7 @@ actor AudioProcessor {
             } else {
                 pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
             }
-            step1Af = "highpass=f=\(hpFreq),\(pan),\(phaseFilter)aresample=\(sr)"
+            step1Af = "highpass=f=\(hpFreq),\(pan),\(phaseFilter)\(FFmpegFilters.aresample(to: sr))"
         }
         try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
@@ -299,9 +299,9 @@ actor AudioProcessor {
         let oversampleSr = sr * 2
 
         let step2Af = [
-            "aresample=\(oversampleSr)",
+            FFmpegFilters.aresample(to: oversampleSr),
             "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
-            "aresample=\(sr)"
+            FFmpegFilters.aresample(to: sr)
         ].joined(separator: ",")
 
         onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
@@ -349,7 +349,7 @@ actor AudioProcessor {
             return (baseURL, baseName)
         }
 
-        let tag = Self.shortPathTag(for: input.path)
+        let tag = OutputNaming.shortPathTag(for: input.path)
         var name = "\(stem)-\(tag)-\(suffix)"
         var url = outDir.appendingPathComponent(name)
         if reservedOutputPaths.contains(url.path) {
@@ -358,14 +358,6 @@ actor AudioProcessor {
         }
         reservedOutputPaths.insert(url.path)
         return (url, name)
-    }
-
-    private nonisolated static func shortPathTag(for path: String) -> String {
-        var hash: UInt64 = 5381
-        for byte in path.utf8 {
-            hash = ((hash << 5) &+ hash) &+ UInt64(byte)
-        }
-        return String(format: "%06x", hash & 0xFFFFFF)
     }
 
     private func makeTemp(prefix: String) throws -> URL {

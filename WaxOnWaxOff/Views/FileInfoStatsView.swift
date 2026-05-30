@@ -49,9 +49,14 @@ struct FileInfoStatsView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: 8) {
                 statBlock("RMS",   stats.map { String(format: "%.1f dBFS", $0.rms)   } ?? "---")
-                statBlock("PEAK",  stats.map { String(format: "%.1f dBFS", $0.peak)  } ?? "---",
+                statBlock("PEAK", stats.map { String(format: "%.1f dBFS", $0.peak) } ?? "---",
                           valueColor: stats.map { peakColor($0.peak) } ?? .primary,
-                          help: "Orange: near-clip (≥ −3 dBFS)  •  Red: clipping (≥ 0 dBFS)")
+                          help: "Sample peak (max absolute sample). Orange ≥ −3 dBFS; red ≥ 0 dBFS.")
+                if let s = stats, s.hasElevatedTruePeak {
+                    statBlock("TP (est.)", String(format: "%.1f dBTP", s.truePeak),
+                              valueColor: peakColor(s.truePeak),
+                              help: "2× linear oversample estimate — inter-sample peaks can exceed the sample peak.")
+                }
                 statBlock("CREST", stats.map { String(format: "%.1f dB",   $0.crest) } ?? "---")
                 statBlock(showingOutput ? "LUFS" : "LUFS (src)", stats.map { String(format: "%.1f", $0.lufs) } ?? "---",
                           help: showingOutput

@@ -120,6 +120,9 @@ enum AudioAnalyzer {
             file.framePosition = 0
             var sumSquares: Double = 0
             var peak: Double = 0
+            var truePeak: Double = 0
+            var lastSample = [Double](repeating: 0, count: channels)
+            var hasLastSample = [Bool](repeating: false, count: channels)
             var totalFrames: Int = 0
 
             while file.framePosition < frameCount {
@@ -141,7 +144,15 @@ enum AudioAnalyzer {
                     var monoSample: Float = 0
                     for ch in 0..<channels {
                         let x = Double(channelData[ch][frame])
-                        peak = max(peak, abs(x))
+                        let absX = abs(x)
+                        peak = max(peak, absX)
+                        if hasLastSample[ch] {
+                            let mid = abs((lastSample[ch] + x) / 2.0)
+                            truePeak = max(truePeak, mid)
+                        }
+                        truePeak = max(truePeak, absX)
+                        lastSample[ch] = x
+                        hasLastSample[ch] = true
 
                         // Stage 1: pre-filter (biquad, transposed direct form II)
                         let y1 = kw.pre_b0 * x + preW1[ch]
@@ -229,6 +240,7 @@ enum AudioAnalyzer {
             let rms = sqrt(sumSquares / Double(totalFrames))
             let rmsDb = 20 * log10(max(rms, 1e-12))
             let peakDb = 20 * log10(max(peak, 1e-12))
+            let truePeakDb = 20 * log10(max(truePeak, 1e-12))
             let crestDb = peakDb - rmsDb
             let lufs = computeGatedLUFS(blockMeanSqs: blockMeanSqs)
 
@@ -250,7 +262,14 @@ enum AudioAnalyzer {
                 noiseFloor = nil
             }
 
-            return AudioStats(rms: rmsDb, peak: peakDb, crest: crestDb, lufs: lufs, noiseFloor: noiseFloor)
+            return AudioStats(
+                rms: rmsDb,
+                peak: peakDb,
+                crest: crestDb,
+                lufs: lufs,
+                noiseFloor: noiseFloor,
+                truePeak: truePeakDb
+            )
         }
     }
 

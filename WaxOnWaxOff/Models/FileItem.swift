@@ -11,19 +11,35 @@ struct FileInfo: Sendable, Equatable {
 
 struct AudioStats: Equatable, Sendable {
     let rms: Double
+    /// Sample peak (dBFS) — max absolute sample value.
     let peak: Double
+    /// 2× linear oversample estimate of true peak (dBTP-style readout for UI).
+    let truePeak: Double
     let crest: Double
     let lufs: Double
     /// Estimated noise floor in dBFS (10th percentile of block RMS values).
     /// nil if not enough blocks to estimate.
     let noiseFloor: Double?
 
-    init(rms: Double, peak: Double, crest: Double, lufs: Double, noiseFloor: Double? = nil) {
+    init(
+        rms: Double,
+        peak: Double,
+        crest: Double,
+        lufs: Double,
+        noiseFloor: Double? = nil,
+        truePeak: Double? = nil
+    ) {
         self.rms = rms
         self.peak = peak
+        self.truePeak = truePeak ?? peak
         self.crest = crest
         self.lufs = lufs
         self.noiseFloor = noiseFloor
+    }
+
+    /// True when the 2× estimate exceeds the sample peak by a visible margin.
+    var hasElevatedTruePeak: Bool {
+        truePeak > peak + 0.1
     }
 
     /// True when the noise floor is high enough to potentially skew loudness measurements.
