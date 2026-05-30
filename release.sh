@@ -243,15 +243,24 @@ gh release create "$TAG" "$DMG" \
     --notes "$RELEASE_NOTES"
 ok "Release published"
 
-# ── Remove old releases (keep the ${KEEP_RELEASES} most recent) ───────────────
+# ── Remove old app releases (keep the ${KEEP_RELEASES} most recent v* tags) ───
+# Never delete ffmpeg-deps-* — CI and fresh clones download binaries from that
+# release (see scripts/fetch-ffmpeg.sh). Pruning all releases by date removed
+# ffmpeg-deps-8.0-arm64 during the v2.0.6 cut.
 KEEP_RELEASES=5
-step "Removing old releases (keeping ${KEEP_RELEASES} most recent)"
+step "Removing old app releases (keeping ${KEEP_RELEASES} most recent v* tags)"
 OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
-    --jq '.[].tagName' | tail -n +$((KEEP_RELEASES + 1)) || true)
+    --jq -r '.[].tagName' | grep -E '^v[0-9]' | tail -n +$((KEEP_RELEASES + 1)) || true)
 if [[ -z "$OLD_TAGS" ]]; then
-    ok "No old releases to remove"
+    ok "No old app releases to remove"
 else
     while IFS= read -r old_tag; do
+        case "$old_tag" in
+            ffmpeg-deps-*)
+                ok "Skipped protected deps release $old_tag"
+                continue
+                ;;
+        esac
         gh release delete "$old_tag" --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
         git tag -d "$old_tag" 2>/dev/null || true
         ok "Removed $old_tag"

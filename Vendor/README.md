@@ -12,6 +12,8 @@ WaxOnWaxOff bundles **static FFmpeg 8.0** binaries for macOS **arm64 (Apple Sili
 
 Xcode runs `scripts/fetch-ffmpeg.sh` before each build; `release.sh` runs it before packaging.
 
+**Do not delete** the `ffmpeg-deps-*` GitHub release — CI and fresh clones fetch binaries from it. `release.sh` only prunes old `v*` app releases.
+
 ### Pinned binary build (manifest)
 
 See `ffmpeg-manifest.env` for:
