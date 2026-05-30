@@ -23,6 +23,7 @@ enum AudioAnalyzer {
             let dur = sr > 0 ? Double(file.length) / sr : 0
             let bitDepth = fmt.settings[AVLinearPCMBitDepthKey] as? Int
             let ext = url.pathExtension.uppercased()
+            let formatLabel = codecLabel(for: fmt, fallback: ext.isEmpty ? "Audio" : ext)
 
             var bitRate: Double? = nil
             if let sz = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64),
@@ -31,13 +32,49 @@ enum AudioAnalyzer {
             }
 
             return FileInfo(
-                format: ext.isEmpty ? "Audio" : ext,
+                format: formatLabel,
                 sampleRate: sr,
                 channelCount: Int(fmt.channelCount),
                 bitDepth: bitDepth,
                 duration: dur,
                 bitRate: bitRate
             )
+        }
+    }
+
+    /// Map AVFoundation's format ID to a short, user-facing codec name. For PCM
+    /// (which lives natively in WAV/AIFF/CAF) the container extension is more
+    /// informative than the literal "PCM", so we fall back to it. For lossy or
+    /// lossless-compressed audio inside a video container (MP4/MOV) we want
+    /// the codec name (AAC, ALAC, …) rather than the container name.
+    private static func codecLabel(for fmt: AVAudioFormat, fallback: String) -> String {
+        guard let formatID = fmt.settings[AVFormatIDKey] as? UInt32 else { return fallback }
+
+        switch formatID {
+        case kAudioFormatLinearPCM:
+            return fallback
+        case kAudioFormatMPEGLayer3:
+            return "MP3"
+        case kAudioFormatMPEG4AAC,
+             kAudioFormatMPEG4AAC_HE,
+             kAudioFormatMPEG4AAC_HE_V2,
+             kAudioFormatMPEG4AAC_LD,
+             kAudioFormatMPEG4AAC_ELD,
+             kAudioFormatMPEG4AAC_ELD_SBR,
+             kAudioFormatMPEG4AAC_Spatial:
+            return "AAC"
+        case kAudioFormatFLAC:
+            return "FLAC"
+        case kAudioFormatOpus:
+            return "Opus"
+        case kAudioFormatAppleLossless:
+            return "ALAC"
+        case kAudioFormatAC3:
+            return "AC3"
+        case kAudioFormatEnhancedAC3:
+            return "EAC3"
+        default:
+            return fallback
         }
     }
 
@@ -103,13 +140,19 @@ enum AudioAnalyzer {
             // LUFS: 400 ms blocks at 75% overlap (one new block every 100 ms).
             // Implemented as a 4-deep ring of 100 ms hop sums; each completed
             // ring emits a block. Matches ITU-R BS.1770 / EBU R128.
+            //
+            // Each block's "loudness energy" is Σ G_ch · z_ch (channel-weighted
+            // sum of per-channel mean-squares). For the mono/stereo/LCR sources
+            // this app processes the channel weights are all 1.0; surround
+            // weights (1.41 for Ls/Rs) aren't applied because AVAudioFile
+            // doesn't reliably expose channel layout for arbitrary inputs.
             let hopFrames = max(1, Int((sr * 0.1).rounded()))
             let hopsPerBlock = 4
             var hopChannelSumSq = [Double](repeating: 0, count: channels)
             var hopFramesElapsed = 0
             var hopHistorySS: [[Double]] = Array(repeating: [], count: channels)
             var hopHistoryFrames: [Int] = []
-            var blockMeanSqs = [Double]()
+            var blockLoudnessEnergies = [Double]()
 
             // Noise floor: non-overlapping 400 ms blocks of HP-filtered mono RMS.
             let nfBlockFrames = max(1, Int((sr * 0.4).rounded()))
@@ -192,13 +235,17 @@ enum AudioAnalyzer {
 
                         if hopHistoryFrames.count == hopsPerBlock {
                             let totalHopFrames = hopHistoryFrames.reduce(0, +)
-                            var avgSq = 0.0
+                            // BS.1770: block loudness = Σ G_ch · z_ch. Channel
+                            // weights G are 1.0 for L/R/C; we don't have
+                            // layout info to apply 1.41 to Ls/Rs, so we sum
+                            // unweighted (correct for mono/stereo, slightly
+                            // low for true surround).
+                            var blockSumSq = 0.0
                             for ch in 0..<channels {
                                 let sumSS = hopHistorySS[ch].reduce(0, +)
-                                avgSq += sumSS / Double(totalHopFrames)
+                                blockSumSq += sumSS / Double(totalHopFrames)
                             }
-                            avgSq /= Double(channels)
-                            blockMeanSqs.append(avgSq)
+                            blockLoudnessEnergies.append(blockSumSq)
                         }
                     }
 
@@ -216,16 +263,15 @@ enum AudioAnalyzer {
             // Flush partial trailing data so very short clips still produce a
             // measurement. For LUFS, only emit a partial block if no full block
             // was ever completed — otherwise we'd skew the gated mean.
-            if blockMeanSqs.isEmpty {
+            if blockLoudnessEnergies.isEmpty {
                 let trailingFrames = hopHistoryFrames.reduce(0, +) + hopFramesElapsed
                 if trailingFrames > 0 {
-                    var avgSq = 0.0
+                    var blockSumSq = 0.0
                     for ch in 0..<channels {
                         let sumSS = hopHistorySS[ch].reduce(0, +) + hopChannelSumSq[ch]
-                        avgSq += sumSS / Double(trailingFrames)
+                        blockSumSq += sumSS / Double(trailingFrames)
                     }
-                    avgSq /= Double(channels)
-                    blockMeanSqs.append(avgSq)
+                    blockLoudnessEnergies.append(blockSumSq)
                 }
             }
             if nfBlockFramesElapsed > 0 {
@@ -242,7 +288,7 @@ enum AudioAnalyzer {
             let peakDb = 20 * log10(max(peak, 1e-12))
             let truePeakDb = 20 * log10(max(truePeak, 1e-12))
             let crestDb = peakDb - rmsDb
-            let lufs = computeGatedLUFS(blockMeanSqs: blockMeanSqs)
+            let lufs = computeGatedLUFS(blockEnergies: blockLoudnessEnergies)
 
             // Noise floor: 10th percentile of per-block RMS (quietest blocks ≈ room tone / noise).
             // Uses linear-interpolation (Type 7) percentile so the result lines up with the
@@ -273,13 +319,14 @@ enum AudioAnalyzer {
         }
     }
 
-    /// Applies ITU-R BS.1770 absolute + relative gating to block mean-squares.
-    private static func computeGatedLUFS(blockMeanSqs: [Double]) -> Double {
-        guard !blockMeanSqs.isEmpty else { return -144.0 }
+    /// Applies ITU-R BS.1770 absolute + relative gating to per-block loudness
+    /// energies (Σ G_ch · z_ch values, one per 400 ms / 75%-overlap block).
+    private static func computeGatedLUFS(blockEnergies: [Double]) -> Double {
+        guard !blockEnergies.isEmpty else { return -144.0 }
 
-        // Absolute gate: -70 LUFS → meanSq threshold = 10^((-70+0.691)/10)
+        // Absolute gate: -70 LUFS → energy threshold = 10^((-70+0.691)/10)
         let absThreshold = pow(10.0, (-70.0 + 0.691) / 10.0)
-        let absoluteGated = blockMeanSqs.filter { $0 > absThreshold }
+        let absoluteGated = blockEnergies.filter { $0 > absThreshold }
         guard !absoluteGated.isEmpty else { return -70.0 }
 
         let ungatedMean = absoluteGated.reduce(0, +) / Double(absoluteGated.count)

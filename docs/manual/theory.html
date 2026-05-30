@@ -1221,7 +1221,7 @@
     <p>WaxOn output names follow <code>{stem}-{rate}waxon.wav</code>. When multiple source files in one batch would collide, a short path-hash suffix is inserted before the rate tag. See the <a href="index.html#waxon-output">user manual</a> for output naming and directory fallbacks.</p>
 
     <h3>Batch Concurrency</h3>
-    <p>WaxOn processes multiple files in parallel, capped at <code>max(2, CPU cores ÷ 2)</code>. WaxOff processes one file at a time per user action.</p>
+    <p>Both WaxOn and WaxOff process multiple files in parallel, capped at <code>max(2, CPU cores ÷ 2)</code>. The same <code>FFmpegRunner</code>-backed task group drives both modes. With parallel WaxOff, the &ldquo;Analyzing loudness… / Normalizing… / Encoding MP3…&rdquo; phase indicator in the waveform pane reflects the most recently emitted phase across all in-flight files, not a single file's progression.</p>
   </section>
 
   <!-- Summary -->

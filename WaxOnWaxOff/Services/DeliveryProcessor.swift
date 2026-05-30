@@ -359,6 +359,11 @@ actor DeliveryProcessor {
             "-hide_banner", "-nostats", "-y",
             "-i", input.path,
             "-af", filterChain,
+            // Carry container-level metadata (title/artist/album/comment, BWF
+            // chunks on WAV→WAV) from the input. FFmpeg's default for filter
+            // graphs is to strip global metadata; a podcast delivery workflow
+            // usually wants it preserved.
+            "-map_metadata", "0",
             "-ar", String(settings.sampleRate),
             "-ac", "2",
             "-c:a", "pcm_s24le",
@@ -399,6 +404,10 @@ actor DeliveryProcessor {
             "-b:a", "\(settings.mp3Bitrate)k",
             "-ar", String(mp3SampleRate),
             "-ac", "2",
+            // Pull artist/album/etc through from the source, then override the
+            // title so it tracks the filename the user is delivering (the
+            // source's "title" tag is often a stale working name).
+            "-map_metadata", "0",
             "-metadata", "title=\(FFmpegFilters.metadataValue(title))",
             "-f", "mp3",
             output.path
