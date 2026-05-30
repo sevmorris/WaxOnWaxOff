@@ -35,7 +35,10 @@ actor UpdateChecker {
         }
 
         do {
-            var request = URLRequest(url: apiURL, cachePolicy: .reloadIgnoringLocalCacheData)
+            // 15 s caps both connect and resource time so a silent launch-time
+            // check doesn't hold a URLSession open for the default 60 s when
+            // GitHub is slow or the user is offline.
+            var request = URLRequest(url: apiURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -71,9 +74,30 @@ actor UpdateChecker {
 
 /// Show an update dialog. When `silent` is true (launch check), only prompt if
 /// an update is actually available — don't bother the user with "you're up to date".
+///
+/// Silent (launch) checks are throttled to once per 24 h via UserDefaults so a
+/// frequently-relaunched app doesn't hit GitHub's rate-limited API on every
+/// open. Explicit "Check for Updates…" menu invocations bypass the throttle.
 @MainActor
 func checkForUpdates(silent: Bool = false) async {
+    let throttleKey = "UpdateChecker.lastSuccessfulCheckAt"
+    let throttleInterval: TimeInterval = 24 * 60 * 60
+    if silent {
+        let last = UserDefaults.standard.double(forKey: throttleKey)
+        if last > 0, Date().timeIntervalSince1970 - last < throttleInterval {
+            return
+        }
+    }
+
     let result = await UpdateChecker().check()
+
+    // Only record success — failed checks shouldn't suppress the next attempt.
+    switch result {
+    case .upToDate, .available:
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: throttleKey)
+    case .error:
+        break
+    }
 
     switch result {
     case .upToDate(let version):

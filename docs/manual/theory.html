@@ -647,7 +647,7 @@
       <summary><span class="callout-cat">Under the Hood</span> alimiter parameters</summary>
       <p>WaxOn's alimiter is configured for transparent peak control:</p>
       <ul>
-        <li><strong>limit</strong>: 0.891251 — the linear amplitude equivalent of −1.0 dBTP, hardcoded as the EBU R128 standard ceiling</li>
+        <li><strong>limit</strong>: ≈ 0.891251 — <code>pow(10, −1.0/20)</code>, the linear-amplitude equivalent of −1.0 dBTP. The dBTP ceiling itself is hardcoded in WaxOn at the EBU R128 standard value and is not user-adjustable (contrast WaxOff's True Peak knob).</li>
         <li><strong>attack=5 ms</strong>: the limiter begins attenuating 5 ms before the peak. Fast enough to prevent transient overshoot, slow enough to avoid pre-ringing artifacts on voice. For reference, a typical plosive consonant (p, b, t) has a voice onset time of roughly 10–30 ms in English speech; 5 ms catches the transient before it peaks without introducing audible artifacts on voiced content.</li>
         <li><strong>release=50 ms</strong>: gain recovers in 50 ms after the peak passes. On typical voice material, this is fast enough to be inaudible as pumping while still recovering promptly between words. For comparison, inter-word pauses in conversational speech are typically 150–300 ms, so a 50 ms release completes well before the next word begins.</li>
         <li><strong>level=disabled</strong>: prevents the limiter from applying makeup gain. Without this, <code>alimiter</code> compensates for gain reduction, undoing the ceiling control. With it disabled, the limiter only attenuates, never amplifies.</li>

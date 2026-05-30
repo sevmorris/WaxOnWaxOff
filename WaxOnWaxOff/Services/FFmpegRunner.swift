@@ -101,6 +101,8 @@ enum FFmpegRunner {
 
     private enum CaptureTarget { case stderr, stdout }
 
+    private static let processTimeoutSeconds: Int = 900
+
     private static func launch(
         exe: String,
         args: [String],
@@ -136,14 +138,33 @@ enum FFmpegRunner {
                     readGroup.leave()
                 }
 
-                let timeoutItem = DispatchWorkItem { process.terminate() }
-                DispatchQueue.global().asyncAfter(deadline: .now() + 900, execute: timeoutItem)
+                // Watchdog. The flag distinguishes a timeout-triggered SIGTERM
+                // from a user-cancel SIGTERM so the terminationHandler can
+                // surface a "timed out after Ns" error instead of an opaque
+                // CancellationError. Lock guards the read/write across the
+                // watchdog queue and the terminationHandler queue.
+                let timeoutFlag = TimeoutFlag()
+                let timeoutItem = DispatchWorkItem {
+                    timeoutFlag.set()
+                    process.terminate()
+                }
+                DispatchQueue.global().asyncAfter(
+                    deadline: .now() + .seconds(processTimeoutSeconds),
+                    execute: timeoutItem
+                )
 
                 process.terminationHandler = { proc in
                     timeoutItem.cancel()
                     readGroup.wait()
-                    // SIGTERM from our onCancel handler sets terminationReason to .uncaughtSignal;
-                    // no shared flag needed — eliminates the data race.
+                    if timeoutFlag.didFire {
+                        continuation.resume(throwing: ProcessingError.ffmpegFailed(
+                            code: -1,
+                            message: "ffmpeg timed out after \(processTimeoutSeconds) seconds"
+                        ))
+                        return
+                    }
+                    // SIGTERM that wasn't from our watchdog: must be the
+                    // onCancel handler firing for a user-initiated cancel.
                     if proc.terminationReason == .uncaughtSignal {
                         continuation.resume(throwing: CancellationError())
                         return
@@ -164,5 +185,24 @@ enum FFmpegRunner {
         } onCancel: {
             process.terminate()
         }
+    }
+}
+
+/// Lock-guarded "did the watchdog fire?" flag, safe to read on the termination
+/// queue and write on the dispatch queue that runs the timeout work item.
+private final class TimeoutFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+
+    func set() {
+        lock.lock()
+        fired = true
+        lock.unlock()
+    }
+
+    var didFire: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return fired
     }
 }

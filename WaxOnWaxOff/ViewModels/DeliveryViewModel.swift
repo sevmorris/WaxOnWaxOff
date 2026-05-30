@@ -78,6 +78,10 @@ final class DeliveryViewModel {
         let outputDirectories = readyFiles.map { file in
             OutputDirectory.waxOffOutputDirectory(for: file.url, settings: settings)
         }
+        if let reason = OutputDirectory.unwritableReason(outputDirectories) {
+            alertMessage = reason
+            return
+        }
         if let reason = DiskSpaceChecker.waxOffBatchBlockedReason(
             inputURLs: readyFiles.map(\.url),
             outputDirectories: outputDirectories

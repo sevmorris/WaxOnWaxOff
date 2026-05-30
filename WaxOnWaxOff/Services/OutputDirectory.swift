@@ -18,27 +18,11 @@ enum OutputDirectory {
         settings: WaxOnSettings,
         onWarning: ((String) -> Void)? = nil
     ) -> URL {
-        let fm = FileManager.default
-
-        if let customPath = settings.outputDirectoryPath {
-            let customURL = URL(fileURLWithPath: customPath, isDirectory: true)
-            if fm.isWritableFile(atPath: customURL.path) { return customURL }
-            onWarning?("Custom output directory not writable (\(customPath)), falling back.")
-        }
-
-        let here = input.deletingLastPathComponent()
-        if fm.isWritableFile(atPath: here.path) { return here }
-
-        onWarning?("Source directory not writable, falling back to ~/Music/WaxOnWaxOff.")
-        let music = fm.homeDirectoryForCurrentUser
-            .appendingPathComponent("Music/WaxOnWaxOff", isDirectory: true)
-        if (try? fm.createDirectory(at: music, withIntermediateDirectories: true)) != nil,
-           fm.isWritableFile(atPath: music.path) {
-            return music
-        }
-
-        onWarning?("~/Music/WaxOnWaxOff unavailable, falling back to Desktop.")
-        return fm.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true)
+        resolve(
+            customPath: settings.outputDirectoryPath,
+            input: input,
+            onWarning: onWarning
+        )
     }
 
     /// Resolve where WaxOff delivery files should land — mirrors WaxOn fallback chain.
@@ -47,9 +31,37 @@ enum OutputDirectory {
         settings: WaxOffSettings,
         onWarning: ((String) -> Void)? = nil
     ) -> URL {
+        resolve(
+            customPath: settings.outputDirectoryPath,
+            input: input,
+            onWarning: onWarning
+        )
+    }
+
+    /// Pre-flight check the resolved output directories are writable. Returns
+    /// a user-facing error string if any aren't (e.g. when the entire fallback
+    /// chain — custom path, source dir, ~/Music/WaxOnWaxOff, ~/Desktop — was
+    /// exhausted to a directory we can't actually write to). Returns nil when
+    /// every directory in `urls` is OK.
+    static func unwritableReason(_ urls: [URL]) -> String? {
+        let fm = FileManager.default
+        let distinct = Array(Set(urls.map(\.path))).sorted()
+        for path in distinct {
+            if !fm.isWritableFile(atPath: path) {
+                return "Output directory is not writable: \(path). Choose a different directory in Settings."
+            }
+        }
+        return nil
+    }
+
+    private static func resolve(
+        customPath: String?,
+        input: URL,
+        onWarning: ((String) -> Void)?
+    ) -> URL {
         let fm = FileManager.default
 
-        if let customPath = settings.outputDirectoryPath {
+        if let customPath {
             let customURL = URL(fileURLWithPath: customPath, isDirectory: true)
             if fm.isWritableFile(atPath: customURL.path) { return customURL }
             onWarning?("Custom output directory not writable (\(customPath)), falling back.")
@@ -66,7 +78,17 @@ enum OutputDirectory {
             return music
         }
 
-        onWarning?("~/Music/WaxOnWaxOff unavailable, falling back to Desktop.")
-        return fm.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true)
+        let desktop = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop", isDirectory: true)
+        if fm.isWritableFile(atPath: desktop.path) {
+            onWarning?("~/Music/WaxOnWaxOff unavailable, falling back to Desktop.")
+            return desktop
+        }
+        // Last resort: still return Desktop so existing logic has a URL to
+        // work with. The pre-flight check (`unwritableReason`) is responsible
+        // for blocking the batch with a clear user-facing message before
+        // anything tries to actually write here.
+        onWarning?("⚠ No writable output directory found — even ~/Desktop is unavailable. Pick a different output directory in Settings.")
+        return desktop
     }
 }

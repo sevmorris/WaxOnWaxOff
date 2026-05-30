@@ -110,6 +110,10 @@ final class ContentViewModel {
         let outputDirectories = inputs.map {
             OutputDirectory.waxOnOutputDirectory(for: $0.url, settings: settings)
         }
+        if let reason = OutputDirectory.unwritableReason(outputDirectories) {
+            alertMessage = reason
+            return
+        }
         let concurrentJobs = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
         if let reason = DiskSpaceChecker.waxOnBatchBlockedReason(
             inputURLs: inputs.map(\.url),

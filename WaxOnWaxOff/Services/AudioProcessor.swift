@@ -98,7 +98,9 @@ actor AudioProcessor {
         let rateTag = sr == 44100 ? "44k" : "48k"
         let stem = input.deletingPathExtension().lastPathComponent
         let filename = input.lastPathComponent
-        let limitAmp = pow(10.0, -1.0 / 20.0)
+        // WaxOn ceiling is fixed at -1.0 dBTP (not user-adjustable); matches the
+        // theory.html "Under the Hood" value of ~0.891251.
+        let limitAmp = FFmpegFilters.limiterCeilingAmplitude(dBFS: -1.0)
         let outDir = OutputDirectory.waxOnOutputDirectory(for: input, settings: settings) { [self] message in
             self.onLog?("⚠ \(message)", .info)
         }

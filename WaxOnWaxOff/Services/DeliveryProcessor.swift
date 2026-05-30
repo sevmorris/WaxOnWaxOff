@@ -349,10 +349,10 @@ actor DeliveryProcessor {
         // Brick-wall limiter as a safety backstop for inter-sample peaks that
         // loudnorm's linear-mode TP analysis missed. Ceiling matches the user's
         // TP setting; on most material the limiter doesn't engage.
-        let limitAmp = pow(10.0, settings.truePeak / 20.0)
+        let limitAmp = FFmpegFilters.limiterCeilingAmplitude(dBFS: settings.truePeak)
         let oversampleSr = settings.sampleRate * 2
         filterChain += ",\(FFmpegFilters.aresample(to: oversampleSr))"
-        filterChain += ",alimiter=limit=\(String(format: "%.6f", limitAmp)):attack=5:release=50:level=disabled"
+        filterChain += ",alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled"
         filterChain += ",\(FFmpegFilters.aresample(to: settings.sampleRate))"
 
         let args = [
@@ -386,12 +386,12 @@ actor DeliveryProcessor {
         // MP3 stays under the same effective ceiling as the WAV output.
         // MP3 always targets 44.1 kHz regardless of the WAV sample rate setting.
         let mp3TP = settings.truePeak - 1.0
-        let limitAmp = pow(10.0, mp3TP / 20.0)
+        let limitAmp = FFmpegFilters.limiterCeilingAmplitude(dBFS: mp3TP)
         let mp3SampleRate = 44100
         let oversampleSr = mp3SampleRate * 2
         let preEncodeFilter = [
             FFmpegFilters.aresample(to: oversampleSr),
-            "alimiter=limit=\(String(format: "%.6f", limitAmp)):attack=1:release=20:level=disabled",
+            "alimiter=limit=\(limitAmp):attack=1:release=20:level=disabled",
             FFmpegFilters.aresample(to: mp3SampleRate)
         ].joined(separator: ",")
 

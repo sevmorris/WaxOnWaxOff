@@ -16,4 +16,12 @@ enum FFmpegFilters {
             .replacingOccurrences(of: "=", with: "-")
             .replacingOccurrences(of: "\n", with: " ")
     }
+
+    /// Format an `alimiter=limit=N` value: linear amplitude derived from a dBFS
+    /// ceiling, rendered to 6 decimal places so the string we pass to FFmpeg is
+    /// stable across builds and matches the rounded value documented in
+    /// theory.html (e.g. -1.0 dBTP → 0.891251).
+    nonisolated static func limiterCeilingAmplitude(dBFS: Double) -> String {
+        String(format: "%.6f", pow(10.0, dBFS / 20.0))
+    }
 }
