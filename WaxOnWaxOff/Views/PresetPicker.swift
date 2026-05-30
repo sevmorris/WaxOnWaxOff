@@ -3,6 +3,7 @@ import SwiftUI
 struct WaxOffPresetPicker: View {
     @Bindable var viewModel: DeliveryViewModel
     @State private var showingSaveSheet = false
+    @State private var showingManageSheet = false
     @State private var newPresetName = ""
 
     var body: some View {
@@ -34,12 +35,8 @@ struct WaxOffPresetPicker: View {
                 }
 
                 if !viewModel.presetStore.presets.isEmpty {
-                    Menu("Delete Preset") {
-                        ForEach(viewModel.presetStore.presets) { preset in
-                            Button(preset.name, role: .destructive) {
-                                viewModel.presetStore.deletePreset(preset)
-                            }
-                        }
+                    Button("Manage Presets…") {
+                        showingManageSheet = true
                     }
                 }
             } label: {
@@ -63,6 +60,9 @@ struct WaxOffPresetPicker: View {
             } onCancel: {
                 showingSaveSheet = false
             }
+        }
+        .sheet(isPresented: $showingManageSheet) {
+            WaxOffManagePresetsSheet(viewModel: viewModel)
         }
     }
 

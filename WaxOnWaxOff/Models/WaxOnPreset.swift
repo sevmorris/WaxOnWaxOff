@@ -49,6 +49,19 @@ final class WaxOnPresetStore {
         persist()
     }
 
+    func updatePreset(id: UUID, name: String?, settings: WaxOnSettings?) {
+        guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
+        if let name {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            presets[index].name = trimmed
+        }
+        if let settings {
+            presets[index].settings = settings
+        }
+        persist()
+    }
+
     func selectPreset(_ id: UUID?) {
         selectedPresetID = id
         if let id {

@@ -4,6 +4,10 @@ struct RotaryKnobView: View {
     @Binding var value: Double   // 0…1
     var size: CGFloat = 52
     var step: Double = 0.05
+    /// VoiceOver / accessibility label (e.g. "Target LUFS").
+    var accessibilityLabel: String = "Control"
+    /// Spoken value (e.g. "-18 LUFS").
+    var accessibilityValueText: String = ""
 
     private static let minAngle: Double = -135
     private static let maxAngle: Double =  135
@@ -34,10 +38,46 @@ struct RotaryKnobView: View {
                 .onEnded { _ in dragStart = nil }
         )
         .scrollWheelStep { delta in
-            let direction: Double = delta > 0 ? 1 : -1
-            value = max(0, min(1, ((value + direction * step) / step).rounded() * step))
+            adjustValue(direction: delta > 0 ? 1 : -1)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValueText.isEmpty ? formattedValue : accessibilityValueText)
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: adjustValue(direction: 1)
+            case .decrement: adjustValue(direction: -1)
+            @unknown default: break
+            }
+        }
+        .accessibilityAddTraits(.isButton)
+        .focusable()
+        .onKeyPress(.upArrow) {
+            adjustValue(direction: 1)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            adjustValue(direction: -1)
+            return .handled
+        }
+        .onKeyPress(.leftArrow) {
+            adjustValue(direction: -1)
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            adjustValue(direction: 1)
+            return .handled
+        }
+        .help("\(accessibilityLabel): drag vertically, scroll wheel, or arrow keys to adjust.")
         .cursor(.resizeUpDown)
+    }
+
+    private var formattedValue: String {
+        String(format: "%.0f%%", value * 100)
+    }
+
+    private func adjustValue(direction: Double) {
+        value = max(0, min(1, ((value + direction * step) / step).rounded() * step))
     }
 
     // MARK: - Subviews

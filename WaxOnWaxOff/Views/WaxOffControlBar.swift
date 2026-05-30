@@ -47,7 +47,13 @@ struct WaxOffControlBar: View {
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .kerning(0.4)
-            RotaryKnobView(value: value, size: 80, step: step)
+            RotaryKnobView(
+                value: value,
+                size: 80,
+                step: step,
+                accessibilityLabel: label,
+                accessibilityValueText: valueLabel
+            )
             Text(valueLabel)
                 .font(.system(size: 11).monospaced())
                 .foregroundStyle(.secondary)

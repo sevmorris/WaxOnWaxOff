@@ -115,8 +115,14 @@ struct WaxOnControlBar: View {
 
             Spacer().frame(height: 22)
 
-            RotaryKnobView(value: value, size: 80, step: step)
-                .disabled(!enabled)
+            RotaryKnobView(
+                value: value,
+                size: 80,
+                step: step,
+                accessibilityLabel: label,
+                accessibilityValueText: valueLabel
+            )
+            .disabled(!enabled)
 
             Spacer().frame(height: 6)
 
