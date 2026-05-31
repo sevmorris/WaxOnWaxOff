@@ -29,25 +29,19 @@ actor UpdateChecker {
         }
     }
 
+    /// App release tags only (`v1.2.3`). Ignores `ffmpeg-deps-*` and other asset releases.
+    private static func isAppReleaseTag(_ tag: String) -> Bool {
+        guard tag.first == "v" else { return false }
+        let version = tag.dropFirst()
+        guard version.contains(".") else { return false }
+        return version.allSatisfy { $0.isNumber || $0 == "." }
+    }
+
     func check() async -> Result {
-        guard let apiURL = URL(string: "https://api.github.com/repos/sevmorris/WaxOnWaxOff/releases/latest") else {
-            return .error("Invalid update URL.")
-        }
-
         do {
-            // 15 s caps both connect and resource time so a silent launch-time
-            // check doesn't hold a URLSession open for the default 60 s when
-            // GitHub is slow or the user is offline.
-            var request = URLRequest(url: apiURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
-            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                return .error("Could not reach GitHub. Check your internet connection.")
+            guard let release = try await fetchLatestAppRelease() else {
+                return .error("No app release found on GitHub.")
             }
-
-            let release = try JSONDecoder().decode(Release.self, from: data)
 
             let latestVersion = release.tagName.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
             let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
@@ -70,34 +64,55 @@ actor UpdateChecker {
             return .error(error.localizedDescription)
         }
     }
+
+    private func githubRequest(path: String) async throws -> (Data, HTTPURLResponse) {
+        guard let url = URL(string: "https://api.github.com\(path)") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard http.statusCode == 200 else {
+            throw UpdateFetchError.badResponse
+        }
+        return (data, http)
+    }
+
+    private func fetchLatestAppRelease() async throws -> Release? {
+        let (latestData, _) = try await githubRequest(
+            path: "/repos/sevmorris/WaxOnWaxOff/releases/latest"
+        )
+        let latest = try JSONDecoder().decode(Release.self, from: latestData)
+        if Self.isAppReleaseTag(latest.tagName) {
+            return latest
+        }
+
+        // `/releases/latest` can point at non-app releases (e.g. ffmpeg-deps-*).
+        let (listData, _) = try await githubRequest(
+            path: "/repos/sevmorris/WaxOnWaxOff/releases?per_page=30"
+        )
+        let releases = try JSONDecoder().decode([Release].self, from: listData)
+        return releases.first { Self.isAppReleaseTag($0.tagName) }
+    }
+}
+
+private enum UpdateFetchError: LocalizedError {
+    case badResponse
+
+    var errorDescription: String? {
+        "Could not reach GitHub. Check your internet connection."
+    }
 }
 
 /// Show an update dialog. When `silent` is true (launch check), only prompt if
 /// an update is actually available — don't bother the user with "you're up to date".
 ///
-/// Silent (launch) checks are throttled to once per 24 h via UserDefaults so a
-/// frequently-relaunched app doesn't hit GitHub's rate-limited API on every
-/// open. Explicit "Check for Updates…" menu invocations bypass the throttle.
 @MainActor
 func checkForUpdates(silent: Bool = false) async {
-    let throttleKey = "UpdateChecker.lastSuccessfulCheckAt"
-    let throttleInterval: TimeInterval = 24 * 60 * 60
-    if silent {
-        let last = UserDefaults.standard.double(forKey: throttleKey)
-        if last > 0, Date().timeIntervalSince1970 - last < throttleInterval {
-            return
-        }
-    }
-
     let result = await UpdateChecker().check()
-
-    // Only record success — failed checks shouldn't suppress the next attempt.
-    switch result {
-    case .upToDate, .available:
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: throttleKey)
-    case .error:
-        break
-    }
 
     switch result {
     case .upToDate(let version):
