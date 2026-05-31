@@ -299,7 +299,7 @@ actor AudioProcessor {
         let step2Af = [
             FFmpegFilters.aresample(to: oversampleSr),
             "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
-            FFmpegFilters.aresample(to: sr)
+            FFmpegFilters.aresampleWithDither(to: sr)
         ].joined(separator: ",")
 
         onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
@@ -311,6 +311,7 @@ actor AudioProcessor {
         try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", limiterInput.path, "-af", step2Af,
+            "-map_metadata", "0",
             "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
         ])
 

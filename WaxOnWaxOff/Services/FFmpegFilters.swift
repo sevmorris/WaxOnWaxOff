@@ -9,6 +9,11 @@ enum FFmpegFilters {
         "aresample=\(rate):filter_size=512:cutoff=0.97:phase_shift=10"
     }
 
+    /// Final export resample with triangular high-pass dither when encoding 24-bit PCM.
+    nonisolated static func aresampleWithDither(to rate: Int) -> String {
+        "aresample=\(rate):filter_size=512:cutoff=0.97:phase_shift=10:dither_method=triangular_hp"
+    }
+
     /// Sanitize a value passed to FFmpeg as `-metadata key=value`. We pass
     /// metadata via `Process.arguments` (no shell), so the only characters we
     /// actually need to defuse are `=` (would re-split the pair) and embedded

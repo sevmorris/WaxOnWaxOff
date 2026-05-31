@@ -198,6 +198,14 @@ final class FileQueueCoordinator {
 
         let task = Task {
             do {
+                let tools = try await FFmpegManager.shared.ensureTools()
+                guard await AudioStreamProbe.hasAudioStream(ffprobe: tools.ffprobe, url: file.url) else {
+                    if let idx = files.firstIndex(where: { $0.id == file.id }) {
+                        files[idx].status = .error("No audio stream found — file may be misnamed or unsupported.")
+                    }
+                    analysisTasks.removeValue(forKey: file.id)
+                    return
+                }
                 let stats = try await AudioAnalyzer.analyze(url: file.url, noiseFloorHighPassHz: hpf)
                 if let idx = files.firstIndex(where: { $0.id == file.id }) {
                     files[idx].status = .ready(stats)

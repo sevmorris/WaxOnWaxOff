@@ -81,6 +81,31 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         XCTAssertEqual(measuredI, settings.targetLUFS, accuracy: 1.0)
     }
 
+    func testWaxOffMP3HitsTargetLUFS() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "wax_off_mp3_in.wav",
+            durationSeconds: 6.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .mp3
+        settings.mp3Bitrate = 160
+        settings.outputDirectoryPath = workDir.path
+
+        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
+
+        let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: mp3)
+        XCTAssertEqual(measuredI, settings.targetLUFS, accuracy: 1.5,
+                       "MP3 encode may drift slightly from WAV; allow wider tolerance")
+    }
+
     // MARK: -
 
     /// Re-runs loudnorm pass-1 analysis on the given file and returns the

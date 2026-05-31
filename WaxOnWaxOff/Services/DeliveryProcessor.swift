@@ -315,7 +315,7 @@ actor DeliveryProcessor {
         let oversampleSr = settings.sampleRate * 2
         filterChain += ",\(FFmpegFilters.aresample(to: oversampleSr))"
         filterChain += ",alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled"
-        filterChain += ",\(FFmpegFilters.aresample(to: settings.sampleRate))"
+        filterChain += ",\(FFmpegFilters.aresampleWithDither(to: settings.sampleRate))"
 
         let args = [
             "-hide_banner", "-nostats", "-y",

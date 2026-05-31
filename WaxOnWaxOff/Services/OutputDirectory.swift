@@ -28,7 +28,7 @@ enum OutputNaming {
 
 enum OutputDirectory {
     /// Resolve where a WaxOn output WAV should land — mirrors AudioProcessor fallback chain.
-    static func waxOnOutputDirectory(
+    nonisolated static func waxOnOutputDirectory(
         for input: URL,
         settings: WaxOnSettings,
         onWarning: ((String) -> Void)? = nil
@@ -41,7 +41,7 @@ enum OutputDirectory {
     }
 
     /// Resolve where WaxOff delivery files should land — mirrors WaxOn fallback chain.
-    static func waxOffOutputDirectory(
+    nonisolated static func waxOffOutputDirectory(
         for input: URL,
         settings: WaxOffSettings,
         onWarning: ((String) -> Void)? = nil
@@ -58,7 +58,7 @@ enum OutputDirectory {
     /// chain — custom path, source dir, ~/Music/WaxOnWaxOff, ~/Desktop — was
     /// exhausted to a directory we can't actually write to). Returns nil when
     /// every directory in `urls` is OK.
-    static func unwritableReason(_ urls: [URL]) -> String? {
+    nonisolated static func unwritableReason(_ urls: [URL]) -> String? {
         let fm = FileManager.default
         let distinct = Array(Set(urls.map(\.path))).sorted()
         for path in distinct {
@@ -69,7 +69,7 @@ enum OutputDirectory {
         return nil
     }
 
-    private static func resolve(
+    nonisolated private static func resolve(
         customPath: String?,
         input: URL,
         onWarning: ((String) -> Void)?

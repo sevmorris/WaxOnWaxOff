@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct RootContentView: View {
@@ -6,10 +7,16 @@ struct RootContentView: View {
     @State private var waxOffVM = DeliveryViewModel()
 
     var body: some View {
-        if appState.mode == .waxOn {
-            ContentView(viewModel: waxOnVM)
-        } else {
-            WaxOffMainView(viewModel: waxOffVM)
+        Group {
+            if appState.mode == .waxOn {
+                ContentView(viewModel: waxOnVM)
+            } else {
+                WaxOffMainView(viewModel: waxOffVM)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            waxOnVM.cancelProcessing()
+            waxOffVM.cancelProcessing()
         }
     }
 }

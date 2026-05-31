@@ -13,6 +13,8 @@
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/">Manual</a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html">Theory of Operation</a>
+  ·
+  <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 **WaxOn/WaxOff** solves a specific problem: you receive a guest recording that's quiet, uneven, or poorly leveled, and you need a consistent prep WAV before you open your session—or a finished mix normalized to your delivery spec. No import-normalize-export dance. No sending audio to a cloud service.

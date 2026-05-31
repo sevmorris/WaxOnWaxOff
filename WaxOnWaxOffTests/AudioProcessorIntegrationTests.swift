@@ -68,5 +68,44 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
         XCTAssertEqual(batch.successes.count, 1)
     }
+
+    func testWaxOnLoudnormAt48kHzHitsTarget() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "loudnorm_48k_in.wav",
+            durationSeconds: 6.0,
+            sampleRate: 48000
+        )
+
+        var settings = WaxOnSettings()
+        settings.sampleRate = .s48000
+        settings.loudnormEnabled = true
+        settings.loudnormTarget = -23.0
+        settings.phaseRotationEnabled = false
+        settings.outputChannels = .mono
+        settings.outputDirectoryPath = workDir.path
+
+        let processor = AudioProcessor(settings: settings)
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
+        let output = try XCTUnwrap(batch.successes.first?.output)
+
+        let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: output)
+        // Prep chain includes HPF + limiter; allow wider tolerance than WaxOff delivery.
+        XCTAssertEqual(measuredI, settings.loudnormTarget, accuracy: 2.0)
+    }
+
+    private func measureIntegratedLoudness(ffmpeg: String, of url: URL) async throws -> Double {
+        let stderr = try await FFmpegRunner.capture(exe: ffmpeg, args: [
+            "-nostdin", "-hide_banner",
+            "-i", url.path,
+            "-af", "loudnorm=I=-23:TP=-1:LRA=20:print_format=json",
+            "-f", "null", "/dev/null"
+        ])
+        let dict = try XCTUnwrap(FFmpegRunner.parseLoudnormJSON(from: stderr))
+        return try XCTUnwrap(Double(dict["input_i"] ?? ""))
+    }
 }
 
