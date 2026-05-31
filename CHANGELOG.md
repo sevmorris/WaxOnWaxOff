@@ -2,6 +2,16 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.0.7] — 2026-05-31
+
+- Cancel in-flight processing when the app quits
+- WaxOn prep WAVs preserve metadata (`-map_metadata 0`)
+- Triangular HP dither on final 24-bit PCM exports
+- ffprobe audio-stream validation before analysis
+- Swift 6: `OutputDirectory` helpers marked `nonisolated`
+- CI: macOS 15 + Xcode 16.4; protect `ffmpeg-deps-*` releases from pruning
+- Expanded integration tests; `CHANGELOG.md` added
+
 ## [2.0.6] — 2026-05-30
 
 - WaxOff re-delivery warning for files matching `-lev*LUFS` output naming

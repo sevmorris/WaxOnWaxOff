@@ -250,7 +250,7 @@ ok "Release published"
 KEEP_RELEASES=5
 step "Removing old app releases (keeping ${KEEP_RELEASES} most recent v* tags)"
 OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
-    --jq -r '.[].tagName' | grep -E '^v[0-9]' | tail -n +$((KEEP_RELEASES + 1)) || true)
+    --jq '.[].tagName' | grep -E '^v[0-9]' | tail -n +$((KEEP_RELEASES + 1)) || true)
 if [[ -z "$OLD_TAGS" ]]; then
     ok "No old app releases to remove"
 else
