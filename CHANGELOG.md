@@ -2,6 +2,11 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.0.8] — 2026-05-31
+
+- Fix silent update checks skipping new releases for up to 24 hours after launch
+- Ignore non-app GitHub releases (`ffmpeg-deps-*`) when resolving the latest version
+
 ## [2.0.7] — 2026-05-31
 
 - Cancel in-flight processing when the app quits
