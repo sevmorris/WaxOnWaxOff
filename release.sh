@@ -37,9 +37,14 @@ ok()    { echo "  ✓ $*"; }
 fail()  { echo "\n  ✗ $*" >&2; exit 1; }
 
 cleanup() {
-    rm -rf "$STAGING" "$MOUNT" "$DERIVED_DATA"
-    rm -f "$DMG"
+    # Uses ${VAR:-} so the trap fires cleanly even if the script exits before
+    # the path variables are defined (e.g. early exit on argument-error).
+    [[ -d "${STAGING:-}" ]]      && rm -rf -- "$STAGING"      || true
+    [[ -d "${MOUNT:-}" ]]        && rm -rf -- "$MOUNT"        || true
+    [[ -d "${DERIVED_DATA:-}" ]] && rm -rf -- "$DERIVED_DATA" || true
+    [[ -f "${DMG:-}" ]]          && rm -f  -- "$DMG"          || true
 }
+trap cleanup EXIT
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 step "Preflight checks"
@@ -72,10 +77,7 @@ else
     ESC_VERSION=$(printf '%s'  "$VERSION" | sed 's/[.[\*^$]/\\&/g')
     sed -i '' "s/MARKETING_VERSION = ${ESC_CURRENT};/MARKETING_VERSION = ${ESC_VERSION};/g" \
         "$PROJECT/project.pbxproj"
-    ok "Bumped $CURRENT → $VERSION"
-    git add "$PROJECT/project.pbxproj"
-    git commit -m "Bump version to $VERSION"
-    ok "Committed version bump"
+    ok "Bumped $CURRENT → $VERSION (commit deferred until after notarization)"
 fi
 
 step "Bumping build number"
@@ -83,7 +85,7 @@ BUILD_NUM=$(grep 'CURRENT_PROJECT_VERSION = ' "$PROJECT/project.pbxproj" | head 
 NEXT_BUILD=$((BUILD_NUM + 1))
 sed -i '' "s/CURRENT_PROJECT_VERSION = ${BUILD_NUM};/CURRENT_PROJECT_VERSION = ${NEXT_BUILD};/g" \
     "$PROJECT/project.pbxproj"
-ok "Build number ${BUILD_NUM} → ${NEXT_BUILD}"
+ok "Build number ${BUILD_NUM} → ${NEXT_BUILD} (commit deferred until after notarization)"
 
 step "Fetching FFmpeg binaries"
 chmod +x "$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
@@ -151,7 +153,12 @@ ok "Created $(du -sh $DMG | cut -f1) DMG"
 step "Notarizing DMG"
 # Assumes a profile named 'WoWoNotary' exists.
 # Setup: xcrun notarytool store-credentials WoWoNotary --apple-id <email> --team-id T9RLNAXPWU
-xcrun notarytool submit "$DMG" --wait --keychain-profile "WoWoNotary"
+# If notarization fails, revert the version-number changes so the working tree
+# is clean and no stranded "Bump version" commit is left on the branch.
+if ! xcrun notarytool submit "$DMG" --wait --keychain-profile "WoWoNotary"; then
+    git checkout -- "$PROJECT/project.pbxproj"
+    fail "Notarization failed — version changes in project.pbxproj have been reverted"
+fi
 xcrun stapler staple "$DMG"
 ok "Notarization complete"
 
@@ -165,6 +172,18 @@ hdiutil detach "$MOUNT" -quiet
 [[ "$DMG_VERSION" == "$VERSION" ]] || \
     fail "DMG version mismatch: expected $VERSION, got $DMG_VERSION"
 ok "DMG contains $DMG_VERSION"
+
+# ── Commit version and build-number bump ──────────────────────────────────────
+# Deferred until here so a notarization failure never strands a version-bump
+# commit on the branch. Notarization succeeded above, so it is safe to commit.
+step "Committing version and build number bump"
+if [[ -n "$(git status --short -- "$PROJECT/project.pbxproj")" ]]; then
+    git add "$PROJECT/project.pbxproj"
+    git commit -m "Bump version to $VERSION"
+    ok "Committed version bump ($CURRENT → $VERSION, build $BUILD_NUM → $NEXT_BUILD)"
+else
+    ok "project.pbxproj unchanged — nothing to commit"
+fi
 
 # ── Update docs (README + manual) to point at the new version ────────────────
 # Per project convention: rewrite unconditionally and let `git status --porcelain`
@@ -193,9 +212,7 @@ if grep -E "WaxOnWaxOff-v[0-9]+\.[0-9]+\.[0-9]+\.dmg" "$MANUAL_IDX" "$LANDING_ID
 fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
-    # Also pick up the build-number bump from the pbxproj so it actually lands
-    # in the repo (otherwise the build bump stays uncommitted across runs).
-    git add "$PROJECT/project.pbxproj" "$MANUAL_IDX" "$LANDING_IDX" "$PROJECT_DIR/README.md"
+    git add "$MANUAL_IDX" "$LANDING_IDX" "$PROJECT_DIR/README.md"
     git commit -m "docs: update download link to ${TAG}"
     ok "Docs point to ${TAG}"
 else

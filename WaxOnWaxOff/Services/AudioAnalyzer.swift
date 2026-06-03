@@ -189,6 +189,11 @@ enum AudioAnalyzer {
                         let x = Double(channelData[ch][frame])
                         let absX = abs(x)
                         peak = max(peak, absX)
+                        // ISP estimate: 2× linear interpolation between adjacent same-channel
+                        // samples. This catches the most common inter-sample peak case but will
+                        // underestimate near-Nyquist content by up to ~1–2 dB. A fully
+                        // ITU-R BS.1770-compliant ISP measurement requires 4× polyphase
+                        // oversampling. The "est." label in the UI reflects this limitation.
                         if hasLastSample[ch] {
                             let mid = abs((lastSample[ch] + x) / 2.0)
                             truePeak = max(truePeak, mid)
@@ -260,20 +265,11 @@ enum AudioAnalyzer {
                 totalFrames += frames
             }
 
-            // Flush partial trailing data so very short clips still produce a
-            // measurement. For LUFS, only emit a partial block if no full block
-            // was ever completed — otherwise we'd skew the gated mean.
-            if blockLoudnessEnergies.isEmpty {
-                let trailingFrames = hopHistoryFrames.reduce(0, +) + hopFramesElapsed
-                if trailingFrames > 0 {
-                    var blockSumSq = 0.0
-                    for ch in 0..<channels {
-                        let sumSS = hopHistorySS[ch].reduce(0, +) + hopChannelSumSq[ch]
-                        blockSumSq += sumSS / Double(trailingFrames)
-                    }
-                    blockLoudnessEnergies.append(blockSumSq)
-                }
-            }
+            // BS.1770 integrated loudness is undefined for content shorter than
+            // 400 ms (one full gating block). If no complete block was produced,
+            // leave blockLoudnessEnergies empty so computeGatedLUFS returns −144.0
+            // — the honest "no valid measurement" sentinel — rather than emitting
+            // a biased value from a sub-400ms partial block weighted as a full block.
             if nfBlockFramesElapsed > 0 {
                 let nfRms = sqrt(nfBlockMonoSumSq / Double(nfBlockFramesElapsed))
                 blockRmsValues.append(nfRms)

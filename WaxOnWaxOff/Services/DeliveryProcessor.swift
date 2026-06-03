@@ -22,18 +22,10 @@ struct DeliveryBatchRunResult: Sendable {
     let failures: [DeliveryJobFailure]
 }
 
-private enum DeliveryJobOutcome: Sendable {
-    case success(DeliveryJobResult)
-    case failure(DeliveryJobFailure)
-    case cancelled
-}
 
 // MARK: - DeliveryProcessor
 
 actor DeliveryProcessor {
-
-    /// Output paths claimed by in-flight jobs in the current batch.
-    private var reservedOutputPaths: Set<String> = []
 
     func run(
         inputs: [DeliveryJobInput],
@@ -46,61 +38,46 @@ actor DeliveryProcessor {
             return DeliveryBatchRunResult(successes: [], failures: [])
         }
 
-        reservedOutputPaths.removeAll(keepingCapacity: true)
-
         let tools = try await FFmpegManager.shared.ensureTools()
-        let maxConcurrent = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
-
-        return try await withThrowingTaskGroup(of: DeliveryJobOutcome.self) { group in
-            var successes: [DeliveryJobResult] = []
-            var failures: [DeliveryJobFailure] = []
-            var index = 0
-
-            func addNext() {
-                guard index < inputs.count else { return }
-                let input = inputs[index]
-                index += 1
-                group.addTask {
-                    do {
-                        try Task.checkCancellation()
-                        onFileStarted?(input.id)
-                        let outputs = try await self.process(
-                            url: input.url,
-                            settings: settings,
-                            tools: tools,
-                            onPhase: { phase in onPhase?(input.id, phase) },
-                            onLog: onLog
-                        )
-                        return .success(DeliveryJobResult(id: input.id, outputURLs: outputs))
-                    } catch is CancellationError {
-                        return .cancelled
-                    } catch {
-                        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                        onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
-                        return .failure(DeliveryJobFailure(id: input.id, message: message))
-                    }
-                }
-            }
-
-            for _ in 0..<min(maxConcurrent, inputs.count) {
-                addNext()
-            }
-
-            for try await outcome in group {
-                switch outcome {
-                case .success(let result):
-                    successes.append(result)
-                case .failure(let failure):
-                    failures.append(failure)
-                case .cancelled:
-                    group.cancelAll()
-                    throw CancellationError()
-                }
-                addNext()
-            }
-
-            return DeliveryBatchRunResult(successes: successes, failures: failures)
+        let lufsTag = formatNumber(settings.targetLUFS)
+        let allocator = OutputAllocator { [lufsTag] input in
+            "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
         }
+
+        let outcomes: [Result<DeliveryJobResult, DeliveryJobFailure>] = try await runBoundedConcurrent(
+            inputs: inputs,
+            limit: ProcessingConfig.maxConcurrentJobs
+        ) { input in
+            do {
+                try Task.checkCancellation()
+                onFileStarted?(input.id)
+                let outputs = try await self.process(
+                    url: input.url,
+                    settings: settings,
+                    tools: tools,
+                    allocator: allocator,
+                    onPhase: { phase in onPhase?(input.id, phase) },
+                    onLog: onLog
+                )
+                return .success(DeliveryJobResult(id: input.id, outputURLs: outputs))
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
+                return .failure(DeliveryJobFailure(id: input.id, message: message))
+            }
+        }
+
+        var successes: [DeliveryJobResult] = []
+        var failures: [DeliveryJobFailure] = []
+        for outcome in outcomes {
+            switch outcome {
+            case .success(let r): successes.append(r)
+            case .failure(let f): failures.append(f)
+            }
+        }
+        return DeliveryBatchRunResult(successes: successes, failures: failures)
     }
 
     func process(
@@ -110,26 +87,32 @@ actor DeliveryProcessor {
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
     ) async throws -> [URL] {
         let tools = try await FFmpegManager.shared.ensureTools()
-        return try await process(url: url, settings: settings, tools: tools, onPhase: onPhase, onLog: onLog)
+        let lufsTag = formatNumber(settings.targetLUFS)
+        let allocator = OutputAllocator { [lufsTag] input in
+            "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
+        }
+        return try await process(url: url, settings: settings, tools: tools, allocator: allocator, onPhase: onPhase, onLog: onLog)
     }
 
     private func process(
         url: URL,
         settings: WaxOffSettings,
         tools: FFmpegManager.Paths,
+        allocator: OutputAllocator,
         onPhase: (@Sendable (String) -> Void)? = nil,
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
     ) async throws -> [URL] {
         let ffmpeg = tools.ffmpeg
+        // Probe source duration for proportional ffmpeg timeouts (FFmpegRunner.effectiveTimeoutSeconds).
+        let fileDuration = await probeFileDuration(ffprobe: tools.ffprobe, url: url)
 
         let outputDir = OutputDirectory.waxOffOutputDirectory(for: url, settings: settings) { message in
             onLog?("⚠ \(message)", .info)
         }
 
-        let stem = url.deletingPathExtension().lastPathComponent
-        let lufsTag = formatNumber(settings.targetLUFS)
-        let outputStem = allocateOutputStem(stem: stem, lufsTag: lufsTag, input: url, outDir: outputDir)
-        let lufs = lufsTag
+        let allocatedURL = allocator.allocate(for: url, in: outputDir)
+        let outputStem = allocatedURL.deletingPathExtension().lastPathComponent
+        let lufs = formatNumber(settings.targetLUFS)
         let tp = String(format: "%.1f", settings.truePeak)
         let lra = formatNumber(settings.lra)
 
@@ -140,7 +123,7 @@ actor DeliveryProcessor {
         onPhase?("Analyzing loudness…")
         try Task.checkCancellation()  // CRITICAL-2
         onLog?("  loudnorm: analyzing…", .verbose)
-        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings)
+        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, fileDuration: fileDuration)
         if let m = measurements {
             onLog?("  \(m.formattedSummary)", .info)
             onLog?(String(format: "  offset: %.2f dB  |  thresh %.1f LUFS", m.targetOffset, m.inputThresh), .verbose)
@@ -167,14 +150,17 @@ actor DeliveryProcessor {
             input: url,
             output: wavTempURL,
             settings: settings,
-            measurements: measurements
+            measurements: measurements,
+            fileDuration: fileDuration
         )
 
         guard FileManager.default.fileExists(atPath: wavTempURL.path) else {
             throw DeliveryError.outputNotCreated
         }
 
-        // HIGH-3: ensure wavTempURL is cleaned up on any failure path
+        // Ensure wavTempURL is cleaned up on all exit paths — including MP3-only
+        // mode (where it is the source for encodeMP3) and WAV+Both mode (where it
+        // was already moved to wavFinalURL so removeItem is a benign no-op).
         defer { try? FileManager.default.removeItem(at: wavTempURL) }
 
         var outputURLs: [URL] = []
@@ -200,9 +186,7 @@ actor DeliveryProcessor {
             let mp3FinalURL = outputDir.appendingPathComponent("\(outputStem).mp3")
 
             defer {
-                if settings.outputMode == .mp3 {
-                    try? FileManager.default.removeItem(at: wavTempURL)
-                }
+                // wavTempURL is covered by the outer defer above.
                 try? FileManager.default.removeItem(at: mp3TempURL)
             }
 
@@ -210,7 +194,8 @@ actor DeliveryProcessor {
                 ffmpeg: ffmpeg,
                 input: sourceForMP3,
                 output: mp3TempURL,
-                settings: settings
+                settings: settings,
+                fileDuration: fileDuration
             )
 
             guard FileManager.default.fileExists(atPath: mp3TempURL.path) else {
@@ -229,28 +214,6 @@ actor DeliveryProcessor {
 
     // MARK: - Private
 
-    /// Pick a unique output stem within this batch when multiple sources share the same name and LUFS tag.
-    private func allocateOutputStem(stem: String, lufsTag: String, input: URL, outDir: URL) -> String {
-        let suffix = "lev\(lufsTag)LUFS"
-        let baseStem = "\(stem)-\(suffix)"
-        let baseKey = outDir.appendingPathComponent("\(baseStem).wav").path
-
-        if !reservedOutputPaths.contains(baseKey) {
-            reservedOutputPaths.insert(baseKey)
-            return baseStem
-        }
-
-        let tag = OutputNaming.shortPathTag(for: input.path)
-        var uniqueStem = "\(stem)-\(tag)-\(suffix)"
-        var uniqueKey = outDir.appendingPathComponent("\(uniqueStem).wav").path
-        if reservedOutputPaths.contains(uniqueKey) {
-            uniqueStem = "\(stem)-\(tag)-\(UUID().uuidString.prefix(4))-\(suffix)"
-            uniqueKey = outDir.appendingPathComponent("\(uniqueStem).wav").path
-        }
-        reservedOutputPaths.insert(uniqueKey)
-        return uniqueStem
-    }
-
     /// Whole numbers render without a decimal ("9"), fractions render with one ("9.5").
     /// Used for both display strings and FFmpeg filter parameters — `loudnorm`
     /// accepts either form.
@@ -258,13 +221,32 @@ actor DeliveryProcessor {
         value == value.rounded() ? "\(Int(value))" : String(format: "%.1f", value)
     }
 
+    /// Probe the source file duration for proportional ffmpeg timeouts.
+    /// Returns nil on any ffprobe error; callers fall back to the 900 s constant.
+    private func probeFileDuration(ffprobe: String, url: URL) async -> TimeInterval? {
+        guard let output = try? await FFmpegRunner.captureStdout(exe: ffprobe, args: [
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            url.path
+        ]) else { return nil }
+        return Double(output.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
     /// Returns nil if the analysis ran but the input was silent / near-silent
     /// (loudnorm reports -inf / inf measurements that pass 2 cannot consume).
     /// Throws only on actual ffmpeg or JSON parsing failures.
+    ///
+    /// Sample-rate assumption: pass-1 (this analysis) and pass-2 (renderWAV) both operate
+    /// on the source file at its native sample rate — neither resamples before loudnorm.
+    /// They match coincidentally (not by explicit coordination). Any future change to
+    /// renderWAV that inserts a pre-loudnorm resample MUST add the same resample here to
+    /// keep the measured_I / offset values valid for the new rate.
     private func analyzeAudio(
         ffmpeg: String,
         input: URL,
-        settings: WaxOffSettings
+        settings: WaxOffSettings,
+        fileDuration: TimeInterval?
     ) async throws -> LoudnormMeasurements? {
         let lufs = formatNumber(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
@@ -281,11 +263,17 @@ actor DeliveryProcessor {
             "-f", "null", "-"
         ]
 
-        let stderr = try await FFmpegRunner.capture(exe: ffmpeg, args: args)
+        let stderr = try await FFmpegRunner.capture(exe: ffmpeg, args: args, fileDuration: fileDuration)
 
         guard let dict = FFmpegRunner.parseLoudnormJSON(from: stderr),
               let measurements = LoudnormMeasurements(json: dict.mapValues { $0 as Any }) else {
-            throw DeliveryError.analysisFailedNoMeasurements
+            // Include a stderr excerpt so future FFmpeg log-format changes are debuggable.
+            let excerpt = String(stderr.prefix(500))
+            throw DeliveryError.processingFailed(
+                excerpt.isEmpty
+                    ? "Could not parse loudnorm analysis output — ffmpeg produced no stderr."
+                    : "Could not parse loudnorm analysis output. FFmpeg stderr: \(excerpt)"
+            )
         }
         return measurements.isFinite ? measurements : nil
     }
@@ -295,11 +283,15 @@ actor DeliveryProcessor {
         input: URL,
         output: URL,
         settings: WaxOffSettings,
-        measurements: LoudnormMeasurements?
+        measurements: LoudnormMeasurements?,
+        fileDuration: TimeInterval?
     ) async throws {
         // Phase rotation always runs. Loudnorm only runs when measurements
         // are available — silent inputs skip it to avoid pass-2 errors.
         var filterChain = "allpass=f=200:t=q:w=0.707"
+        // NOTE: loudnorm pass-2 runs at the source file's native sample rate — no pre-loudnorm
+        // resample in this filter chain. If you add one here, update analyzeAudio to apply the
+        // same resample before its pass-1 analysis so measured_I / offset remain valid.
         if let m = measurements {
             filterChain += "," + m.linearPassFilter(
                 targetLUFS: settings.targetLUFS,
@@ -315,7 +307,7 @@ actor DeliveryProcessor {
         let oversampleSr = settings.sampleRate * 2
         filterChain += ",\(FFmpegFilters.aresample(to: oversampleSr))"
         filterChain += ",alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled"
-        filterChain += ",\(FFmpegFilters.aresampleWithDither(to: settings.sampleRate))"
+        filterChain += ",\(FFmpegFilters.aresample(to: settings.sampleRate))"
 
         let args = [
             "-hide_banner", "-nostats", "-y",
@@ -333,14 +325,15 @@ actor DeliveryProcessor {
             output.path
         ]
 
-        try await FFmpegRunner.run(exe: ffmpeg, args: args)
+        try await FFmpegRunner.run(exe: ffmpeg, args: args, fileDuration: fileDuration)
     }
 
     private func encodeMP3(
         ffmpeg: String,
         input: URL,
         output: URL,
-        settings: WaxOffSettings
+        settings: WaxOffSettings,
+        fileDuration: TimeInterval?
     ) async throws {
         // 2× oversample → brick-wall limit → resample back
         // Lossy codecs introduce ~0.5–1.5 dB of inter-sample peak overshoot during decode;
@@ -375,7 +368,7 @@ actor DeliveryProcessor {
             output.path
         ]
 
-        try await FFmpegRunner.run(exe: ffmpeg, args: args)
+        try await FFmpegRunner.run(exe: ffmpeg, args: args, fileDuration: fileDuration)
     }
 }
 

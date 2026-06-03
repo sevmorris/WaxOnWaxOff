@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import OSLog
@@ -114,7 +115,23 @@ final class ContentViewModel {
             alertMessage = reason
             return
         }
-        let concurrentJobs = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
+
+        // If the fallback chain would send more than one output to ~/Desktop,
+        // confirm before proceeding — a silent batch of files on the Desktop is
+        // surprising. Single-file jobs fall back silently (existing behaviour).
+        let desktopPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop").path
+        let desktopCount = outputDirectories.filter { $0.path == desktopPath }.count
+        if desktopCount > 1 {
+            let alert = NSAlert()
+            alert.messageText = "Output will land on your Desktop"
+            alert.informativeText = "\(desktopCount) output files will be written to ~/Desktop because no other writable directory was found. Set a custom output directory in Settings to avoid this."
+            alert.addButton(withTitle: "Continue Anyway")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+
+        let concurrentJobs = ProcessingConfig.maxConcurrentJobs
         if let reason = DiskSpaceChecker.waxOnBatchBlockedReason(
             inputURLs: inputs.map(\.url),
             outputDirectories: outputDirectories,

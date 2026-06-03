@@ -666,6 +666,7 @@
         <li>2× oversampling at <code>2 × sample rate</code> for true-peak accuracy.</li>
       </ul>
       <p>The limiter is a safety backstop, not a loudness maximizer. WaxOff doesn't push gain above what loudnorm calculated; the limiter exists so the user can trust that the rendered WAV will not exceed the configured ceiling.</p>
+      <p>A consequence: if enough inter-sample peaks require attenuation, the output integrated loudness lands slightly below the configured LUFS target — typically less than 0.5 LU on well-mixed material. This is correct behavior. Slightly under target with a clean True Peak ceiling is better than exactly on target with inter-sample clipping risk at the streaming encoder.</p>
     </details>
 
     <details class="callout callout-impl">
@@ -915,6 +916,7 @@
       <li>The alimiter is the hard ceiling. It guarantees no output sample (at 2× sample rate) exceeds the limit.</li>
     </ul>
     <p>Setting both to the same value means loudnorm and the limiter are working toward the same goal. If loudnorm succeeds, the limiter barely engages. If loudnorm slightly overshoots, the limiter catches it. The two stages are complementary, not redundant. When Loudness Norm is off, only the limiter applies gain control — still at the fixed −1.0 dBTP ceiling.</p>
+    <p>There is a deliberate trade-off here: on dynamic source material where inter-sample peaks push past −1.0 dBTP after loudnorm, the limiter must attenuate those peaks and the output integrated loudness lands slightly below the configured target — typically less than 0.5 LU on well-recorded speech, more on heavily compressed or clipped sources. True Peak protection is the harder constraint; the LUFS target is the goal. For WaxOn's editing-prep purpose this is entirely acceptable: material landing 0.5–1 LU under target is fully usable, and the editor applies further gain and dynamics in the DAW anyway. The ceiling guarantee is what matters — it prevents digital overs at every downstream stage.</p>
   </section>
 
   <!-- WaxOff Design -->
@@ -954,7 +956,7 @@
         </tr>
         <tr>
           <td>Buzzsprout</td>
-          <td>−19 LUFS (mono) / −16 LUFS (stereo)</td>
+          <td>−16 LUFS</td>
           <td>−1.0 dBTP</td>
         </tr>
         <tr>

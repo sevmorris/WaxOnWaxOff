@@ -170,14 +170,49 @@ final class FileQueueCoordinator {
 
     private func expandFolder(_ url: URL) -> [URL] {
         guard url.hasDirectoryPath else { return [url] }
+
+        // Resolve the root path once for ancestor-cycle detection below.
+        let rootRealPath = (try? url.resolvingSymlinksInPath().path) ?? url.path
+
         guard let enumerator = FileManager.default.enumerator(
             at: url,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return [] }
-        return enumerator.compactMap { $0 as? URL }.filter {
-            (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+
+        let maxDepth = 8   // sufficient for any real podcast asset folder
+        var results: [URL] = []
+
+        for case let fileURL as URL in enumerator {
+            // Hard depth cap — enumerator.level is 1-based (root's direct children = 1).
+            if enumerator.level > maxDepth {
+                enumerator.skipDescendants()
+                continue
+            }
+
+            let rv = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+
+            if rv?.isSymbolicLink == true {
+                // Resolve the symlink. Skip silently if resolution fails.
+                guard let resolved = try? fileURL.resolvingSymlinksInPath() else {
+                    enumerator.skipDescendants()
+                    continue
+                }
+                // Skip if the resolved target is an ancestor of (or equal to) the
+                // enumeration root — following it would create an infinite loop.
+                let rp = resolved.path
+                if rootRealPath.hasPrefix(rp + "/") || rp == rootRealPath {
+                    enumerator.skipDescendants()
+                    continue
+                }
+            }
+
+            if rv?.isRegularFile == true {
+                results.append(fileURL)
+            }
         }
+
+        return results
     }
 
     private func analyzeFileInfo(_ file: FileItem) {
@@ -199,7 +234,13 @@ final class FileQueueCoordinator {
         let task = Task {
             do {
                 let tools = try await FFmpegManager.shared.ensureTools()
-                guard await AudioStreamProbe.hasAudioStream(ffprobe: tools.ffprobe, url: file.url) else {
+                guard await AudioStreamProbe.hasAudioStream(
+                    ffprobe: tools.ffprobe,
+                    url: file.url,
+                    onLog: { detail in
+                        fileQueueLogger.debug("\(detail, privacy: .public)")
+                    }
+                ) else {
                     if let idx = files.firstIndex(where: { $0.id == file.id }) {
                         files[idx].status = .error("No audio stream found — file may be misnamed or unsupported.")
                     }

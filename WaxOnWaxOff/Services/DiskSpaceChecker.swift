@@ -6,10 +6,17 @@ enum DiskSpaceChecker {
     /// Per-output-directory headroom when writing finished files.
     private static let outputHeadroomBytes: Int64 = 100 * 1024 * 1024
 
-    /// WaxOn keeps several full-size intermediates per concurrent job in app temp.
+    /// WaxOn keeps up to five full-size intermediate files per concurrent job in app temp:
+    /// (1) midURL — HPF/channel output, (2) dynLevelURL — optional dynamic leveling output,
+    /// (3) nrTempURL — optional NR analysis temp, (4) normURL — optional loudnorm output,
+    /// (5) tmpURL — final limiter output awaiting move. If stages are added to AudioProcessor,
+    /// update this multiplier to match.
     private static let waxOnTempMultiplier: Int64 = 5
 
-    /// WaxOff may hold a decoded/normalized WAV temp plus delivery outputs.
+    /// WaxOff holds at most two temp files per job: (1) wavTempURL — the normalized WAV
+    /// before it is moved to the final location, and (2) mp3TempURL — the encoded MP3 temp
+    /// (only present when MP3 output is requested). If stages are added to DeliveryProcessor,
+    /// update this multiplier to match.
     private static let waxOffTempMultiplier: Int64 = 2
 
     static func waxOnBatchBlockedReason(

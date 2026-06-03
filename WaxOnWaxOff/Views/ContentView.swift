@@ -148,7 +148,32 @@ struct ContentView: View {
         if viewModel.files.isEmpty {
             EmptyStateView(mode: appState.mode ?? .waxOn)
         } else {
-            FileListView(viewModel: viewModel)
+            VStack(spacing: 0) {
+                // Show a non-blocking note when phase rotation is on and multiple files
+                // are queued. If they were recorded simultaneously in the same room,
+                // independent phase rotation per track can cause cancellation when mixed.
+                // Dismisses automatically when the condition is no longer met.
+                if viewModel.settings.phaseRotationEnabled && viewModel.files.count > 1 {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                            .padding(.top, 1)
+                        Text("Phase rotation is on. If these files were recorded simultaneously in the same room, disabling it will prevent phase cancellation when the tracks are combined.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.secondary.opacity(0.07))
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.1))
+                        .frame(height: 1)
+                }
+                FileListView(viewModel: viewModel)
+            }
         }
     }
 

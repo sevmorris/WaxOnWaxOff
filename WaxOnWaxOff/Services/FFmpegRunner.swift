@@ -4,8 +4,11 @@
 enum FFmpegRunner {
 
     /// Run a command, discarding output. Throws on non-zero exit.
-    static func run(exe: String, args: [String]) async throws {
-        let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr)
+    /// - Parameter fileDuration: source file duration in seconds, used to scale the watchdog
+    ///   timeout proportionally: max(300 s, duration × 4). Pass nil to use the 900 s constant.
+    static func run(exe: String, args: [String], fileDuration: TimeInterval? = nil) async throws {
+        let t = effectiveTimeoutSeconds(for: fileDuration)
+        let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr, timeoutSeconds: t)
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
@@ -15,8 +18,10 @@ enum FFmpegRunner {
     }
 
     /// Run a command and return captured stderr. Throws on non-zero exit.
-    static func capture(exe: String, args: [String]) async throws -> String {
-        let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr)
+    /// - Parameter fileDuration: see `run(exe:args:fileDuration:)`.
+    static func capture(exe: String, args: [String], fileDuration: TimeInterval? = nil) async throws -> String {
+        let t = effectiveTimeoutSeconds(for: fileDuration)
+        let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr, timeoutSeconds: t)
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
@@ -27,8 +32,10 @@ enum FFmpegRunner {
     }
 
     /// Capture stdout — used for ffprobe, which writes its output to stdout.
-    static func captureStdout(exe: String, args: [String]) async throws -> String {
-        let (exitCode, stdout) = try await launch(exe: exe, args: args, capture: .stdout)
+    /// - Parameter fileDuration: see `run(exe:args:fileDuration:)`.
+    static func captureStdout(exe: String, args: [String], fileDuration: TimeInterval? = nil) async throws -> String {
+        let t = effectiveTimeoutSeconds(for: fileDuration)
+        let (exitCode, stdout) = try await launch(exe: exe, args: args, capture: .stdout, timeoutSeconds: t)
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
@@ -103,10 +110,20 @@ enum FFmpegRunner {
 
     nonisolated static let processTimeoutSeconds: Int = 900
 
+    /// Effective watchdog timeout for an ffmpeg invocation.
+    /// When source duration is known: max(300 s, duration × 4) — five-minute floor, four
+    /// times the file length. A 90-minute recording gets a six-hour window; a 10-second
+    /// clip gets the five-minute floor. Falls back to `processTimeoutSeconds` (900 s) when nil.
+    nonisolated static func effectiveTimeoutSeconds(for fileDuration: TimeInterval?) -> Int {
+        guard let d = fileDuration else { return processTimeoutSeconds }
+        return max(300, Int((d * 4.0).rounded()))
+    }
+
     private static func launch(
         exe: String,
         args: [String],
-        capture: CaptureTarget
+        capture: CaptureTarget,
+        timeoutSeconds: Int
     ) async throws -> (Int32, String) {
         guard FileManager.default.fileExists(atPath: exe) else {
             throw ProcessingError.ffmpegNotFound
@@ -116,6 +133,13 @@ enum FFmpegRunner {
         process.executableURL = URL(fileURLWithPath: exe)
         process.arguments = args
         process.standardInput = FileHandle.nullDevice
+
+        // Tracks whether *we* sent SIGTERM via the onCancel handler. Set before
+        // calling process.terminate() so the terminationHandler can distinguish
+        // a deliberate user-cancel from an ffmpeg crash (SIGSEGV, SIGABRT, OOM
+        // SIGKILL, etc.). Without this flag, any signal-terminated child would be
+        // reported as CancellationError, silently aborting the entire batch.
+        let cancelFlag = TimeoutFlag()
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Int32, String), Error>) in
@@ -149,7 +173,7 @@ enum FFmpegRunner {
                     process.terminate()
                 }
                 DispatchQueue.global().asyncAfter(
-                    deadline: .now() + .seconds(processTimeoutSeconds),
+                    deadline: .now() + .seconds(timeoutSeconds),
                     execute: timeoutItem
                 )
 
@@ -159,14 +183,26 @@ enum FFmpegRunner {
                     if timeoutFlag.didFire {
                         continuation.resume(throwing: ProcessingError.ffmpegFailed(
                             code: -1,
-                            message: "ffmpeg timed out after \(processTimeoutSeconds) seconds"
+                            message: "ffmpeg timed out after \(timeoutSeconds) seconds"
                         ))
                         return
                     }
-                    // SIGTERM that wasn't from our watchdog: must be the
-                    // onCancel handler firing for a user-initiated cancel.
+                    // If the process exited due to a signal, check who sent it.
+                    // Only throw CancellationError when *we* cancelled via onCancel.
+                    // Any other signal (SIGSEGV, SIGABRT, OOM SIGKILL, etc.) is an
+                    // ffmpeg crash — surface it as a real error so callers don't
+                    // silently cancel every other in-flight job in the batch.
+                    // Note: on Darwin, terminationStatus holds the signal number when
+                    // terminationReason == .uncaughtSignal.
                     if proc.terminationReason == .uncaughtSignal {
-                        continuation.resume(throwing: CancellationError())
+                        if cancelFlag.didFire {
+                            continuation.resume(throwing: CancellationError())
+                        } else {
+                            continuation.resume(throwing: ProcessingError.ffmpegFailed(
+                                code: proc.terminationStatus,
+                                message: "ffmpeg crashed (signal \(proc.terminationStatus))"
+                            ))
+                        }
                         return
                     }
                     let msg = String(data: box.value, encoding: .utf8) ?? ""
@@ -183,6 +219,7 @@ enum FFmpegRunner {
                 }
             }
         } onCancel: {
+            cancelFlag.set()
             process.terminate()
         }
     }

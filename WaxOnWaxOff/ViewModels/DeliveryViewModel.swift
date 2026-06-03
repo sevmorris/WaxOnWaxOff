@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import OSLog
@@ -91,12 +92,30 @@ final class DeliveryViewModel {
             return
         }
 
+        // Reject files where channel count is already known to be mono.
+        // WaxOff always outputs stereo (-ac 2); a naive mono→dual-mono upmix
+        // doubles K-weighted energy and inflates integrated loudness by ~3 LUFS,
+        // causing the configured target to be silently missed.
+        // Files whose fileInfo is not yet populated are allowed through; the
+        // user can requeue them once analysis completes.
+        var monoRejectedCount = 0
+        for i in files.indices {
+            if case .ready = files[i].status,
+               let channelCount = files[i].fileInfo?.channelCount,
+               channelCount == 1 {
+                files[i].status = .error("WaxOff requires stereo files. This file is mono and cannot be processed.")
+                monoRejectedCount += 1
+            }
+        }
+
         let readyFiles = files.filter {
             if case .ready = $0.status { return true }
             return false
         }
         guard !readyFiles.isEmpty else {
-            alertMessage = "No files are ready to process — wait for analysis to finish or fix errors first."
+            alertMessage = monoRejectedCount > 0
+                ? "No processable files — WaxOff requires stereo input."
+                : "No files are ready to process — wait for analysis to finish or fix errors first."
             return
         }
 
@@ -107,6 +126,22 @@ final class DeliveryViewModel {
             alertMessage = reason
             return
         }
+
+        // If the fallback chain would send more than one output to ~/Desktop,
+        // confirm before proceeding — a silent batch of files on the Desktop is
+        // surprising. Single-file jobs fall back silently (existing behaviour).
+        let desktopPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop").path
+        let desktopCount = outputDirectories.filter { $0.path == desktopPath }.count
+        if desktopCount > 1 {
+            let alert = NSAlert()
+            alert.messageText = "Output will land on your Desktop"
+            alert.informativeText = "\(desktopCount) output files will be written to ~/Desktop because no other writable directory was found. Set a custom output directory in Settings to avoid this."
+            alert.addButton(withTitle: "Continue Anyway")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+
         if let reason = DiskSpaceChecker.waxOffBatchBlockedReason(
             inputURLs: readyFiles.map(\.url),
             outputDirectories: outputDirectories

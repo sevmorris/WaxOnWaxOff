@@ -49,9 +49,18 @@ actor FFmpegManager {
         let fm = FileManager.default
         // Version-key the directory so updated app builds always use fresh binaries.
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
-        let tempBase = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("WaxOn-\(appVersion)/bin", isDirectory: true)
+        let currentDirName = "WaxOn-\(appVersion)"
+        let tempRoot = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
 
+        // Remove stale versioned binary directories left by earlier app releases.
+        // Each is ~50 MB; cleaning them up avoids unbounded accumulation across updates.
+        if let siblings = try? fm.contentsOfDirectory(atPath: tempRoot.path) {
+            for name in siblings where name.hasPrefix("WaxOn-") && name != currentDirName {
+                try? fm.removeItem(at: tempRoot.appendingPathComponent(name))
+            }
+        }
+
+        let tempBase = tempRoot.appendingPathComponent("\(currentDirName)/bin", isDirectory: true)
         try fm.createDirectory(at: tempBase, withIntermediateDirectories: true)
 
         let ffmpegDst = tempBase.appendingPathComponent("ffmpeg")

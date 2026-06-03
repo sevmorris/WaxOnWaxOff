@@ -5,13 +5,11 @@ enum FFmpegFilters {
 
     /// Resample to `rate` Hz. Uses SWResample with a large filter — the bundled static
     /// FFmpeg build does not include the SoXR engine (`resampler=soxr` fails at runtime).
+    /// Used for both intermediate hops and final-export resamples. No dither is applied:
+    /// all outputs are 24-bit PCM, which involves no word-length reduction and therefore
+    /// requires no dithering.
     nonisolated static func aresample(to rate: Int) -> String {
         "aresample=\(rate):filter_size=512:cutoff=0.97:phase_shift=10"
-    }
-
-    /// Final export resample with triangular high-pass dither when encoding 24-bit PCM.
-    nonisolated static func aresampleWithDither(to rate: Int) -> String {
-        "aresample=\(rate):filter_size=512:cutoff=0.97:phase_shift=10:dither_method=triangular_hp"
     }
 
     /// Sanitize a value passed to FFmpeg as `-metadata key=value`. We pass

@@ -5,6 +5,7 @@
 //  Created by Seven Morris on 11/15/25.
 //
 
+import AppKit
 import SwiftUI
 
 @main
@@ -13,9 +14,22 @@ struct WaxOnWaxOffApp: App {
     @Environment(\.openWindow) private var openWindow
 
     init() {
-        // Purge orphaned temp files left by any previous crash or force-quit.
+        // Purge this instance's own PID-scoped temp directory in case it already
+        // exists (same PID reused after a crash — rare, but safe to clear). Each
+        // instance only touches its own subtree; concurrent instances are unaffected.
         let appTemp = FileManager.waxonTempDirectory
         try? FileManager.default.removeItem(at: appTemp)
+
+        // On clean exit (Quit / Cmd+Q), remove the PID-scoped directory.
+        // Force-quits and crashes leave it behind; macOS reclaims
+        // NSTemporaryDirectory contents periodically.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: nil
+        ) { _ in
+            try? FileManager.default.removeItem(at: FileManager.waxonTempDirectory)
+        }
 
         Task { await checkForUpdates(silent: true) }
     }

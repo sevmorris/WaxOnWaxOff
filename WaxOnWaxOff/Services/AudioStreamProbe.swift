@@ -3,7 +3,16 @@ import Foundation
 /// Lightweight ffprobe checks used before analysis / processing.
 enum AudioStreamProbe {
     /// True when the file contains at least one audio stream FFmpeg can decode.
-    nonisolated static func hasAudioStream(ffprobe: String, url: URL) async -> Bool {
+    ///
+    /// - Parameter onLog: Called with a brief error excerpt when ffprobe exits
+    ///   non-zero or throws — distinguishing a process failure from a clean
+    ///   "no audio stream" result (exit 0, empty output). Intended for the
+    ///   verbose/debug log; the user-facing error string is set by the caller.
+    nonisolated static func hasAudioStream(
+        ffprobe: String,
+        url: URL,
+        onLog: (@Sendable (String) -> Void)? = nil
+    ) async -> Bool {
         do {
             let output = try await FFmpegRunner.captureStdout(exe: ffprobe, args: [
                 "-v", "error",
@@ -14,6 +23,14 @@ enum AudioStreamProbe {
             ])
             return output.trimmingCharacters(in: .whitespacesAndNewlines) == "audio"
         } catch {
+            // Process error (non-zero exit, timeout, crash) — distinct from a
+            // clean "no audio stream" result. Log the detail for diagnosis.
+            // Note: stderr is unavailable here because captureStdout discards it;
+            // the error description contains the exit code and any captured output.
+            if let onLog {
+                let detail = String(error.localizedDescription.prefix(300))
+                onLog("ffprobe process error for \(url.lastPathComponent): \(detail)")
+            }
             return false
         }
     }

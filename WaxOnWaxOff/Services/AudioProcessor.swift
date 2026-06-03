@@ -10,9 +10,6 @@ actor AudioProcessor {
     let onFileStarted: (@Sendable (UUID) -> Void)?
     let onLog: (@Sendable (String, LogLevel) -> Void)?
 
-    /// Output paths claimed by in-flight jobs in the current batch.
-    private var reservedOutputPaths: Set<String> = []
-
     init(settings: WaxOnSettings,
          onFileStarted: (@Sendable (UUID) -> Void)? = nil,
          onLog: (@Sendable (String, LogLevel) -> Void)? = nil) {
@@ -21,74 +18,53 @@ actor AudioProcessor {
         self.onLog = onLog
     }
 
-    private enum JobOutcome: Sendable {
-        case success(JobResult)
-        case failure(WaxOnJobFailure)
-        case cancelled
-    }
-
     func run(inputs: [JobInput]) async throws -> WaxOnBatchRunResult {
         guard !inputs.isEmpty else {
             return WaxOnBatchRunResult(successes: [], failures: [])
         }
 
-        reservedOutputPaths.removeAll(keepingCapacity: true)
-
         let tools = try await FFmpegManager.shared.ensureTools()
-        let maxConcurrent = max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
-
-        return try await withThrowingTaskGroup(of: JobOutcome.self) { group in
-            var successes: [JobResult] = []
-            var failures: [WaxOnJobFailure] = []
-            var index = 0
-
-            func addNext() {
-                guard index < inputs.count else { return }
-                let input = inputs[index]
-                index += 1
-                group.addTask {
-                    do {
-                        try Task.checkCancellation()
-                        self.onFileStarted?(input.id)
-                        guard let result = try await self.processOne(input.url, id: input.id, tools: tools) else {
-                            return .failure(WaxOnJobFailure(
-                                id: input.id,
-                                message: ProcessingError.outputMissing.errorDescription ?? "No output produced"
-                            ))
-                        }
-                        return .success(result)
-                    } catch is CancellationError {
-                        return .cancelled
-                    } catch {
-                        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                        self.onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
-                        return .failure(WaxOnJobFailure(id: input.id, message: message))
-                    }
-                }
-            }
-
-            for _ in 0..<min(maxConcurrent, inputs.count) {
-                addNext()
-            }
-
-            for try await outcome in group {
-                switch outcome {
-                case .success(let result):
-                    successes.append(result)
-                case .failure(let failure):
-                    failures.append(failure)
-                case .cancelled:
-                    group.cancelAll()
-                    throw CancellationError()
-                }
-                addNext()
-            }
-
-            return WaxOnBatchRunResult(successes: successes, failures: failures)
+        let sr = settings.sampleRate.rawValue
+        let rateTag = sr == 44100 ? "44k" : "48k"
+        let allocator = OutputAllocator { [rateTag] input in
+            "\(input.deletingPathExtension().lastPathComponent)-\(rateTag)waxon.wav"
         }
+
+        let outcomes: [Result<JobResult, WaxOnJobFailure>] = try await runBoundedConcurrent(
+            inputs: inputs,
+            limit: ProcessingConfig.maxConcurrentJobs
+        ) { input in
+            do {
+                try Task.checkCancellation()
+                self.onFileStarted?(input.id)
+                guard let result = try await self.processOne(input.url, id: input.id, tools: tools, allocator: allocator) else {
+                    return .failure(WaxOnJobFailure(
+                        id: input.id,
+                        message: ProcessingError.outputMissing.errorDescription ?? "No output produced"
+                    ))
+                }
+                return .success(result)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                self.onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
+                return .failure(WaxOnJobFailure(id: input.id, message: message))
+            }
+        }
+
+        var successes: [JobResult] = []
+        var failures: [WaxOnJobFailure] = []
+        for outcome in outcomes {
+            switch outcome {
+            case .success(let r): successes.append(r)
+            case .failure(let f): failures.append(f)
+            }
+        }
+        return WaxOnBatchRunResult(successes: successes, failures: failures)
     }
 
-    private func processOne(_ input: URL, id: UUID, tools: FFmpegManager.Paths) async throws -> JobResult? {
+    private func processOne(_ input: URL, id: UUID, tools: FFmpegManager.Paths, allocator: OutputAllocator) async throws -> JobResult? {
         let fm = FileManager.default
         guard fm.fileExists(atPath: input.path) else {
             throw ProcessingError.invalidInput
@@ -104,7 +80,8 @@ actor AudioProcessor {
         let outDir = OutputDirectory.waxOnOutputDirectory(for: input, settings: settings) { [self] message in
             self.onLog?("⚠ \(message)", .info)
         }
-        let (finalURL, outName) = allocateWaxOnOutput(stem: stem, rateTag: rateTag, input: input, outDir: outDir)
+        let finalURL = allocator.allocate(for: input, in: outDir)
+        let outName = finalURL.lastPathComponent
 
         let work = try makeTemp(prefix: "waxon_\(rateTag)_")
         defer { try? fm.removeItem(at: work) }
@@ -113,6 +90,11 @@ actor AudioProcessor {
         // and the startup purge handles any orphan from a force-quit.
         let tmpURL = work.appendingPathComponent(outName)
 
+        // All intermediate files use pcm_s24le throughout. At 24-bit, the quantization
+        // noise floor sits at ~−144 dBFS — inaudible in any real-world context. Adding
+        // TPDF dither between pipeline stages would add filter-graph complexity for zero
+        // perceptible benefit. Dither is also not applied at the final export stage; see
+        // FFmpegFilters.aresample and theory.html §Dithering for the full rationale.
         let isStereo = settings.outputChannels == .stereo
         let channelSuffix = isStereo ? "stereo" : "mono"
         let midURL = work.appendingPathComponent("\(stem)_\(rateTag)24_\(channelSuffix).wav")
@@ -122,6 +104,10 @@ actor AudioProcessor {
 
         onLog?("▶ \(filename)", .info)
         let inputChannelCount = try await getChannelCount(exe: tools.ffprobe, url: input)
+        // Probe file duration once for all processing stages. Used for proportional ffmpeg
+        // timeouts (FFmpegRunner.effectiveTimeoutSeconds) and reused below for dynaudnorm
+        // boundary math, avoiding a second ffprobe round-trip when leveling is enabled.
+        let fileDuration: TimeInterval? = try? await getAudioDuration(exe: tools.ffprobe, url: input)
         let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
         let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
         let hpFreq = settings.highPassEnabled ? 80 : 20
@@ -149,7 +135,7 @@ actor AudioProcessor {
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", input.path, "-af", step1Af,
             "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
-        ])
+        ], fileDuration: fileDuration)
 
         try Task.checkCancellation()
 
@@ -162,13 +148,15 @@ actor AudioProcessor {
         // on both sides of the boundary.
         let postDynLevelURL: URL
         if settings.dynamicLevelingEnabled {
-            let duration = try? await getAudioDuration(exe: tools.ffprobe, url: midURL)
+            let duration = fileDuration  // probed at start of processOne; resampling preserves duration
             let amount = settings.dynamicLevelingAmount
             // Half of the dynaudnorm Gaussian window (g hops × frame_ms). Mirror
             // padding only works if the clip is at least this long — otherwise
             // the smoothing window peeks past the padded edge.
             let frameMs = 500.0 - amount * 350.0
-            let gauss = max(1, Int((31.0 - amount * 16.0).rounded()))
+            // Use the canonical gaussian window size (same formula as the dynaudnorm
+            // g= parameter) so the smoothing-radius estimate matches the actual filter.
+            let gauss = gaussianWindowSize(amount: amount)
             let smoothingRadiusS = Double(gauss) * frameMs / 1000.0 / 2.0
 
             if let d = duration, d < 2.0 {
@@ -195,7 +183,7 @@ actor AudioProcessor {
                             "-af", dynFilter,
                             "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, dynLevelURL.path]
                 }
-                try await FFmpegRunner.run(exe: tools.ffmpeg, args: args)
+                try await FFmpegRunner.run(exe: tools.ffmpeg, args: args, fileDuration: fileDuration)
                 postDynLevelURL = dynLevelURL
             }
             try Task.checkCancellation()
@@ -232,13 +220,13 @@ actor AudioProcessor {
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                         "-i", postDynLevelURL.path, "-filter_complex", nrFc,
                         "-c:a", "pcm_s24le", "-ar", nrSampleRate, "-ac", outputChannelCount, nrTempURL.path
-                    ])
+                    ], fileDuration: fileDuration)
                 } else {
                     try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
                         "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                         "-i", postDynLevelURL.path, "-af", "arnndn=m=\(escapedNrModel)",
                         "-c:a", "pcm_s24le", "-ar", nrSampleRate, "-ac", outputChannelCount, nrTempURL.path
-                    ])
+                    ], fileDuration: fileDuration)
                 }
                 analysisInput = nrTempURL
             } else {
@@ -252,11 +240,18 @@ actor AudioProcessor {
                 "-nostdin", "-hide_banner",
                 "-i", analysisInput.path, "-af", analyzeAf,
                 "-f", "null", "/dev/null"
-            ])
+            ], fileDuration: fileDuration)
 
             guard let lnDict = FFmpegRunner.parseLoudnormJSON(from: analysisOutput),
                   let measurements = LoudnormMeasurements(json: lnDict.mapValues { $0 as Any }) else {
-                throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse loudnorm analysis output")
+                // Include a stderr excerpt so future FFmpeg log-format changes are debuggable.
+                let excerpt = String(analysisOutput.prefix(500))
+                throw ProcessingError.ffmpegFailed(
+                    code: -1,
+                    message: excerpt.isEmpty
+                        ? "Could not parse loudnorm analysis output — ffmpeg produced no stderr."
+                        : "Could not parse loudnorm analysis output. FFmpeg stderr: \(excerpt)"
+                )
             }
 
             // Silent / near-silent inputs cause loudnorm to emit -inf or inf.
@@ -284,7 +279,7 @@ actor AudioProcessor {
                     "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                     "-i", postDynLevelURL.path, "-af", normAf,
                     "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
-                ])
+                ], fileDuration: fileDuration)
 
                 limiterInput = normURL
             }
@@ -299,7 +294,7 @@ actor AudioProcessor {
         let step2Af = [
             FFmpegFilters.aresample(to: oversampleSr),
             "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
-            FFmpegFilters.aresampleWithDither(to: sr)
+            FFmpegFilters.aresample(to: sr)
         ].joined(separator: ",")
 
         onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
@@ -313,7 +308,7 @@ actor AudioProcessor {
             "-i", limiterInput.path, "-af", step2Af,
             "-map_metadata", "0",
             "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
-        ])
+        ], fileDuration: fileDuration)
 
         guard let attrs = try? fm.attributesOfItem(atPath: tmpURL.path),
               let size = attrs[.size] as? NSNumber,
@@ -331,34 +326,6 @@ actor AudioProcessor {
         return JobResult(id: id, input: input, output: finalURL)
     }
 
-    /// Pick a unique WaxOn output filename within this batch. Adds a short path
-    /// tag when multiple sources would otherwise collide on `{stem}-{rate}waxon.wav`.
-    private func allocateWaxOnOutput(
-        stem: String,
-        rateTag: String,
-        input: URL,
-        outDir: URL
-    ) -> (url: URL, name: String) {
-        let suffix = "\(rateTag)waxon.wav"
-        let baseName = "\(stem)-\(suffix)"
-        let baseURL = outDir.appendingPathComponent(baseName)
-
-        if !reservedOutputPaths.contains(baseURL.path) {
-            reservedOutputPaths.insert(baseURL.path)
-            return (baseURL, baseName)
-        }
-
-        let tag = OutputNaming.shortPathTag(for: input.path)
-        var name = "\(stem)-\(tag)-\(suffix)"
-        var url = outDir.appendingPathComponent(name)
-        if reservedOutputPaths.contains(url.path) {
-            name = "\(stem)-\(tag)-\(UUID().uuidString.prefix(4))-\(suffix)"
-            url = outDir.appendingPathComponent(name)
-        }
-        reservedOutputPaths.insert(url.path)
-        return (url, name)
-    }
-
     private func makeTemp(prefix: String) throws -> URL {
         let dir = FileManager.waxonTempDirectory
             .appendingPathComponent(prefix + UUID().uuidString.prefix(8), isDirectory: true)
@@ -370,6 +337,15 @@ actor AudioProcessor {
         return dir
     }
 
+    /// Dynaudnorm Gaussian window size for the given leveling `amount` (0–1).
+    /// Returns an odd integer in [15, 31]: the value passed to dynaudnorm's `g=`
+    /// parameter. Floored then forced odd — matches the filter's own requirement
+    /// and ensures the smoothing-radius estimate in `processOne` uses the same value.
+    private func gaussianWindowSize(amount: Double) -> Int {
+        let gRaw = Int(31.0 - amount * 16.0)        // gaussian: 31 → 15
+        return gRaw % 2 == 0 ? gRaw - 1 : gRaw     // must be odd
+    }
+
     // Shorter frames and tighter Gaussian smoothing = more responsive leveling.
     // No t (silence threshold): an active threshold causes severe attenuation at
     // speech-to-silence transitions because the Gaussian window interpolates
@@ -378,9 +354,8 @@ actor AudioProcessor {
     // noise floor between words gets boosted by up to m dB — acceptable on the
     // clean source material Dynamic Leveling targets (panel / multi-voice).
     private func dynamicLevelingFilter(amount: Double) -> String {
-        let f = Int(500.0 - amount * 350.0)         // frame ms: 500 → 150
-        let gRaw = Int(31.0 - amount * 16.0)        // gaussian: 31 → 15
-        let g = gRaw % 2 == 0 ? gRaw - 1 : gRaw    // must be odd
+        let f = Int(500.0 - amount * 350.0)          // frame ms: 500 → 150
+        let g = gaussianWindowSize(amount: amount)   // gaussian: 31 → 15 (odd)
         let m = 2.0 + amount * 4.0                  // max gain factor: 2x → 6x (+6 to +15 dB)
         // c=0 (channel-coupling off) keeps stereo gain decisions decoupled —
         // the default in modern FFmpeg, but pinned explicitly so behavior
@@ -430,6 +405,12 @@ actor AudioProcessor {
         let str = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let n = Int(str), n > 0 else {
             throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse channel count")
+        }
+        guard n <= 64 else {
+            throw ProcessingError.ffmpegFailed(
+                code: -1,
+                message: "Unexpected channel count (\(n)) — expected 1–64 channels"
+            )
         }
         return n
     }

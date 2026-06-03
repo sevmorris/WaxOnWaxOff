@@ -56,3 +56,22 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
         sampleRate == 44100 ? "44.1 kHz" : "48 kHz"
     }
 }
+
+// Custom decoder so that adding a new property in a future version never
+// invalidates existing UserDefaults blobs — missing keys fall back to the
+// property default instead of failing the whole decode.
+extension WaxOffSettings {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = WaxOffSettings()
+        self.init(
+            targetLUFS:          try c.decodeIfPresent(Double.self,     forKey: .targetLUFS)         ?? d.targetLUFS,
+            truePeak:            try c.decodeIfPresent(Double.self,     forKey: .truePeak)            ?? d.truePeak,
+            lra:                 try c.decodeIfPresent(Double.self,     forKey: .lra)                 ?? d.lra,
+            outputMode:          try c.decodeIfPresent(OutputMode.self, forKey: .outputMode)          ?? d.outputMode,
+            mp3Bitrate:          try c.decodeIfPresent(Int.self,        forKey: .mp3Bitrate)          ?? d.mp3Bitrate,
+            sampleRate:          try c.decodeIfPresent(Int.self,        forKey: .sampleRate)          ?? d.sampleRate,
+            outputDirectoryPath: try c.decodeIfPresent(String.self,     forKey: .outputDirectoryPath) ?? d.outputDirectoryPath
+        )
+    }
+}
