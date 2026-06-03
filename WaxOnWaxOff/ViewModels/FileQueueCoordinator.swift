@@ -3,7 +3,9 @@ import Observation
 import OSLog
 import SwiftUI
 
-private let fileQueueLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "FileQueue")
+// nonisolated(unsafe): Logger is thread-safe and used from @Sendable closures as well as
+// MainActor-isolated contexts. The unsafe annotation suppresses the Swift 6 capture warning.
+private nonisolated(unsafe) let fileQueueLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "FileQueue")
 
 /// Shared drag-and-drop file list, analysis, and waveform generation for WaxOn and WaxOff.
 @Observable
@@ -172,7 +174,8 @@ final class FileQueueCoordinator {
         guard url.hasDirectoryPath else { return [url] }
 
         // Resolve the root path once for ancestor-cycle detection below.
-        let rootRealPath = (try? url.resolvingSymlinksInPath().path) ?? url.path
+        // resolvingSymlinksInPath() never throws — it returns the original URL on failure.
+        let rootRealPath = url.resolvingSymlinksInPath().path
 
         guard let enumerator = FileManager.default.enumerator(
             at: url,
@@ -193,11 +196,9 @@ final class FileQueueCoordinator {
             let rv = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
 
             if rv?.isSymbolicLink == true {
-                // Resolve the symlink. Skip silently if resolution fails.
-                guard let resolved = try? fileURL.resolvingSymlinksInPath() else {
-                    enumerator.skipDescendants()
-                    continue
-                }
+                // Resolve the symlink. resolvingSymlinksInPath() returns the original
+                // URL unchanged when it cannot be resolved — no failure to guard against.
+                let resolved = fileURL.resolvingSymlinksInPath()
                 // Skip if the resolved target is an ancestor of (or equal to) the
                 // enumeration root — following it would create an infinite loop.
                 let rp = resolved.path

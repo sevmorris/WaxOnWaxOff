@@ -12,7 +12,7 @@ struct JobResult: Sendable {
     }
 }
 
-struct WaxOnJobFailure: Sendable {
+struct WaxOnJobFailure: Sendable, Error {
     let id: UUID
     let message: String
 }

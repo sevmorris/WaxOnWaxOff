@@ -12,7 +12,7 @@ struct DeliveryJobResult: Sendable {
     let outputURLs: [URL]
 }
 
-struct DeliveryJobFailure: Sendable {
+struct DeliveryJobFailure: Sendable, Error {
     let id: UUID
     let message: String
 }

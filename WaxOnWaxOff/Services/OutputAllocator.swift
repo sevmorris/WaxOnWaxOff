@@ -20,14 +20,14 @@ final class OutputAllocator: @unchecked Sendable {
     /// - Parameter computeBaseName: Maps an input URL to a candidate output filename.
     ///   Should follow the pattern `stem-typeSuffix[.ext]` so the allocator can
     ///   correctly insert disambiguation tags between the stem and the type suffix.
-    init(computeBaseName: @escaping (URL) -> String) {
+    nonisolated init(computeBaseName: @escaping (URL) -> String) {
         self.computeBaseName = computeBaseName
     }
 
     /// Returns a unique output URL inside `directory` for the given `input`.
     /// The first call with a given base name claims it; subsequent calls for the
     /// same base name receive a tag-disambiguated variant.
-    func allocate(for input: URL, in directory: URL) -> URL {
+    nonisolated func allocate(for input: URL, in directory: URL) -> URL {
         let baseName = computeBaseName(input)
         let baseURL = directory.appendingPathComponent(baseName)
 
