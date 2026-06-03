@@ -3,9 +3,8 @@ import Observation
 import OSLog
 import SwiftUI
 
-// nonisolated(unsafe): Logger is thread-safe and used from @Sendable closures as well as
-// MainActor-isolated contexts. The unsafe annotation suppresses the Swift 6 capture warning.
-private nonisolated(unsafe) let fileQueueLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "FileQueue")
+// Logger is Sendable and thread-safe — can be captured in @Sendable closures without annotation.
+private let fileQueueLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "FileQueue")
 
 /// Shared drag-and-drop file list, analysis, and waveform generation for WaxOn and WaxOff.
 @Observable

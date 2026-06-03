@@ -14,8 +14,10 @@ import Foundation
 /// actor-isolated code; the actor's serial executor provides the necessary
 /// serialization of `allocate(for:in:)` calls.
 final class OutputAllocator: @unchecked Sendable {
-    private var reserved: Set<String> = []
-    private let computeBaseName: (URL) -> String
+    // nonisolated(unsafe): both fields are accessed exclusively from actor-isolated code;
+    // the actor's serial executor provides serialization, making direct access safe.
+    private nonisolated(unsafe) var reserved: Set<String> = []
+    private nonisolated(unsafe) let computeBaseName: (URL) -> String
 
     /// - Parameter computeBaseName: Maps an input URL to a candidate output filename.
     ///   Should follow the pattern `stem-typeSuffix[.ext]` so the allocator can
