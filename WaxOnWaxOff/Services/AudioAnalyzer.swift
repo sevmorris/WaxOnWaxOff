@@ -395,9 +395,13 @@ private struct KWeightCoeffs {
         let Kh   = tan(Double.pi * f0h / sampleRate)
         let Khsq = Kh * Kh
         let d2 = 1 + Kh / Q + Khsq
-        hp_b0 =  1.0 / d2
-        hp_b1 = -2.0 / d2
-        hp_b2 =  1.0 / d2
+        // Numerator b = [1, −2, 1] — unnormalized, matching the pyloudnorm reference
+        // and ITU-R BS.1770. Dividing by d2 (as was done previously) reduces the
+        // overall gain by ~1/d2, producing LUFS ~0.04–0.05 LU below the reference
+        // in a rate-dependent way. The denominator is correctly normalized by d2.
+        hp_b0 =  1.0
+        hp_b1 = -2.0
+        hp_b2 =  1.0
         hp_a1 = 2 * (Khsq - 1) / d2
         hp_a2 = (1 - Kh / Q + Khsq) / d2
     }
