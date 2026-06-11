@@ -140,7 +140,7 @@ actor DeliveryProcessor {
         onLog?("  phase rotation: 200 Hz allpass (always applied)", .verbose)
         // Phase 1: Analyze loudness
         onPhase?("Analyzing loudness…")
-        try Task.checkCancellation()  // CRITICAL-2
+        try Task.checkCancellation()
         onLog?("  loudnorm: analyzing…", .verbose)
         let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, fileDuration: fileDuration)
         if let m = measurements {
@@ -158,7 +158,7 @@ actor DeliveryProcessor {
 
         // Phase 2: Render WAV
         onPhase?("Normalizing…")
-        try Task.checkCancellation()  // CRITICAL-2
+        try Task.checkCancellation()
         onLog?("  loudnorm: normalizing…", .verbose)
         onLog?("  limiter: 2× oversample (\(settings.sampleRate * 2) Hz)  |  ceiling \(tp) dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
         let wavTempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).wav")
@@ -196,7 +196,7 @@ actor DeliveryProcessor {
         // Phase 3: Encode MP3 (if needed)
         if settings.outputMode == .mp3 || settings.outputMode == .both {
             onPhase?("Encoding MP3…")
-            try Task.checkCancellation()  // CRITICAL-2
+            try Task.checkCancellation()
             let mp3TPCeiling = settings.truePeak - 1.0
             onLog?("  mp3: \(settings.mp3Bitrate)k  |  limiter: 2× oversample  |  ceiling \(String(format: "%.1f", mp3TPCeiling)) dBTP", .verbose)
 

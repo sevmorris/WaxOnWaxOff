@@ -192,9 +192,6 @@ final class DeliveryViewModel {
                             // the user can see what their WaxOff output landed at
                             // — mirrors WaxOn's post-process behavior.
                             self.fileQueue.analyzeOutputFile(id: result.id, url: primaryURL)
-                            if let msg = result.mp3FailureMessage {
-                                self.log.append("⚠ MP3 encoding failed: \(msg)", level: .info)
-                            }
                         }
                     },
                     onFileFailed: { [weak self] failure in

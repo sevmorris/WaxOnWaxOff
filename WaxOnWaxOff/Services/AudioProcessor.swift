@@ -320,9 +320,7 @@ actor AudioProcessor {
 
         onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
 
-        if fm.fileExists(atPath: tmpURL.path) {
-            try? fm.removeItem(at: tmpURL)
-        }
+        try? fm.removeItem(at: tmpURL)
 
         try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
