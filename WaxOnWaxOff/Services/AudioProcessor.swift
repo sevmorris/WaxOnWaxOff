@@ -89,8 +89,9 @@ actor AudioProcessor {
         let work = try makeTemp(prefix: "waxon_\(rateTag)_")
         defer { try? fm.removeItem(at: work) }
 
-        // Stage inside work so the existing defer cleans it on crash/cancel,
-        // and the startup purge handles any orphan from a force-quit.
+        // Stage inside work so the existing defer cleans it on crash/cancel.
+        // The startup purge covers only the current PID's subtree — a force-quit
+        // leaves an orphaned subtree in /tmp until the OS reclaims it (~3 days).
         let tmpURL = work.appendingPathComponent(outName)
 
         // All intermediate files use pcm_s24le throughout. At 24-bit, the quantization
@@ -142,7 +143,7 @@ actor AudioProcessor {
         }
         try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", input.path, "-af", step1Af,
+            "-i", input.path, "-map", "0:a:0", "-af", step1Af,
             "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, midURL.path
         ], fileDuration: fileDuration)
 

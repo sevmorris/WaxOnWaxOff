@@ -270,7 +270,7 @@ actor DeliveryProcessor {
 
         let args = [
             "-hide_banner", "-nostats", "-y",
-            "-i", input.path,
+            "-i", input.path, "-map", "0:a:0",
             "-af", filterChain,
             "-f", "null", "-"
         ]
@@ -323,7 +323,7 @@ actor DeliveryProcessor {
 
         let args = [
             "-hide_banner", "-nostats", "-y",
-            "-i", input.path,
+            "-i", input.path, "-map", "0:a:0",
             "-af", filterChain,
             // Carry container-level metadata (title/artist/album/comment, BWF
             // chunks on WAV→WAV) from the input. FFmpeg's default for filter
