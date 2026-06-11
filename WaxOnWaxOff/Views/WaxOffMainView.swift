@@ -226,7 +226,7 @@ private struct DeliveryFileListView: View {
                 FileRowView(
                     file: file,
                     isProcessing: viewModel.isProcessing,
-                    channelBadge: Self.monoRejectionBadge(for: file)
+                    channelBadge: Self.upmixBadge(for: file)
                 )
                     .tag(file.id)
             }
@@ -243,11 +243,11 @@ private struct DeliveryFileListView: View {
         }
     }
 
-    private static func monoRejectionBadge(for file: FileItem) -> ChannelBadge? {
+    private static func upmixBadge(for file: FileItem) -> ChannelBadge? {
         guard file.fileInfo?.channelCount == 1 else { return nil }
         return ChannelBadge(
             label: "MONO",
-            help: "Mono not accepted — stereo files only"
+            help: "Mono input — will be upmixed to dual-mono stereo before processing"
         )
     }
 }

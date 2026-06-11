@@ -124,6 +124,8 @@ actor DeliveryProcessor {
         let ffmpeg = tools.ffmpeg
         // Probe source duration for proportional ffmpeg timeouts (FFmpegRunner.effectiveTimeoutSeconds).
         let fileDuration = await probeFileDuration(ffprobe: tools.ffprobe, url: url)
+        let channelCount = await probeChannelCount(ffprobe: tools.ffprobe, url: url)
+        let isMono = channelCount == 1
 
         let outputDir = OutputDirectory.waxOffOutputDirectory(for: url, settings: settings) { message in
             onLog?("⚠ \(message)", .info)
@@ -142,7 +144,7 @@ actor DeliveryProcessor {
         onPhase?("Analyzing loudness…")
         try Task.checkCancellation()
         onLog?("  loudnorm: analyzing…", .verbose)
-        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, fileDuration: fileDuration)
+        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, isMono: isMono, fileDuration: fileDuration)
         if let m = measurements {
             onLog?("  \(m.formattedSummary)", .info)
             onLog?(String(format: "  offset: %.2f dB  |  thresh %.1f LUFS", m.targetOffset, m.inputThresh), .verbose)
@@ -169,6 +171,7 @@ actor DeliveryProcessor {
             input: url,
             output: wavTempURL,
             settings: settings,
+            isMono: isMono,
             measurements: measurements,
             fileDuration: fileDuration
         )
@@ -273,6 +276,21 @@ actor DeliveryProcessor {
         return d
     }
 
+    /// Probe the channel count of stream a:0. Returns nil on ffprobe error or an
+    /// implausible value; callers treat nil as "channel count unknown" (stereo assumed).
+    private func probeChannelCount(ffprobe: String, url: URL) async -> Int? {
+        guard let output = try? await FFmpegRunner.captureStdout(exe: ffprobe, args: [
+            "-v", "error",
+            "-select_streams", "a:0",
+            "-show_entries", "stream=channels",
+            "-of", "default=nw=1:nk=1",
+            url.path
+        ]) else { return nil }
+        let str = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let n = Int(str), n >= 1, n <= 32 else { return nil }
+        return n
+    }
+
     /// Returns nil if the analysis ran but the input was silent / near-silent
     /// (loudnorm reports -inf / inf measurements that pass 2 cannot consume).
     /// Throws only on actual ffmpeg or JSON parsing failures.
@@ -286,15 +304,18 @@ actor DeliveryProcessor {
         ffmpeg: String,
         input: URL,
         settings: WaxOffSettings,
+        isMono: Bool,
         fileDuration: TimeInterval?
     ) async throws -> LoudnormMeasurements? {
         let lufs = formatNumber(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
         let lra  = formatNumber(settings.lra)
-        // Phase rotation runs first so loudnorm's TP measurement reflects the
-        // post-rotation waveform — otherwise the pass-2 gain correction is based
-        // on a peak budget that no longer matches the rendered output.
-        let filterChain = "allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
+        // Mono input is upmixed to dual-mono first so loudnorm measures the
+        // stereo signal — matching what renderWAV will produce. Phase rotation
+        // runs next so loudnorm's TP measurement reflects the post-rotation
+        // waveform; without that the pass-2 gain correction overshoots target.
+        let upmix = isMono ? "pan=stereo|c0=c0|c1=c0," : ""
+        let filterChain = "\(upmix)allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
 
         let args = [
             "-hide_banner", "-nostats", "-y",
@@ -323,12 +344,16 @@ actor DeliveryProcessor {
         input: URL,
         output: URL,
         settings: WaxOffSettings,
+        isMono: Bool,
         measurements: LoudnormMeasurements?,
         fileDuration: TimeInterval?
     ) async throws {
+        // Mono input is upmixed to dual-mono first — matching the analyzeAudio
+        // filter chain so measured_I / offset remain valid for the stereo signal.
         // Phase rotation always runs. Loudnorm only runs when measurements
         // are available — silent inputs skip it to avoid pass-2 errors.
-        var filterChain = "allpass=f=200:t=q:w=0.707"
+        let upmix = isMono ? "pan=stereo|c0=c0|c1=c0," : ""
+        var filterChain = "\(upmix)allpass=f=200:t=q:w=0.707"
         // NOTE: loudnorm pass-2 runs at the source file's native sample rate — no pre-loudnorm
         // resample in this filter chain. If you add one here, update analyzeAudio to apply the
         // same resample before its pass-1 analysis so measured_I / offset remain valid.

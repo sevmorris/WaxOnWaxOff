@@ -43,7 +43,7 @@ struct WaxOffSettingsView: View {
                             Text("Both").tag(OutputMode.both)
                         }
                         .pickerStyle(.segmented)
-                        Text("Stereo only — mono files are not accepted")
+                        Text("Mono sources are upmixed to dual-mono stereo before processing")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
