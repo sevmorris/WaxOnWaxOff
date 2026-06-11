@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 enum DiskSpaceChecker {
@@ -26,13 +27,13 @@ enum DiskSpaceChecker {
     ) -> String? {
         guard !inputURLs.isEmpty else { return nil }
 
-        let sizes = inputURLs.compactMap { fileSize(at: $0) }
-        guard !sizes.isEmpty else { return nil }
+        let decodedSizes = inputURLs.map { decodedPCMBytes(for: $0) }
+        guard decodedSizes.contains(where: { $0 > 0 }) else { return nil }
 
-        let largestInput = sizes.max() ?? 0
+        let largestDecoded = decodedSizes.max() ?? 0
         let workers = max(1, min(concurrentJobs, inputURLs.count))
 
-        let tempRequired = largestInput * waxOnTempMultiplier * Int64(workers) + tempHeadroomBytes
+        let tempRequired = largestDecoded * waxOnTempMultiplier * Int64(workers) + tempHeadroomBytes
         if let reason = insufficientSpaceReason(
             requiredBytes: tempRequired,
             at: FileManager.waxonTempDirectory,
@@ -42,10 +43,10 @@ enum DiskSpaceChecker {
         }
 
         var requiredPerDirectory: [String: Int64] = [:]
-        for (url, dir) in zip(inputURLs, outputDirectories) {
-            let inputBytes = fileSize(at: url) ?? largestInput
+        for (decoded, dir) in zip(decodedSizes, outputDirectories) {
+            let bytes = decoded > 0 ? decoded : largestDecoded
             let key = dir.path
-            requiredPerDirectory[key, default: outputHeadroomBytes] += inputBytes
+            requiredPerDirectory[key, default: outputHeadroomBytes] += bytes
         }
 
         for (path, required) in requiredPerDirectory {
@@ -67,11 +68,11 @@ enum DiskSpaceChecker {
     ) -> String? {
         guard !inputURLs.isEmpty else { return nil }
 
-        let sizes = inputURLs.compactMap { fileSize(at: $0) }
-        guard !sizes.isEmpty else { return nil }
+        let decodedSizes = inputURLs.map { decodedPCMBytes(for: $0) }
+        guard decodedSizes.contains(where: { $0 > 0 }) else { return nil }
 
-        let largestInput = sizes.max() ?? 0
-        let tempRequired = largestInput * waxOffTempMultiplier + tempHeadroomBytes
+        let largestDecoded = decodedSizes.max() ?? 0
+        let tempRequired = largestDecoded * waxOffTempMultiplier + tempHeadroomBytes
         if let reason = insufficientSpaceReason(
             requiredBytes: tempRequired,
             at: FileManager.waxonTempDirectory,
@@ -81,11 +82,12 @@ enum DiskSpaceChecker {
         }
 
         var requiredPerDirectory: [String: Int64] = [:]
-        for (url, dir) in zip(inputURLs, outputDirectories) {
-            let inputBytes = fileSize(at: url) ?? largestInput
+        for (decoded, dir) in zip(decodedSizes, outputDirectories) {
+            let bytes = decoded > 0 ? decoded : largestDecoded
             let key = dir.path
-            // WAV + MP3 “Both” can exceed 2× input size (PCM + compressed).
-            requiredPerDirectory[key, default: outputHeadroomBytes] += inputBytes * 3
+            // WAV + MP3 "Both" can exceed 2× decoded size (PCM + compressed);
+            // multiply by 3 for a conservative upper bound on output footprint.
+            requiredPerDirectory[key, default: outputHeadroomBytes] += bytes * 3
         }
 
         for (path, required) in requiredPerDirectory {
@@ -124,6 +126,22 @@ enum DiskSpaceChecker {
             return nil
         }
         return capacity
+    }
+
+    /// Estimate the decoded 24-bit PCM footprint of `url` by opening the file
+    /// with AVAudioFile and computing `frameCount × 3 bytes × channelCount`.
+    /// This gives an accurate size regardless of input container/codec (e.g., a
+    /// 64 kbps MP3 decodes to ~17× its container size). Falls back to the
+    /// container file size if AVAudioFile cannot open the URL.
+    private static func decodedPCMBytes(for url: URL) -> Int64 {
+        if let file = try? AVAudioFile(forReading: url) {
+            let channels = Int64(max(1, file.processingFormat.channelCount))
+            let frames = file.length
+            if frames > 0 {
+                return frames * 3 * channels
+            }
+        }
+        return fileSize(at: url) ?? 0
     }
 
     private static func fileSize(at url: URL) -> Int64? {
