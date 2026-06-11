@@ -57,4 +57,31 @@ final class FFmpegRunnerTests: XCTestCase {
         XCTAssertEqual(FFmpegRunner.filterEscape("a,b"), "a\\,b")
         XCTAssertEqual(FFmpegRunner.filterEscape("a;b"), "a\\;b")
     }
+
+    func testEffectiveTimeoutSecondsReturnsCorrectBounds() {
+        XCTAssertEqual(FFmpegRunner.effectiveTimeoutSeconds(for: nil),        900)
+        XCTAssertEqual(FFmpegRunner.effectiveTimeoutSeconds(for: .infinity),  900)
+        XCTAssertEqual(FFmpegRunner.effectiveTimeoutSeconds(for: .nan),       900)
+        XCTAssertEqual(FFmpegRunner.effectiveTimeoutSeconds(for: -1.0),       900)
+        XCTAssertEqual(FFmpegRunner.effectiveTimeoutSeconds(for: 1e300),      900)
+        XCTAssertEqual(FFmpegRunner.effectiveTimeoutSeconds(for: 10.0),       300)
+        XCTAssertEqual(FFmpegRunner.effectiveTimeoutSeconds(for: 1000.0),    4000)
+    }
+
+    func testRunThrowsProcessingErrorOnNonExecutablePath() async {
+        // /etc/hosts exists on macOS but is not an executable binary;
+        // process.run() throws, landing in the launchFlag-guard catch branch
+        // as ProcessingError.ffmpegFailed rather than crashing with
+        // NSInvalidArgumentException. Pins the T1-1 Path A guard.
+        let nonExe = "/etc/hosts"
+        XCTAssertTrue(FileManager.default.fileExists(atPath: nonExe))
+        do {
+            try await FFmpegRunner.run(exe: nonExe, args: [])
+            XCTFail("Expected ProcessingError — run should throw on a non-executable path")
+        } catch is ProcessingError {
+            // Expected — launchFlag guard surfaced the failure correctly
+        } catch {
+            XCTFail("Expected ProcessingError but got \(type(of: error)): \(error)")
+        }
+    }
 }
