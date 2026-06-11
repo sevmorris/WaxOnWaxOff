@@ -1,4 +1,7 @@
 import Foundation
+import OSLog
+
+private let loudnormLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "LoudnormMeasurements")
 
 /// Pass-1 measurements emitted by FFmpeg's `loudnorm=…:print_format=json`,
 /// normalized to Doubles so callers don't re-parse them ad-hoc. Used by both
@@ -37,10 +40,24 @@ struct LoudnormMeasurements: Sendable {
     /// `loudnorm=...:linear=true` args with this pass's measured values
     /// plumbed in. Caller supplies the target loudness, TP ceiling, and LRA
     /// (all three appear before the `measured_*` overrides in the chain).
+    /// Values are clamped to loudnorm's documented option ranges before use;
+    /// out-of-range measurements (e.g. input_i > 0 from a severely clipped
+    /// source) cause an opaque FFmpeg error in pass 2 if passed unclamped.
     nonisolated func linearPassFilter(targetLUFS: Double, truePeakDB: Double, lra: Double) -> String {
-        "loudnorm=I=\(targetLUFS):TP=\(truePeakDB):LRA=\(lra)" +
-            ":measured_I=\(inputI):measured_TP=\(inputTP)" +
-            ":measured_LRA=\(inputLRA):measured_thresh=\(inputThresh)" +
+        // Clamp to loudnorm's documented option ranges before injecting into pass 2.
+        // measured_I: [−99, 0]  measured_TP: [−99, 99]
+        // measured_LRA: [0, 99]  measured_thresh: [−99, 0]
+        // target_offset (offset=) has no documented bound and is left unclamped.
+        let measI      = max(-99, min(0,  inputI))
+        let measTP     = max(-99, min(99, inputTP))
+        let measLRA    = max(0,   min(99, inputLRA))
+        let measThresh = max(-99, min(0,  inputThresh))
+        if measI != inputI || measTP != inputTP || measLRA != inputLRA || measThresh != inputThresh {
+            loudnormLogger.warning("Pass-1 measurements outside loudnorm option ranges — clamping before pass 2: I=\(self.inputI, privacy: .public)→\(measI, privacy: .public) TP=\(self.inputTP, privacy: .public)→\(measTP, privacy: .public) LRA=\(self.inputLRA, privacy: .public)→\(measLRA, privacy: .public) thresh=\(self.inputThresh, privacy: .public)→\(measThresh, privacy: .public)")
+        }
+        return "loudnorm=I=\(targetLUFS):TP=\(truePeakDB):LRA=\(lra)" +
+            ":measured_I=\(measI):measured_TP=\(measTP)" +
+            ":measured_LRA=\(measLRA):measured_thresh=\(measThresh)" +
             ":offset=\(targetOffset):linear=true"
     }
 
