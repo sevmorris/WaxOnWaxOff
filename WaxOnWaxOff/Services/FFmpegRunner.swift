@@ -65,7 +65,7 @@ enum FFmpegRunner {
         // Anchor on the loudnorm filter's own log prefix so any later stderr
         // chatter that happens to contain `{` (filter parameter dumps,
         // deprecation notices, etc.) can't latch the parser onto the wrong
-        // brace. Falls back to "last `{`" only if the prefix isn't present.
+        // brace. Falls back to the first `{` in stderr if the prefix is absent.
         let searchStart: String.Index
         if let prefixRange = output.range(of: "[Parsed_loudnorm_", options: .backwards) {
             searchStart = prefixRange.upperBound
