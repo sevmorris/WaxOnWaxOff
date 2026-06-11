@@ -186,8 +186,8 @@ actor DeliveryProcessor {
 
         if settings.outputMode == .wav || settings.outputMode == .both {
             try? FileManager.default.removeItem(at: wavFinalURL)
-            try FileManager.default.moveItem(at: wavTempURL, to: wavFinalURL)
-            // wavTempURL is now gone (moved); defer removeItem is a no-op for it
+            try FileManager.moveAtomically(at: wavTempURL, to: wavFinalURL)
+            // wavTempURL is now gone (moved or deleted after cross-volume copy); defer is a no-op
             outputURLs.append(wavFinalURL)
             onLog?("✓ \(wavFinalURL.lastPathComponent)", .info)
             onLog?("  → \(wavFinalURL.path)", .verbose)
@@ -223,7 +223,7 @@ actor DeliveryProcessor {
                 }
 
                 try? FileManager.default.removeItem(at: mp3FinalURL)
-                try FileManager.default.moveItem(at: mp3TempURL, to: mp3FinalURL)
+                try FileManager.moveAtomically(at: mp3TempURL, to: mp3FinalURL)
                 outputURLs.append(mp3FinalURL)
                 onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
                 onLog?("  → \(mp3FinalURL.path)", .verbose)

@@ -16,4 +16,43 @@ extension FileManager {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
+
+    /// Moves `source` to `destination`, guaranteeing no partial file is left at
+    /// `destination` if the transfer fails mid-way.
+    ///
+    /// Same-volume: delegates to `moveItem`, which is an atomic rename. Different
+    /// volumes (external drive, secondary disk): copies `source` to a dot-prefixed
+    /// UUID temp inside the destination directory (same volume as `destination`),
+    /// then atomically renames that temp into place. The destination-side temp is
+    /// removed before any error propagates. The caller must remove any pre-existing
+    /// file at `destination` before calling — `moveItem` fails if the destination
+    /// already exists.
+    nonisolated static func moveAtomically(at source: URL, to destination: URL) throws {
+        let dstDir = destination.deletingLastPathComponent()
+        let srcVol = try? source.resourceValues(forKeys: [.volumeIdentifierKey]).volumeIdentifier
+        let dstVol = try? dstDir.resourceValues(forKeys: [.volumeIdentifierKey]).volumeIdentifier
+        let sameVolume: Bool
+        if let s = srcVol, let d = dstVol {
+            sameVolume = (s as AnyObject).isEqual(d as AnyObject)
+        } else {
+            sameVolume = true  // can't determine volumes — fall back to plain rename
+        }
+        if sameVolume {
+            try FileManager.default.moveItem(at: source, to: destination)
+        } else {
+            // Copy to a hidden temp in the destination directory so the final rename
+            // is same-volume and atomic. Clean up the temp on any failure.
+            let ext = destination.pathExtension
+            let suffix = ext.isEmpty ? "" : ".\(ext)"
+            let dstTemp = dstDir.appendingPathComponent(".\(UUID().uuidString)\(suffix)")
+            do {
+                try FileManager.default.copyItem(at: source, to: dstTemp)
+                try FileManager.default.moveItem(at: dstTemp, to: destination)
+            } catch {
+                try? FileManager.default.removeItem(at: dstTemp)
+                throw error
+            }
+            try? FileManager.default.removeItem(at: source)
+        }
+    }
 }
