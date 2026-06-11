@@ -226,7 +226,7 @@ private struct DeliveryFileListView: View {
                 FileRowView(
                     file: file,
                     isProcessing: viewModel.isProcessing,
-                    channelBadge: Self.upmixBadge(for: file)
+                    channelBadge: Self.monoRejectionBadge(for: file)
                 )
                     .tag(file.id)
             }
@@ -243,7 +243,7 @@ private struct DeliveryFileListView: View {
         }
     }
 
-    private static func upmixBadge(for file: FileItem) -> ChannelBadge? {
+    private static func monoRejectionBadge(for file: FileItem) -> ChannelBadge? {
         guard file.fileInfo?.channelCount == 1 else { return nil }
         return ChannelBadge(
             label: "MONO",
