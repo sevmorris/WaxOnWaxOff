@@ -52,6 +52,8 @@ enum FFmpegRunner {
          .replacingOccurrences(of: ":",  with: "\\:")
          .replacingOccurrences(of: "[",  with: "\\[")
          .replacingOccurrences(of: "]",  with: "\\]")
+         .replacingOccurrences(of: ",",  with: "\\,")
+         .replacingOccurrences(of: ";",  with: "\\;")
     }
 
     // MARK: - Loudnorm Parsing

@@ -54,5 +54,7 @@ final class FFmpegRunnerTests: XCTestCase {
         XCTAssertEqual(FFmpegRunner.filterEscape("it's"), "it\\'s")
         XCTAssertEqual(FFmpegRunner.filterEscape("a\\b"), "a\\\\b")
         XCTAssertEqual(FFmpegRunner.filterEscape("[0:a]"), "\\[0\\:a\\]")
+        XCTAssertEqual(FFmpegRunner.filterEscape("a,b"), "a\\,b")
+        XCTAssertEqual(FFmpegRunner.filterEscape("a;b"), "a\\;b")
     }
 }
