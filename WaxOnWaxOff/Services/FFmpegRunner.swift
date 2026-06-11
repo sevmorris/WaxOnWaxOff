@@ -115,7 +115,13 @@ enum FFmpegRunner {
     /// times the file length. A 90-minute recording gets a six-hour window; a 10-second
     /// clip gets the five-minute floor. Falls back to `processTimeoutSeconds` (900 s) when nil.
     nonisolated static func effectiveTimeoutSeconds(for fileDuration: TimeInterval?) -> Int {
-        guard let d = fileDuration else { return processTimeoutSeconds }
+        // Belt-and-suspenders: guard non-finite and out-of-range values before the
+        // Int conversion — Int(Double) traps on overflow for large doubles. Parse
+        // sites already validate, but this prevents a crash if a bad value reaches
+        // here via any future path. 30 days covers any real podcast file.
+        guard let d = fileDuration, d.isFinite, d >= 0, d <= 30 * 24 * 3600 else {
+            return processTimeoutSeconds
+        }
         return max(300, Int((d * 4.0).rounded()))
     }
 

@@ -1,4 +1,7 @@
 import Foundation
+import OSLog
+
+private let deliveryProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
 
 // MARK: - Batch types
 
@@ -222,7 +225,7 @@ actor DeliveryProcessor {
     }
 
     /// Probe the source file duration for proportional ffmpeg timeouts.
-    /// Returns nil on any ffprobe error; callers fall back to the 900 s constant.
+    /// Returns nil on any ffprobe error or implausible value; callers fall back to the 900 s constant.
     private func probeFileDuration(ffprobe: String, url: URL) async -> TimeInterval? {
         guard let output = try? await FFmpegRunner.captureStdout(exe: ffprobe, args: [
             "-v", "error",
@@ -230,7 +233,16 @@ actor DeliveryProcessor {
             "-of", "default=noprint_wrappers=1:nokey=1",
             url.path
         ]) else { return nil }
-        return Double(output.trimmingCharacters(in: .whitespacesAndNewlines))
+        let str = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let d = Double(str) else { return nil }
+        // Guard against non-finite, negative, or absurd values from corrupt container
+        // headers. 30 days is a generous ceiling for any real podcast or long-form file.
+        let maxDuration: Double = 30 * 24 * 3600
+        guard d.isFinite, d >= 0, d <= maxDuration else {
+            deliveryProcessorLogger.warning("Implausible audio duration '\(str, privacy: .public)' from \(url.lastPathComponent, privacy: .public) — ignoring, will use default timeout")
+            return nil
+        }
+        return d
     }
 
     /// Returns nil if the analysis ran but the input was silent / near-silent

@@ -1,4 +1,7 @@
 import Foundation
+import OSLog
+
+private let audioProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "AudioProcessor")
 
 struct JobInput: Sendable {
     let id: UUID
@@ -396,6 +399,14 @@ actor AudioProcessor {
         let str = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let d = Double(str) else {
             throw ProcessingError.ffmpegFailed(code: -1, message: "Could not parse audio duration")
+        }
+        // Guard against non-finite, negative, or absurd values from corrupt container
+        // headers — Int((d * 4.0).rounded()) traps on overflow for large doubles.
+        // 30 days is a generous ceiling that covers any real podcast or long-form file.
+        let maxDuration: Double = 30 * 24 * 3600
+        guard d.isFinite, d >= 0, d <= maxDuration else {
+            audioProcessorLogger.warning("Implausible audio duration '\(str, privacy: .public)' from \(url.lastPathComponent, privacy: .public) — ignoring, will use default timeout")
+            throw ProcessingError.ffmpegFailed(code: -1, message: "Implausible audio duration (\(str))")
         }
         return d
     }
