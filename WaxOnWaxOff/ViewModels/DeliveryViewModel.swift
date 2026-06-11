@@ -22,6 +22,7 @@ final class DeliveryViewModel {
     var log = ProcessingLog()
 
     private var processingTask: Task<Void, Never>?
+    private var processingCancelled = false
 
     var files: [FileItem] {
         get { fileQueue.files }
@@ -159,6 +160,7 @@ final class DeliveryViewModel {
         }
 
         isProcessing = true
+        processingCancelled = false
         log.clear()
         fileQueue.snapshotReadyStats()
 
@@ -172,10 +174,34 @@ final class DeliveryViewModel {
                     inputs: inputs,
                     settings: currentSettings,
                     onFileStarted: { [weak self] id in
-                        Task { @MainActor [weak self] in
-                            guard let self,
-                                  let idx = self.files.firstIndex(where: { $0.id == id }) else { return }
+                        guard let self else { return }
+                        Task { @MainActor [self] in
+                            guard !self.processingCancelled else { return }
+                            guard let idx = self.files.firstIndex(where: { $0.id == id }) else { return }
                             self.files[idx].status = .processing
+                        }
+                    },
+                    onFileCompleted: { [weak self] result in
+                        guard let self else { return }
+                        Task { @MainActor [self] in
+                            guard let idx = self.files.firstIndex(where: { $0.id == result.id }),
+                                  let primaryURL = result.outputURLs.first else { return }
+                            self.files[idx].status = .processed(outputURL: primaryURL)
+                            self.fileQueue.generateOutputWaveform(id: result.id, url: primaryURL)
+                            // Refresh the stats panel against the rendered file so
+                            // the user can see what their WaxOff output landed at
+                            // — mirrors WaxOn's post-process behavior.
+                            self.fileQueue.analyzeOutputFile(id: result.id, url: primaryURL)
+                            if let msg = result.mp3FailureMessage {
+                                self.log.append("⚠ MP3 encoding failed: \(msg)", level: .info)
+                            }
+                        }
+                    },
+                    onFileFailed: { [weak self] failure in
+                        guard let self else { return }
+                        Task { @MainActor [self] in
+                            guard let idx = self.files.firstIndex(where: { $0.id == failure.id }) else { return }
+                            self.files[idx].status = .error("Processing failed — see Console")
                         }
                     },
                     onPhase: { [weak self] id, phase in
@@ -192,28 +218,13 @@ final class DeliveryViewModel {
                     }
                 )
 
-                for result in batch.successes {
-                    if let idx = files.firstIndex(where: { $0.id == result.id }),
-                       let primaryURL = result.outputURLs.first {
-                        files[idx].status = .processed(outputURL: primaryURL)
-                        fileQueue.generateOutputWaveform(id: result.id, url: primaryURL)
-                        // Refresh the stats panel against the rendered file so
-                        // the user can see what their WaxOff output landed at
-                        // — mirrors WaxOn's post-process behavior.
-                        fileQueue.analyzeOutputFile(id: result.id, url: primaryURL)
-                    }
-                }
-
-                for failure in batch.failures {
-                    if let idx = files.firstIndex(where: { $0.id == failure.id }) {
-                        files[idx].status = .error("Processing failed — see Console")
-                    }
-                    log.append("✗ \(failure.message)", level: .info)
-                }
-
                 fileQueue.restoreProcessingRows()
 
+                let partials = batch.successes.filter { $0.mp3FailureMessage != nil }
                 if !batch.successes.isEmpty {
+                    if !partials.isEmpty {
+                        alertMessage = "\(partials.count) file\(partials.count == 1 ? "" : "s") had MP3 encoding failure (WAV complete). See Console for details."
+                    }
                     await NotificationService.showCompletionNotification(
                         mode: .waxOff,
                         fileCount: batch.successes.count
@@ -222,7 +233,7 @@ final class DeliveryViewModel {
                     alertMessage = "Processing failed. Open the Console tab for details."
                 }
             } catch is CancellationError {
-                fileQueue.restoreProcessingRowsAfterCancel()
+                // User cancelled — cancelProcessing() already restored row state
             } catch {
                 logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
                 log.append("✗ \(error.localizedDescription)", level: .info)
@@ -237,6 +248,7 @@ final class DeliveryViewModel {
     }
 
     func cancelProcessing() {
+        processingCancelled = true
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false

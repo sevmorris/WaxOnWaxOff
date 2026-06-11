@@ -13,6 +13,15 @@ struct DeliveryJobInput: Sendable {
 struct DeliveryJobResult: Sendable {
     let id: UUID
     let outputURLs: [URL]
+    /// Non-nil when the WAV rendered but MP3 encoding failed in `.both` mode.
+    /// Callers should show the WAV as delivered and surface this message in the log.
+    let mp3FailureMessage: String?
+
+    init(id: UUID, outputURLs: [URL], mp3FailureMessage: String? = nil) {
+        self.id = id
+        self.outputURLs = outputURLs
+        self.mp3FailureMessage = mp3FailureMessage
+    }
 }
 
 struct DeliveryJobFailure: Sendable, Error {
@@ -34,6 +43,8 @@ actor DeliveryProcessor {
         inputs: [DeliveryJobInput],
         settings: WaxOffSettings,
         onFileStarted: (@Sendable (UUID) -> Void)? = nil,
+        onFileCompleted: (@Sendable (DeliveryJobResult) -> Void)? = nil,
+        onFileFailed: (@Sendable (DeliveryJobFailure) -> Void)? = nil,
         onPhase: (@Sendable (UUID, String) -> Void)? = nil,
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
     ) async throws -> DeliveryBatchRunResult {
@@ -54,7 +65,7 @@ actor DeliveryProcessor {
             do {
                 try Task.checkCancellation()
                 onFileStarted?(input.id)
-                let outputs = try await self.process(
+                let (outputs, mp3Fail) = try await self.process(
                     url: input.url,
                     settings: settings,
                     tools: tools,
@@ -62,13 +73,17 @@ actor DeliveryProcessor {
                     onPhase: { phase in onPhase?(input.id, phase) },
                     onLog: onLog
                 )
-                return .success(DeliveryJobResult(id: input.id, outputURLs: outputs))
+                let result = DeliveryJobResult(id: input.id, outputURLs: outputs, mp3FailureMessage: mp3Fail)
+                onFileCompleted?(result)
+                return .success(result)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
-                return .failure(DeliveryJobFailure(id: input.id, message: message))
+                let failure = DeliveryJobFailure(id: input.id, message: message)
+                onFileFailed?(failure)
+                return .failure(failure)
             }
         }
 
@@ -94,7 +109,8 @@ actor DeliveryProcessor {
         let allocator = OutputAllocator { [lufsTag] input in
             "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
         }
-        return try await process(url: url, settings: settings, tools: tools, allocator: allocator, onPhase: onPhase, onLog: onLog)
+        let (outputs, _) = try await process(url: url, settings: settings, tools: tools, allocator: allocator, onPhase: onPhase, onLog: onLog)
+        return outputs
     }
 
     private func process(
@@ -104,7 +120,7 @@ actor DeliveryProcessor {
         allocator: OutputAllocator,
         onPhase: (@Sendable (String) -> Void)? = nil,
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
-    ) async throws -> [URL] {
+    ) async throws -> ([URL], String?) {
         let ffmpeg = tools.ffmpeg
         // Probe source duration for proportional ffmpeg timeouts (FFmpegRunner.effectiveTimeoutSeconds).
         let fileDuration = await probeFileDuration(ffprobe: tools.ffprobe, url: url)
@@ -193,26 +209,38 @@ actor DeliveryProcessor {
                 try? FileManager.default.removeItem(at: mp3TempURL)
             }
 
-            try await encodeMP3(
-                ffmpeg: ffmpeg,
-                input: sourceForMP3,
-                output: mp3TempURL,
-                settings: settings,
-                fileDuration: fileDuration
-            )
+            do {
+                try await encodeMP3(
+                    ffmpeg: ffmpeg,
+                    input: sourceForMP3,
+                    output: mp3TempURL,
+                    settings: settings,
+                    fileDuration: fileDuration
+                )
 
-            guard FileManager.default.fileExists(atPath: mp3TempURL.path) else {
-                throw DeliveryError.encodingFailed("MP3 file was not created")
+                guard FileManager.default.fileExists(atPath: mp3TempURL.path) else {
+                    throw DeliveryError.encodingFailed("MP3 file was not created")
+                }
+
+                try? FileManager.default.removeItem(at: mp3FinalURL)
+                try FileManager.default.moveItem(at: mp3TempURL, to: mp3FinalURL)
+                outputURLs.append(mp3FinalURL)
+                onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
+                onLog?("  → \(mp3FinalURL.path)", .verbose)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                if settings.outputMode == .both {
+                    // WAV is already at wavFinalURL — partial success.
+                    let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    onLog?("⚠ MP3 encoding failed: \(msg)", .info)
+                    return (outputURLs, msg)
+                }
+                throw error  // mp3-only mode: total failure
             }
-
-            try? FileManager.default.removeItem(at: mp3FinalURL)
-            try FileManager.default.moveItem(at: mp3TempURL, to: mp3FinalURL)
-            outputURLs.append(mp3FinalURL)
-            onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
-            onLog?("  → \(mp3FinalURL.path)", .verbose)
         }
 
-        return outputURLs
+        return (outputURLs, nil)
     }
 
     // MARK: - Private

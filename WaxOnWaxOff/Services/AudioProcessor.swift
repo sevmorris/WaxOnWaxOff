@@ -11,13 +11,19 @@ struct JobInput: Sendable {
 actor AudioProcessor {
     let settings: WaxOnSettings
     let onFileStarted: (@Sendable (UUID) -> Void)?
+    let onFileCompleted: (@Sendable (JobResult) -> Void)?
+    let onFileFailed: (@Sendable (WaxOnJobFailure) -> Void)?
     let onLog: (@Sendable (String, LogLevel) -> Void)?
 
     init(settings: WaxOnSettings,
          onFileStarted: (@Sendable (UUID) -> Void)? = nil,
+         onFileCompleted: (@Sendable (JobResult) -> Void)? = nil,
+         onFileFailed: (@Sendable (WaxOnJobFailure) -> Void)? = nil,
          onLog: (@Sendable (String, LogLevel) -> Void)? = nil) {
         self.settings = settings
         self.onFileStarted = onFileStarted
+        self.onFileCompleted = onFileCompleted
+        self.onFileFailed = onFileFailed
         self.onLog = onLog
     }
 
@@ -41,18 +47,23 @@ actor AudioProcessor {
                 try Task.checkCancellation()
                 self.onFileStarted?(input.id)
                 guard let result = try await self.processOne(input.url, id: input.id, tools: tools, allocator: allocator) else {
-                    return .failure(WaxOnJobFailure(
+                    let failure = WaxOnJobFailure(
                         id: input.id,
                         message: ProcessingError.outputMissing.errorDescription ?? "No output produced"
-                    ))
+                    )
+                    self.onFileFailed?(failure)
+                    return .failure(failure)
                 }
+                self.onFileCompleted?(result)
                 return .success(result)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 self.onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
-                return .failure(WaxOnJobFailure(id: input.id, message: message))
+                let failure = WaxOnJobFailure(id: input.id, message: message)
+                self.onFileFailed?(failure)
+                return .failure(failure)
             }
         }
 

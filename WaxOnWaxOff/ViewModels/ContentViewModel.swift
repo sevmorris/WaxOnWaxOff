@@ -159,6 +159,23 @@ final class ContentViewModel {
                             self.files[index].status = .processing
                         }
                     },
+                    onFileCompleted: { [weak self] result in
+                        guard let self else { return }
+                        Task { @MainActor [self] in
+                            guard let id = result.id,
+                                  let index = self.files.firstIndex(where: { $0.id == id }) else { return }
+                            self.files[index].status = .processed(outputURL: result.output)
+                            self.fileQueue.generateOutputWaveform(id: id, url: result.output)
+                            self.fileQueue.analyzeOutputFile(id: id, url: result.output)
+                        }
+                    },
+                    onFileFailed: { [weak self] failure in
+                        guard let self else { return }
+                        Task { @MainActor [self] in
+                            guard let index = self.files.firstIndex(where: { $0.id == failure.id }) else { return }
+                            self.files[index].status = .error(failure.message)
+                        }
+                    },
                     onLog: { [weak self] message, level in
                         Task { @MainActor [weak self] in
                             self?.log.append(message, level: level)
@@ -166,27 +183,7 @@ final class ContentViewModel {
                     })
                 let batch = try await processor.run(inputs: inputs)
 
-                for result in batch.successes {
-                    if let id = result.id,
-                       let index = files.firstIndex(where: { $0.id == id }) {
-                        files[index].status = .processed(outputURL: result.output)
-                    }
-                }
-
-                for failure in batch.failures {
-                    if let index = files.firstIndex(where: { $0.id == failure.id }) {
-                        files[index].status = .error(failure.message)
-                    }
-                }
-
                 fileQueue.restoreProcessingRows()
-
-                for result in batch.successes {
-                    if let id = result.id {
-                        fileQueue.generateOutputWaveform(id: id, url: result.output)
-                        fileQueue.analyzeOutputFile(id: id, url: result.output)
-                    }
-                }
 
                 if batch.failures.isEmpty {
                     await NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
