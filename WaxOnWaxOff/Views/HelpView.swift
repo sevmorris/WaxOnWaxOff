@@ -103,7 +103,7 @@ struct HelpView: View {
                         "Normalization pass — measured values are applied as a single linear gain. No dynamic processing; the stereo image and transients are unchanged.",
                         "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate."
                     ])
-                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3. Always stereo — mono files are rejected with an error.")
+                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3. Always stereo — mono sources are automatically upmixed to dual-mono stereo.")
                 }
                 section("WaxOff — Settings") {
                     definition("Preset", "Applies a saved group of settings in one click. Three built-in presets are included; you can save your own via the Preset menu.")

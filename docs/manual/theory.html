@@ -924,7 +924,8 @@
     <h2>WaxOff Design Rationale <span class="mode-badge mode-waxoff">WaxOff</span></h2>
 
     <h3>Always Stereo Output</h3>
-    <p>WaxOff always outputs 2-channel stereo and requires stereo input — mono files are rejected with an error rather than silently upmixed to dual-mono. WaxOff is designed for finished stereo mixes: if a source file is mono, the right place to handle it is WaxOn, which accepts mono and stereo input and can output either layout. For podcast delivery, stereo is the expected format — most platforms and players expect two-channel audio, some handle mono inconsistently, and the file size difference is negligible at typical podcast bitrates.</p>
+    <p>WaxOff always outputs 2-channel stereo. Mono input is accepted: WaxOff upmixes it to dual-mono as the first filter stage — before phase rotation and loudnorm. Both the pass-1 loudness measurement and the pass-2 gain correction then operate on the stereo signal, so the output lands at the configured LUFS target regardless of whether the source was mono or stereo.</p>
+    <p>The position of the upmix matters. The intuitive approach — normalize, then duplicate channels — produces output that reads approximately 3 LU above target. The reason: loudnorm's gain correction is computed against the mono signal. When <code>-ac 2</code> then duplicates the channels at encode time, the stereo loudness measurement sums both channels' energy; a dual-mono file where L and R carry identical content reads louder than the mono signal the gain was chosen for. Moving the upmix before loudnorm avoids this: both passes normalize the stereo signal they will actually output.</p>
 
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
@@ -1193,7 +1194,7 @@
         <tr>
           <td>Output channels</td>
           <td>—</td>
-          <td>Always stereo (mono rejected with error)</td>
+          <td>Always stereo (mono upmixed to dual-mono)</td>
         </tr>
       </tbody>
     </table>

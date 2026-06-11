@@ -512,7 +512,7 @@
       <li><strong>Output: …</strong> — processed; a green ✓ Complete indicator appears next to the filename and a folder icon reveals the output in Finder</li>
       <li><strong>Error</strong> — something went wrong; the message is shown inline</li>
     </ul>
-    <p>Files with a high estimated noise floor show an orange warning triangle next to the filename. Hover over the badge for detail. In WaxOff, mono sources show a <strong>MONO</strong> badge indicating the file will be rejected — WaxOff requires stereo input.</p>
+    <p>Files with a high estimated noise floor show an orange warning triangle next to the filename. Hover over the badge for detail. In WaxOff, mono sources show a <strong>MONO</strong> badge indicating the file will be upmixed to dual-mono stereo before processing.</p>
 
     <p>WaxOn processes multiple files concurrently, scaling with available CPU cores. Files waiting their turn show a muted static progress bar so it's clear they are queued and not stalled.</p>
     <p>Select files and press <kbd>Delete</kbd> to remove them, or use <kbd>⌘⌥Delete</kbd> to clear the entire list.</p>
@@ -836,7 +836,7 @@
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no compression, no change to stereo image. Output is always stereo (2-channel).</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no compression, no change to stereo image. Output is always stereo (2-channel); mono input is upmixed to dual-mono at the start of the filter chain so both passes measure and normalize the stereo signal.</span>
         </div>
       </li>
       <li>
@@ -869,7 +869,7 @@
     <p>Examples: <code>episode-42-final-lev-18LUFS.wav</code> &nbsp; <code>episode-42-final-lev-18LUFS.mp3</code></p>
 
     <h3>Channels</h3>
-    <p>WaxOff always outputs stereo (2-channel) and requires stereo input — mono files are rejected with an error. There is no channel setting in WaxOff.</p>
+    <p>WaxOff always outputs stereo (2-channel). Mono input is accepted — it is upmixed to dual-mono stereo before processing. There is no channel setting in WaxOff.</p>
 
     <h3>Location</h3>
     <p>Output files are written alongside the source by default, or to your configured output directory. Existing files with the same name are overwritten.</p>
