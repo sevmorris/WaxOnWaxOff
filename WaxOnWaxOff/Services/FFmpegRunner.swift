@@ -141,6 +141,12 @@ enum FFmpegRunner {
         // reported as CancellationError, silently aborting the entire batch.
         let cancelFlag = TimeoutFlag()
 
+        // Set to true only after process.run() returns without throwing. Guards all
+        // process.terminate() call sites: both the watchdog and the onCancel handler
+        // must be no-ops if the process was never launched, because calling
+        // terminate() on an unlaunched Process raises NSInvalidArgumentException.
+        let launchFlag = TimeoutFlag()
+
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Int32, String), Error>) in
                 let pipe = Pipe()
@@ -170,7 +176,9 @@ enum FFmpegRunner {
                 let timeoutFlag = TimeoutFlag()
                 let timeoutItem = DispatchWorkItem {
                     timeoutFlag.set()
-                    process.terminate()
+                    if launchFlag.didFire {
+                        process.terminate()
+                    }
                 }
                 DispatchQueue.global().asyncAfter(
                     deadline: .now() + .seconds(timeoutSeconds),
@@ -187,22 +195,24 @@ enum FFmpegRunner {
                         ))
                         return
                     }
-                    // If the process exited due to a signal, check who sent it.
-                    // Only throw CancellationError when *we* cancelled via onCancel.
-                    // Any other signal (SIGSEGV, SIGABRT, OOM SIGKILL, etc.) is an
-                    // ffmpeg crash — surface it as a real error so callers don't
-                    // silently cancel every other in-flight job in the batch.
+                    // Check cancel flag first — FFmpeg catches SIGTERM and exits
+                    // normally with code 255 and reason .exit (not .uncaughtSignal),
+                    // so terminationReason alone cannot distinguish a user cancel
+                    // from an ordinary non-zero exit.
+                    if cancelFlag.didFire {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    // Not cancelled by us. An unexpected signal is an ffmpeg crash
+                    // (SIGSEGV, SIGABRT, OOM SIGKILL, etc.) — surface as a real error
+                    // so callers don't silently cancel every other in-flight batch job.
                     // Note: on Darwin, terminationStatus holds the signal number when
                     // terminationReason == .uncaughtSignal.
                     if proc.terminationReason == .uncaughtSignal {
-                        if cancelFlag.didFire {
-                            continuation.resume(throwing: CancellationError())
-                        } else {
-                            continuation.resume(throwing: ProcessingError.ffmpegFailed(
-                                code: proc.terminationStatus,
-                                message: "ffmpeg crashed (signal \(proc.terminationStatus))"
-                            ))
-                        }
+                        continuation.resume(throwing: ProcessingError.ffmpegFailed(
+                            code: proc.terminationStatus,
+                            message: "ffmpeg crashed (signal \(proc.terminationStatus))"
+                        ))
                         return
                     }
                     let msg = String(data: box.value, encoding: .utf8) ?? ""
@@ -211,7 +221,15 @@ enum FFmpegRunner {
 
                 do {
                     try process.run()
+                    launchFlag.set()
+                    // Close the race window: if onCancel fired between the launchFlag
+                    // check and launchFlag.set() above, we must terminate the now-running
+                    // process ourselves — onCancel saw launchFlag unset and skipped it.
+                    if cancelFlag.didFire {
+                        process.terminate()
+                    }
                 } catch {
+                    timeoutItem.cancel()
                     continuation.resume(throwing: ProcessingError.ffmpegFailed(
                         code: -1,
                         message: "Failed to launch: \(error.localizedDescription)"
@@ -220,7 +238,9 @@ enum FFmpegRunner {
             }
         } onCancel: {
             cancelFlag.set()
-            process.terminate()
+            if launchFlag.didFire {
+                process.terminate()
+            }
         }
     }
 }
