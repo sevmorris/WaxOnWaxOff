@@ -246,8 +246,8 @@ private struct DeliveryFileListView: View {
     private static func upmixBadge(for file: FileItem) -> ChannelBadge? {
         guard file.fileInfo?.channelCount == 1 else { return nil }
         return ChannelBadge(
-            label: "MONO→STEREO",
-            help: "Mono source — will be upmixed to dual-mono stereo"
+            label: "MONO",
+            help: "Mono not accepted — stereo files only"
         )
     }
 }

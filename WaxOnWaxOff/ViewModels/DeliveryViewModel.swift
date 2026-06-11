@@ -92,17 +92,21 @@ final class DeliveryViewModel {
             return
         }
 
-        // Reject files where channel count is already known to be mono.
-        // WaxOff always outputs stereo (-ac 2); a naive mono→dual-mono upmix
-        // doubles K-weighted energy and inflates integrated loudness by ~3 LUFS,
-        // causing the configured target to be silently missed.
-        // Files whose fileInfo is not yet populated are allowed through; the
-        // user can requeue them once analysis completes.
+        // Reject files where channel count is known to be mono. Fail closed on
+        // files whose fileInfo is nil — a nil probe means analysis either failed
+        // or hasn't finished, so channel count is unknown. Passing such a file
+        // through risks a silent ~3 LUFS miss if it turns out to be mono (the
+        // two-channel output would carry doubled K-weighted energy).
         var monoRejectedCount = 0
+        var analysisIncompleteCount = 0
         for i in files.indices {
-            if case .ready = files[i].status,
-               let channelCount = files[i].fileInfo?.channelCount,
-               channelCount == 1 {
+            guard case .ready = files[i].status else { continue }
+            guard let info = files[i].fileInfo else {
+                files[i].status = .error("File analysis incomplete — channel count could not be determined. Wait for analysis to finish, then try again.")
+                analysisIncompleteCount += 1
+                continue
+            }
+            if info.channelCount == 1 {
                 files[i].status = .error("WaxOff requires stereo files. This file is mono and cannot be processed.")
                 monoRejectedCount += 1
             }
@@ -113,9 +117,13 @@ final class DeliveryViewModel {
             return false
         }
         guard !readyFiles.isEmpty else {
-            alertMessage = monoRejectedCount > 0
-                ? "No processable files — WaxOff requires stereo input."
-                : "No files are ready to process — wait for analysis to finish or fix errors first."
+            if monoRejectedCount > 0 {
+                alertMessage = "No processable files — WaxOff requires stereo input."
+            } else if analysisIncompleteCount > 0 {
+                alertMessage = "No processable files — wait for file analysis to complete, then try again."
+            } else {
+                alertMessage = "No files are ready to process — wait for analysis to finish or fix errors first."
+            }
             return
         }
 
