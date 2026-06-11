@@ -759,7 +759,7 @@
     <p>The net effect: noisy files measure louder than their speech content actually is. When loudness normalization targets a specific LUFS value, the gain applied is less than the speech needs. The speech ends up under target.</p>
 
     <h3>Estimation Method</h3>
-    <p>The analyzer divides the audio into non-overlapping 400 ms blocks (the same block size used for LUFS gating). For FLOOR only, each block is first summed to mono and passed through an <strong>80 Hz Butterworth high-pass filter</strong> — matching WaxOn's typical HPF-on processing path — so rumble and HVAC below 80 Hz do not inflate the estimate. The noise floor is the <strong>10th percentile</strong> of these filtered block RMS values, converted to dBFS. RMS, peak, crest factor, and LUFS stats use unfiltered audio.</p>
+    <p>The analyzer divides the audio into non-overlapping 400 ms blocks (the same block size used for LUFS gating). For FLOOR only, each block is first summed to mono and passed through a Butterworth high-pass filter whose cutoff tracks the WaxOn High Pass toggle: <strong>80 Hz when High Pass is on, 20 Hz when off</strong> — so the FLOOR estimate reflects the same frequency content the processing pipeline sees. The noise floor is the <strong>10th percentile</strong> of these filtered block RMS values, converted to dBFS. RMS, peak, crest factor, and LUFS stats use unfiltered audio.</p>
     <p>The 10th percentile was chosen because it represents the quietest 10% of the file's blocks. For speech recordings, the quietest blocks are the pauses, breaths, and gaps where the microphone is capturing only the ambient environment. The 10th percentile is more robust than the absolute minimum (which might catch a single anomalously quiet block) while still reflecting the true background level rather than the speech level.</p>
     <p>At least 5 blocks are required for a meaningful estimate (about 2 seconds of audio). Shorter files show no FLOOR stat.</p>
 
@@ -924,7 +924,7 @@
     <h2>WaxOff Design Rationale <span class="mode-badge mode-waxoff">WaxOff</span></h2>
 
     <h3>Always Stereo Output</h3>
-    <p>WaxOff always outputs 2-channel stereo regardless of the input channel count. If the source is mono, FFmpeg upmixes it to dual-mono — identical left and right channels. This is correct behavior for podcast delivery: most platforms and players expect stereo files, some handle mono inconsistently, and the file size difference is negligible at typical podcast bitrates. A dual-mono stereo file sounds completely natural — the content is centered as expected, with no audible difference from a true stereo file for voice content.</p>
+    <p>WaxOff always outputs 2-channel stereo and requires stereo input — mono files are rejected with an error rather than silently upmixed to dual-mono. WaxOff is designed for finished stereo mixes: if a source file is mono, the right place to handle it is WaxOn, which accepts mono and stereo input and can output either layout. For podcast delivery, stereo is the expected format — most platforms and players expect two-channel audio, some handle mono inconsistently, and the file size difference is negligible at typical podcast bitrates.</p>
 
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
@@ -1056,10 +1056,11 @@
   <section id="analysis-vs-processing">
     <h2>Analysis vs Processing</h2>
 
-    <p>The file stats panel (RMS, Peak, Crest, LUFS, FLOOR) and the FFmpeg processing pipeline both implement ITU-R BS.1770 concepts, but they are separate code paths and are not guaranteed to match exactly.</p>
+    <p>The file stats panel (RMS, Peak, ISP (est.), Crest, LUFS, FLOOR) and the FFmpeg processing pipeline both implement ITU-R BS.1770 concepts, but they are separate code paths and are not guaranteed to match exactly.</p>
 
     <h3>Stats Panel: Native Analyzer</h3>
     <p>When you drop a file into WaxOn or WaxOff, the app analyzes it with an in-process Swift implementation (<code>AudioAnalyzer</code>): K-weighting coefficients computed via the bilinear transform at the file's sample rate, 400 ms / 75%-overlap gating for LUFS, and the 10th-percentile noise-floor estimate described in <a href="#noise-floor">Noise Floor Estimation</a>. This runs once at load time and costs no extra FFmpeg passes.</p>
+    <p>The RMS stat uses a <strong>mono fold-down</strong> before squaring: each stereo frame is summed to (L+R)/2 before the RMS accumulation. For correlated material (mono or near-mono sources) this closely tracks per-channel power, but for wide or decorrelated stereo the fold-down under-reads true RMS by up to 3 dB, and for out-of-phase material it collapses toward −∞. Because Peak is the per-channel maximum (not a fold-down), Crest (Peak − RMS) reads higher than expected on wide mixes and substantially higher on phase-problematic sources. This is a known characteristic of the stat, not a measurement error.</p>
 
     <h3>Processing: FFmpeg Loudnorm</h3>
     <p>Actual normalization uses FFmpeg's <code>loudnorm</code> filter in a two-pass pipeline. Pass 1 may optionally run on an RNNoise-processed temp copy (WaxOn only, when Loudness Norm is enabled). The gain applied in pass 2 is derived from FFmpeg's measurements, not from the stats panel values.</p>
