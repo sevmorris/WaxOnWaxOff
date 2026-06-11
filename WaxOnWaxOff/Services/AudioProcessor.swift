@@ -123,7 +123,13 @@ actor AudioProcessor {
             // FFmpeg's default mono downmix matrix for those cases so center
             // and surrounds are summed in.
             let pan: String
-            if inputChannelCount > 2 {
+            if inputChannelCount == 1 {
+                // A 1-channel source has no c1; pan=1c|c0=c1 would error at
+                // graph configuration. Pass the single channel through and
+                // note that the L/R pick is irrelevant for mono input.
+                pan = "aformat=channel_layouts=mono"
+                onLog?("⚠ Input is mono; channel selection ignored.", .info)
+            } else if inputChannelCount > 2 {
                 pan = "aformat=channel_layouts=mono"
                 onLog?("⚠ \(inputChannelCount)-channel input — using mono downmix instead of \(settings.channel.rawValue) channel pick.", .info)
             } else {
