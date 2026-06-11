@@ -124,7 +124,7 @@ struct HelpView: View {
                 dividerRow
 
                 section("Supported Formats") {
-                    text("WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, OGG, Opus, CAF, WMA, AAC, MP4, MOV.")
+                    text("WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, CAF, AAC, MP4, MOV.")
                     text("All processing uses FFmpeg, bundled inside the app — no separate installation required.")
                 }
 

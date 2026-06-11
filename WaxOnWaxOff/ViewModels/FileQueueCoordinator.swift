@@ -11,7 +11,7 @@ private let fileQueueLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff
 @MainActor
 final class FileQueueCoordinator {
     static let defaultValidExtensions: Set<String> = [
-        "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "ogg", "opus", "caf", "wma", "aac",
+        "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "caf", "aac",
         "mp4", "mov"
     ]
 
