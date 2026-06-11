@@ -64,10 +64,31 @@ final class FileQueueCoordinator {
     func commitFiles(_ urls: [URL]) {
         let newFiles = urls.map { FileItem(url: $0) }
         files.append(contentsOf: newFiles)
-        for file in newFiles {
-            analyzeFile(file)
-            generateWaveform(file)
-            analyzeFileInfo(file)
+        let limit = ProcessingConfig.maxConcurrentJobs
+        Task { [weak self] in
+            guard let self else { return }
+            // At most maxConcurrentJobs files start analysis simultaneously. Each
+            // slot calls the three per-file methods and then holds until the
+            // analysis Task finishes, so ffprobe/AVFoundation concurrency is
+            // actually bounded rather than just task-spawning being bounded.
+            // Waveform and fileInfo tasks continue beyond the gate; they are
+            // lighter than analysis (no ffprobe subprocess). Task dicts are still
+            // populated by the per-file methods for individual cancellation.
+            _ = try? await runBoundedConcurrent(inputs: newFiles, limit: limit) { [weak self] file in
+                guard let self else { return }
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.analyzeFile(file)
+                    self.generateWaveform(file)
+                    self.analyzeFileInfo(file)
+                }
+                // Await the analysis task to hold the slot. If the file was removed
+                // while we waited, cancelAnalysisTasks cleared the dict entry and we
+                // skip the await — the slot releases and the next file starts.
+                if let task = await MainActor.run(body: { [weak self] in self?.analysisTasks[file.id] }) {
+                    _ = await task.value
+                }
+            }
         }
     }
 
