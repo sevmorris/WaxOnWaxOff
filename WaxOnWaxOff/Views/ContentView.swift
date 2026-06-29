@@ -149,9 +149,10 @@ struct ContentView: View {
             EmptyStateView(mode: appState.mode ?? .waxOn)
         } else {
             VStack(spacing: 0) {
-                // Show a non-blocking note when phase rotation is on and multiple files
-                // are queued. If they were recorded simultaneously in the same room,
-                // independent phase rotation per track can cause cancellation when mixed.
+                // Show a non-blocking recommendation when phase rotation is on and
+                // multiple files are queued. If they were recorded simultaneously in the
+                // same room, independent phase rotation per track can cancel when mixed —
+                // applying it once at the mix bus instead avoids that.
                 // Dismisses automatically when the condition is no longer met.
                 if viewModel.settings.phaseRotationEnabled && viewModel.files.count > 1 {
                     HStack(alignment: .top, spacing: 6) {
@@ -159,7 +160,7 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                             .font(.caption)
                             .padding(.top, 1)
-                        Text("Phase rotation is on. If these files were recorded simultaneously in the same room, disabling it will prevent phase cancellation when the tracks are combined.")
+                        Text("2+ files queued — if these were recorded in the same room, consider applying phase rotation at the mix bus instead of per-track (see Theory of Operation).")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
