@@ -106,7 +106,99 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                        "MP3 encode may drift slightly from WAV; allow wider tolerance")
     }
 
+    /// The post-render verification pass logs a "delivered … LUFS · … dBTP"
+    /// info line for the WAV output (wav-only path).
+    func testVerificationLogsDeliveredLineForWAV() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "wax_off_verify_wav.wav",
+            durationSeconds: 4.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .wav
+        settings.outputDirectoryPath = workDir.path
+
+        let (outputs, info) = try await runCapturingLog(input: input, settings: settings)
+        let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
+        let line = try XCTUnwrap(info.first(where: { $0.contains("delivered \(wav.lastPathComponent)") }),
+                                 "expected a 'delivered' verification line for the WAV output")
+        XCTAssertTrue(line.contains("LUFS") && line.contains("dBTP"),
+                      "verification line should report integrated loudness and true peak")
+    }
+
+    /// Same verification line is logged for the MP3 output (mp3-only path).
+    func testVerificationLogsDeliveredLineForMP3() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "wax_off_verify_mp3.wav",
+            durationSeconds: 4.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .mp3
+        settings.mp3Bitrate = 160
+        settings.outputDirectoryPath = workDir.path
+
+        let (outputs, info) = try await runCapturingLog(input: input, settings: settings)
+        let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
+        let line = try XCTUnwrap(info.first(where: { $0.contains("delivered \(mp3.lastPathComponent)") }),
+                                 "expected a 'delivered' verification line for the MP3 output")
+        XCTAssertTrue(line.contains("LUFS") && line.contains("dBTP"),
+                      "verification line should report integrated loudness and true peak")
+    }
+
+    /// In `.both` mode the verification pass runs once per delivered file, so
+    /// both the WAV and the MP3 get their own "delivered" line.
+    func testVerificationLogsDeliveredLinesForBothOutputs() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "wax_off_verify_both.wav",
+            durationSeconds: 4.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .both
+        settings.mp3Bitrate = 160
+        settings.outputDirectoryPath = workDir.path
+
+        let (outputs, info) = try await runCapturingLog(input: input, settings: settings)
+        let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
+        let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
+        XCTAssertTrue(info.contains(where: { $0.contains("delivered \(wav.lastPathComponent)") }),
+                      "expected a 'delivered' line for the WAV in .both mode")
+        XCTAssertTrue(info.contains(where: { $0.contains("delivered \(mp3.lastPathComponent)") }),
+                      "expected a 'delivered' line for the MP3 in .both mode")
+    }
+
     // MARK: -
+
+    /// Drives `DeliveryProcessor.process` while capturing the processing-log
+    /// stream, returning the produced outputs and the info-level log messages.
+    private func runCapturingLog(input: URL, settings: WaxOffSettings) async throws -> (outputs: [URL], info: [String]) {
+        let collector = LogCollector()
+        let outputs = try await DeliveryProcessor().process(
+            url: input,
+            settings: settings,
+            onLog: { message, level in collector.append(message, level) }
+        )
+        return (outputs, collector.infoMessages)
+    }
 
     /// Re-runs loudnorm pass-1 analysis on the given file and returns the
     /// integrated-loudness reading. Same parsing path the processor uses, so
@@ -121,5 +213,26 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         let dict = try XCTUnwrap(FFmpegRunner.parseLoudnormJSON(from: stderr))
         let inputI = try XCTUnwrap(dict["input_i"])
         return try XCTUnwrap(Double(inputI))
+    }
+}
+
+/// Thread-safe sink for the `onLog` callback, which fires from the processor's
+/// concurrency domain. Lets a test collect log lines and inspect them after the
+/// awaited run completes.
+private final class LogCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lines: [(message: String, level: LogLevel)] = []
+
+    func append(_ message: String, _ level: LogLevel) {
+        lock.lock(); defer { lock.unlock() }
+        lines.append((message, level))
+    }
+
+    var infoMessages: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return lines.compactMap { line in
+            if case .info = line.level { return line.message }
+            return nil
+        }
     }
 }

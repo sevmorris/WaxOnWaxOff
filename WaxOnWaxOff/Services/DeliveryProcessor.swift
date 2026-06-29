@@ -194,6 +194,7 @@ actor DeliveryProcessor {
             outputURLs.append(wavFinalURL)
             onLog?("✓ \(wavFinalURL.lastPathComponent)", .info)
             onLog?("  → \(wavFinalURL.path)", .verbose)
+            await verifyDelivered(ffmpeg: ffmpeg, output: wavFinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)
         }
 
         // Phase 3: Encode MP3 (if needed)
@@ -230,6 +231,7 @@ actor DeliveryProcessor {
                 outputURLs.append(mp3FinalURL)
                 onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
                 onLog?("  → \(mp3FinalURL.path)", .verbose)
+                await verifyDelivered(ffmpeg: ffmpeg, output: mp3FinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -337,6 +339,53 @@ actor DeliveryProcessor {
             )
         }
         return measurements.isFinite ? measurements : nil
+    }
+
+    /// Post-render verification: re-measure a finished output file and log its
+    /// integrated loudness and true peak. Purely advisory — the render already
+    /// succeeded and the file is delivered, so this never throws and a
+    /// measurement hiccup only downgrades to a verbose note.
+    private func verifyDelivered(
+        ffmpeg: String,
+        output: URL,
+        settings: WaxOffSettings,
+        fileDuration: TimeInterval?,
+        onLog: (@Sendable (String, LogLevel) -> Void)?
+    ) async {
+        guard let m = await measureOutput(ffmpeg: ffmpeg, output: output, settings: settings, fileDuration: fileDuration) else {
+            onLog?("  could not verify \(output.lastPathComponent) — output loudness/true-peak not measured", .verbose)
+            return
+        }
+        onLog?(String(format: "  delivered %@: %.1f LUFS · %.1f dBTP", output.lastPathComponent, m.inputI, m.inputTP), .info)
+        onLog?(String(format: "  measured %@: I=%.2f LUFS  TP=%.2f dBTP  LRA=%.2f LU  thresh=%.2f LUFS",
+                      output.lastPathComponent, m.inputI, m.inputTP, m.inputLRA, m.inputThresh), .verbose)
+    }
+
+    /// Loudnorm analysis pass over a finished output file, reusing the same
+    /// capture + JSON parsing path as the pre-render analysis. The target
+    /// params don't affect the reported `input_*` values, so any valid
+    /// loudnorm call returns the output's own integrated loudness / true peak.
+    /// Returns nil if the pass or parse fails.
+    private func measureOutput(
+        ffmpeg: String,
+        output: URL,
+        settings: WaxOffSettings,
+        fileDuration: TimeInterval?
+    ) async -> LoudnormMeasurements? {
+        let lufs = formatNumber(settings.targetLUFS)
+        let tp   = String(format: "%.1f", settings.truePeak)
+        let lra  = formatNumber(settings.lra)
+        let args = [
+            "-hide_banner", "-nostats", "-y",
+            "-i", output.path, "-map", "0:a:0",
+            "-af", "loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json",
+            "-f", "null", "-"
+        ]
+        guard let stderr = try? await FFmpegRunner.capture(exe: ffmpeg, args: args, fileDuration: fileDuration),
+              let dict = FFmpegRunner.parseLoudnormJSON(from: stderr),
+              let m = LoudnormMeasurements(json: dict.mapValues { $0 as Any })
+        else { return nil }
+        return m
     }
 
     private func renderWAV(
