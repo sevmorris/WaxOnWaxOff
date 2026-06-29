@@ -9,7 +9,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("OUTPUT FORMAT")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Color.accentColor.opacity(0.8))
+                    .foregroundStyle(Color.brandAccent.opacity(0.8))
                     .kerning(0.4)
                     .padding(.top, 6)
                     .padding(.horizontal, 2)
@@ -43,7 +43,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("OUTPUT DIR")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Color.accentColor.opacity(0.8))
+                        .foregroundStyle(Color.brandAccent.opacity(0.8))
                         .kerning(0.4)
                     if let path = viewModel.settings.outputDirectoryPath {
                         Text(URL(fileURLWithPath: path).lastPathComponent)

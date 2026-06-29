@@ -49,7 +49,7 @@ private struct ModeCard: View {
             VStack(spacing: 12) {
                 Image(systemName: systemImage)
                     .font(.system(size: 32))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.brandAccent)
 
                 Text(title)
                     .font(.title2.bold())
@@ -64,11 +64,11 @@ private struct ModeCard: View {
             .padding(.horizontal, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isHovering ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.04))
+                    .fill(isHovering ? Color.brandAccent.opacity(0.08) : Color.primary.opacity(0.04))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .strokeBorder(
-                                isHovering ? Color.accentColor.opacity(0.4) : Color.primary.opacity(0.12),
+                                isHovering ? Color.brandAccent.opacity(0.4) : Color.primary.opacity(0.12),
                                 lineWidth: 1
                             )
                     )

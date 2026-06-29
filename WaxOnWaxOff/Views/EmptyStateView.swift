@@ -7,7 +7,7 @@ struct EmptyStateView: View {
         VStack(spacing: 16) {
             Image(systemName: mode == .waxOn ? "mic.fill" : "antenna.radiowaves.left.and.right")
                 .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor.opacity(0.5))
+                .foregroundStyle(Color.brandAccent.opacity(0.5))
 
             VStack(spacing: 8) {
                 Text("Drag and drop audio files here to get started.")

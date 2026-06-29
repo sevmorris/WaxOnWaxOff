@@ -17,7 +17,7 @@ struct ModeSwitcher: View {
                         .padding(.vertical, 4)
                         .background(
                             active
-                                ? AnyShapeStyle(Color.accentColor)
+                                ? AnyShapeStyle(Color.brandAccent)
                                 : AnyShapeStyle(Color.clear),
                             in: RoundedRectangle(cornerRadius: 6)
                         )

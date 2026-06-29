@@ -20,7 +20,7 @@ struct ToggleSwitch: View {
                         .stroke(Color.primary.opacity(0.18), lineWidth: 0.5)
                 )
                 .shadow(
-                    color: tinted && isOn ? Color.accentColor.opacity(0.6) : .clear,
+                    color: tinted && isOn ? Color.brandAccent.opacity(0.6) : .clear,
                     radius: tinted && isOn ? 4 : 0
                 )
 
@@ -41,7 +41,7 @@ struct ToggleSwitch: View {
 
     private var trackFill: AnyShapeStyle {
         if tinted && isOn {
-            return AnyShapeStyle(Color.accentColor)
+            return AnyShapeStyle(Color.brandAccent)
         }
         return AnyShapeStyle(Color.primary.opacity(0.18))
     }

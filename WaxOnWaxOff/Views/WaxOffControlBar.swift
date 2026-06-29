@@ -38,7 +38,7 @@ struct WaxOffControlBar: View {
         .background(.regularMaterial)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.accentColor.opacity(0.35))
+                .fill(Color.brandAccent.opacity(0.35))
                 .frame(height: 1)
         }
     }

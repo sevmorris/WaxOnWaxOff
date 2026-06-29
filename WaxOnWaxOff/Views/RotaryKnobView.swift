@@ -116,7 +116,7 @@ struct RotaryKnobView: View {
 
                 ctx.stroke(
                     path,
-                    with: .color(fraction <= value ? Color.accentColor : Color.primary.opacity(0.2)),
+                    with: .color(fraction <= value ? Color.brandAccent : Color.primary.opacity(0.2)),
                     lineWidth: i == 0 || i == totalTicks - 1 ? 2 : 1.5
                 )
             }

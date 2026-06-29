@@ -12,10 +12,10 @@ struct FileInfoStatsView: View {
                     if showingOutput {
                         Text("OUTPUT")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(Color.brandAccent)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
-                            .background(Color.accentColor.opacity(0.15))
+                            .background(Color.brandAccent.opacity(0.15))
                             .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                     infoRow(info)
@@ -72,14 +72,14 @@ struct FileInfoStatsView: View {
     }
 
     private func peakColor(_ peak: Double) -> Color {
-        if peak >= 0   { return .red }
-        if peak >= -3  { return .orange }
+        if peak >= 0   { return .meterCritical }
+        if peak >= -3  { return .meterWarning }
         return .primary
     }
 
     private func noiseFloorColor(_ nf: Double) -> Color {
-        if nf > -40 { return .red }
-        if nf > -50 { return .orange }
+        if nf > -40 { return .meterCritical }
+        if nf > -50 { return .meterWarning }
         return .primary
     }
 

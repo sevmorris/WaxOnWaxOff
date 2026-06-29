@@ -87,7 +87,7 @@ struct FileRowView: View {
 
                 if file.hasHighNoiseFloor {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.meterWarning)
                         .font(.caption)
                         .help("High noise floor — loudness normalization may be less accurate. Enable Loudness Norm so the automatic NR analysis runs.")
                 }
@@ -120,7 +120,7 @@ struct FileRowView: View {
             if case .processing = file.status {
                 ProgressView(value: nil as Double?)
                     .progressViewStyle(.linear)
-                    .tint(.accentColor)
+                    .tint(.brandAccent)
             } else if isProcessing, case .ready = file.status {
                 ProgressView(value: 0.0, total: 1.0)
                     .progressViewStyle(.linear)

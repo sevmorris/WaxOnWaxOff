@@ -138,7 +138,7 @@ struct ContentView: View {
         .background(.regularMaterial)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.accentColor.opacity(0.35))
+                .fill(Color.brandAccent.opacity(0.35))
                 .frame(height: 1)
         }
     }
