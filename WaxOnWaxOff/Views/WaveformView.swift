@@ -3,7 +3,7 @@ import SwiftUI
 struct WaveformView: View {
     let waveformData: WaveformData?
 
-    private let dbLevels: [Double] = [0, -1, -2, -3, -4, -5, -6, -12, -18, -24, -36, -48]
+    private let dbLevels: [Double] = [0, -6, -12, -24, -48]
 
     var body: some View {
         Group {
