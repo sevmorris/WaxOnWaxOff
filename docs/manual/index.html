@@ -535,7 +535,7 @@
   <!-- WaxOn Mode -->
   <section id="waxon-overview">
     <h2>WaxOn Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, optional dynamic leveling, loudness normalization, phase rotation, and brick-wall limiting, outputting 24-bit WAV files ready to drop into Logic Pro, Reaper, or any other editor.</p>
+    <p>WaxOn prepares raw podcast recordings for editing in a DAW. It handles high-pass filtering, optional dynamic leveling, loudness normalization, phase rotation, and true-peak ceiling control, outputting 24-bit WAV files ready to drop into Logic Pro, Reaper, or any other editor.</p>
     <p>WaxOn is a first-step ingest processor: get your raw recordings into a consistent, workable format before editing. It does not do spectral repair, noise reduction, or multiband restoration. For recordings with noise problems, de-essing needs, or other surgical work, dedicated tools like iZotope RX are the right choice.</p>
 
     <h3>Quick Start</h3>
@@ -648,7 +648,7 @@
         <tr>
           <td>Loudness Norm</td>
           <td>On · Off</td>
-          <td>Enables two-pass EBU R128 loudness normalization. The analysis pass applies RNNoise internally on a temp copy to prevent broadband noise from skewing the loudness measurement; the output signal is not affected. Off = filtering and limiting only.</td>
+          <td>Enables two-pass EBU R128 loudness normalization. The analysis pass applies RNNoise internally on a temp copy to prevent broadband noise from skewing the loudness measurement; the output signal is not affected. Off = filtering and linear peak normalization to the −1.0 dBTP ceiling only.</td>
         </tr>
         <tr>
           <td>Target LUFS</td>
@@ -689,8 +689,8 @@
       </li>
       <li>
         <div>
-          <strong>Brick-Wall Limiting</strong>
-          <span>The signal is upsampled to 2× the target rate, passed through FFmpeg's <code>alimiter</code> with a 5 ms attack and 50 ms release, then resampled back and written as 24-bit WAV. Running at 2× makes inter-sample peaks visible to the limiter, preventing true peak violations in the final file.</span>
+          <strong>True-Peak Control</strong>
+          <span>When Loudness Norm is on, the signal is upsampled to 2× the target rate, passed through FFmpeg's <code>alimiter</code> with a 5 ms attack and 50 ms release, then resampled back — running at 2× makes inter-sample peaks visible to the limiter, preventing true peak violations. When Loudness Norm is off, the limiter is replaced by downward-only linear peak normalization: the true peak is measured and a single attenuating gain brings it to the −1.0 dBTP ceiling (a transparent pass-through when the source is already under it), preserving the source's dynamics. Either way the output honors the −1.0 dBTP ceiling and is written as 24-bit WAV.</span>
         </div>
       </li>
     </ol>
@@ -950,7 +950,7 @@
     <p>The <strong>FLOOR</strong> stat estimates the background noise level. Below −60 dBFS is typically a clean recording. Between −60 and −50 dBFS the noise may be audible but is unlikely to affect processing. Above −50 dBFS (orange) the noise floor is high enough to skew loudness measurements, and above −40 dBFS (red) it will almost certainly affect results. At those levels, make sure Loudness Norm is enabled — WaxOn auto-applies RNNoise to the measurement pass — and consider running a dedicated noise-reduction tool (e.g. iZotope RX) on the source before WaxOn for the best result.</p>
 
     <h3>WaxOn: Loudnorm On or Off?</h3>
-    <p>For consistent batch ingest where files were recorded at different gain levels, turn Loudness Norm on. It ensures every file lands at the same integrated loudness before the limiter. For a single file or when you want to preserve the original level relationship between takes, leave it off and let the limiter handle ceiling compliance only.</p>
+    <p>For consistent batch ingest where files were recorded at different gain levels, turn Loudness Norm on. It ensures every file lands at the same integrated loudness before the limiter. For a single file or when you want to preserve the original level relationship between takes, leave it off and let downward-only linear peak normalization handle ceiling compliance only — no limiting.</p>
 
     <h3>WaxOff: Choosing a LUFS Target</h3>
     <p>−18 LUFS is a safe, conservative delivery target rather than a level the platforms themselves use: it sits below the major platform targets (Spotify −14, Apple Podcasts −16), so both boost it modestly rather than attenuate it. −16 LUFS gives a louder result but is still within typical platform limits. Going higher than −14 LUFS risks clipping or rejection by some platforms. When in doubt, use the Podcast Standard preset.</p>
