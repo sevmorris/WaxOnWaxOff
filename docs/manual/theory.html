@@ -764,13 +764,14 @@
     <p>At least 5 blocks are required for a meaningful estimate (about 2 seconds of audio). Shorter files show no FLOOR stat.</p>
 
     <h3>Thresholds and Color Coding</h3>
-    <p>The FLOOR stat is color-coded in the stats panel:</p>
+    <p>In WaxOn, the FLOOR stat is color-coded in the stats panel:</p>
     <ul>
       <li><strong>Normal (no color)</strong>: noise floor below −50 dBFS. Unlikely to affect loudness measurements meaningfully.</li>
       <li><strong>Orange (above −50 dBFS)</strong>: the noise floor may be contributing to the integrated loudness measurement. Speech targets may be slightly undershot. When Loudness Norm is enabled, WaxOn's internal NR-for-measurement pass will help accuracy; the noise in the output itself is unaffected.</li>
       <li><strong>Red (above −40 dBFS)</strong>: the noise floor is high enough to significantly skew loudness measurements. At this level, the noise is almost certainly audible to listeners as well. Consider dedicated noise reduction in iZotope RX or similar before processing in WaxOn.</li>
     </ul>
-    <p>Files with an orange or red noise floor also show a ⚠️ warning badge in the file list.</p>
+    <p>In WaxOn, files with an orange or red noise floor also show a ⚠️ warning badge in the file list.</p>
+    <p><strong>WaxOff suppresses both the color-coding and the badge.</strong> The thresholds above are calibrated for a raw, unedited speech floor — the gap between words where the mic captures only the room. A finished delivery mix legitimately carries continuous low-level content there: music beds, room tone deliberately left under the voice, sustained ambience. That content reads as a high floor without being a defect, so flagging it on a delivery file would be a false alarm. WaxOff still computes and displays the same FLOOR value — the measurement is identical to WaxOn's — and only withholds the warning/critical styling. WaxOn's thresholds (−50 / −40 dBFS) and behavior are unchanged.</p>
   </section>
 
   <!-- NR-for-Measurement -->
