@@ -811,7 +811,7 @@
         <tr>
           <td>Target LUFS</td>
           <td>−24 to −14 LUFS · 1 LUFS steps · default −18</td>
-          <td>Integrated loudness target. −18 LUFS is the podcast standard used by most hosting platforms. −16 LUFS gives a louder result.</td>
+          <td>Integrated loudness target. −18 LUFS is a safe, conservative target that sits below the major platform levels (Spotify −14, Apple Podcasts −16), so both boost rather than attenuate it. −16 LUFS gives a louder result.</td>
         </tr>
         <tr>
           <td>Output Dir</td>
@@ -953,7 +953,7 @@
     <p>For consistent batch ingest where files were recorded at different gain levels, turn Loudness Norm on. It ensures every file lands at the same integrated loudness before the limiter. For a single file or when you want to preserve the original level relationship between takes, leave it off and let the limiter handle ceiling compliance only.</p>
 
     <h3>WaxOff: Choosing a LUFS Target</h3>
-    <p>−18 LUFS is the standard for most podcast platforms. −16 LUFS gives a louder result but is still within typical platform limits. Going higher than −14 LUFS risks clipping or rejection by some platforms. When in doubt, use the Podcast Standard preset.</p>
+    <p>−18 LUFS is a safe, conservative delivery target rather than a level the platforms themselves use: it sits below the major platform targets (Spotify −14, Apple Podcasts −16), so both boost it modestly rather than attenuate it. −16 LUFS gives a louder result but is still within typical platform limits. Going higher than −14 LUFS risks clipping or rejection by some platforms. When in doubt, use the Podcast Standard preset.</p>
 
     <h3>WaxOn: Mono vs. Stereo for Podcasts</h3>
     <p>Most podcast editing workflows prefer mono tracks per speaker, which are easier to pan, balance, and process individually. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface captures both mics on a single stereo file, set Output to Stereo and process before bringing into your DAW.</p>
