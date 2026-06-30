@@ -9,12 +9,6 @@ _None currently tracked._
 
 ## Test gaps
 
-- **Both-mode partial-failure** — no test for the WAV-success + MP3-
-  failure path in DeliveryProcessor. Drive via `run()` with
-  `outputMode = .both` and `mp3Bitrate = 0`; assert result lands in
-  successes with non-nil `mp3FailureMessage` and WAV exists at output
-  path.
-
 - **Duration parse-site validation** — the parse-site guard (T2-5) is
   correct but untested; requires a crafted corrupt container. The
   `effectiveTimeoutSeconds` belt-and-suspenders is covered by the

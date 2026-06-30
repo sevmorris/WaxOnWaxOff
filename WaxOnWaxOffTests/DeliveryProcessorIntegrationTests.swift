@@ -186,6 +186,67 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "expected a 'delivered' line for the MP3 in .both mode")
     }
 
+    /// Both-mode partial failure: when the MP3 encode fails but the WAV already
+    /// rendered, the file lands in `successes` with a non-nil `mp3FailureMessage`
+    /// and the WAV exists at its output path; no MP3 is reported or written.
+    ///
+    /// The failure is forced with a negative `mp3Bitrate`, which reaches the
+    /// spawned `libmp3lame` process and fails it at the ffmpeg layer (exit 222,
+    /// "Result too large") — there is no Swift-side bitrate guard, so this
+    /// exercises the genuine partial-failure aggregation path rather than a
+    /// pre-flight short-circuit. (A bitrate of 0 is silently clamped to a valid
+    /// default by libmp3lame and would NOT fail.) The `FFmpeg failed` assertion
+    /// below pins that distinction.
+    func testBothModePartialFailureDeliversWAVAndReportsMP3Failure() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "wax_off_partial.wav",
+            durationSeconds: 2.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .both
+        settings.mp3Bitrate = -1
+        settings.outputDirectoryPath = workDir.path
+
+        let collector = LogCollector()
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings,
+            onLog: { message, level in collector.append(message, level) }
+        )
+
+        XCTAssertEqual(result.failures.count, 0,
+                       "WAV-success/MP3-failure must aggregate into successes, not failures")
+        let job = try XCTUnwrap(result.successes.first)
+
+        let mp3Failure = try XCTUnwrap(job.mp3FailureMessage,
+                                       "partial failure must carry a non-nil mp3FailureMessage")
+        // Proves the failure originated in the spawned ffmpeg encode process, not a
+        // Swift-side guard that never runs ffmpeg.
+        XCTAssertTrue(mp3Failure.contains("FFmpeg failed"),
+                      "mp3FailureMessage should reflect a real ffmpeg encode failure, got: \(mp3Failure)")
+
+        // WAV delivered and present on disk; MP3 neither listed nor written.
+        let wav = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "wav" }),
+                                "the WAV should be among the delivered outputs")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: wav.path),
+                      "the delivered WAV should exist at its output path")
+        XCTAssertFalse(job.outputURLs.contains(where: { $0.pathExtension == "mp3" }),
+                       "no MP3 should be reported among outputs when its encode failed")
+        let expectedMP3 = wav.deletingPathExtension().appendingPathExtension("mp3")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: expectedMP3.path),
+                       "no MP3 file should be written when its encode failed")
+
+        XCTAssertTrue(collector.infoMessages.contains { $0.contains("MP3 encoding failed") },
+                      "the processing log should record the MP3 encoding failure")
+    }
+
     // MARK: -
 
     /// Drives `DeliveryProcessor.process` while capturing the processing-log
