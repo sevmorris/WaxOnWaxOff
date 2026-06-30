@@ -923,9 +923,10 @@
   <section id="waxoff-design">
     <h2>WaxOff Design Rationale <span class="mode-badge mode-waxoff">WaxOff</span></h2>
 
-    <h3>Always Stereo Output</h3>
-    <p>WaxOff always outputs 2-channel stereo. Mono input is accepted: WaxOff upmixes it to dual-mono as the first filter stage — before phase rotation and loudnorm. Both the pass-1 loudness measurement and the pass-2 gain correction then operate on the stereo signal, so the output lands at the configured LUFS target regardless of whether the source was mono or stereo.</p>
+    <h3>Stereo Output and Mono Delivery</h3>
+    <p>WaxOff outputs 2-channel stereo by default. Mono input is accepted: WaxOff upmixes it to dual-mono as the first filter stage — before phase rotation and loudnorm. Both the pass-1 loudness measurement and the pass-2 gain correction then operate on the stereo signal, so the output lands at the configured LUFS target regardless of whether the source was mono or stereo.</p>
     <p>The position of the upmix matters. The intuitive approach — normalize, then duplicate channels — produces output that reads approximately 3 LU above target. The reason: loudnorm's gain correction is computed against the mono signal. When <code>-ac 2</code> then duplicates the channels at encode time, the stereo loudness measurement sums both channels' energy; a dual-mono file where L and R carry identical content reads louder than the mono signal the gain was chosen for. Moving the upmix before loudnorm avoids this: both passes normalize the stereo signal they will actually output.</p>
+    <p>Mono delivery is the inverse. When the Channels control selects mono for a mono source, the upmix is skipped outright — not applied and then undone — in both the analysis and render passes. With no dual-mono pair created at any point, the +3 LU quirk above simply does not arise: there is nothing to correct for. Loudnorm measures and normalizes the native single channel, and the output is written as that one channel. The same invariant holds as in the dual-mono case — both passes operate on an identical channel layout, so the pass-1 gain stays valid for the pass-2 render. The control is batch-wide rather than per-file: it is offered only when every loaded source is mono, so the choice unambiguously applies to the whole run. And it is not a downmix — a stereo source is always delivered as stereo, untouched by this setting.</p>
 
     <h3>No High-Pass Filter</h3>
     <p>WaxOff doesn't include a high-pass filter. By the time a mix reaches WaxOff, it has presumably been edited and processed in a DAW. High-pass filtering, EQ, and cleanup are part of the editing workflow. WaxOff assumes the mix is already correct and applies only the normalization needed for delivery.</p>
@@ -1193,8 +1194,8 @@
         </tr>
         <tr>
           <td>Output channels</td>
-          <td>—</td>
-          <td>Always stereo (mono upmixed to dual-mono)</td>
+          <td>Mono · Stereo (mono sources only)</td>
+          <td>Stereo (mono upmixed to dual-mono)</td>
         </tr>
       </tbody>
     </table>
