@@ -13,9 +13,17 @@ All notable changes to WaxOn/WaxOff are documented here. Version numbers match G
 **Interface**
 - Waveform dB axis switched to a fixed sparse tick set (0, −6, −12, −24, −48 dBFS); the previous 1-dB spacing crowded the top 6 dB and dropped labels inconsistently
 - WaxOn multi-file phase-rotation hint escalated from a passive note to an active recommendation — with 2+ files queued and phase rotation on, it now suggests applying phase rotation at the mix bus rather than per-track for same-room recordings; the default (phase rotation on) is unchanged
+- WaxOff gains a mono delivery option for mono sources — a Mono/Stereo channel toggle in the Output Format panel (mirroring WaxOn's) that delivers a true single-channel WAV/MP3 instead of the dual-mono-stereo upmix. Enabled only when every loaded source is mono; defaults to off (dual-mono stereo unchanged); never downmixes a stereo source
+- FLOOR noise-floor warning styling is suppressed in WaxOff — the stats-panel value and the file-list badge still appear, but the warning/critical coloring no longer fires, since a finished delivery mix may legitimately carry continuous low-level content (music beds, room tone under a mix). WaxOn's −40/−50 dBFS thresholds are unchanged
+
+**Robustness**
+- Update checker distinguishes a GitHub API rate-limit response (403 with a rate-limit body) from a genuine connectivity failure, surfacing an accurate "rate limit reached" message instead of "check your internet connection"
 
 **Structural**
 - Brand-accent and metering warning/critical colors routed through named semantic tokens (`brandAccent`, `meterWarning`, `meterCritical`); ~20 call sites across the view layer repointed with no change to any rendered color
+- WaxOn's Loudness-Norm-on path fuses the pass-2 linear normalize and the 2× oversampled limiter into a single ffmpeg filter chain, eliminating one intermediate WAV write/read — internal only, with no change to the rendered result (verified loudness/true-peak-equivalent to the prior two-process approach)
+- `moveAtomically` cross-volume branch (copy → rename → source cleanup) now covered by a RAM-disk fixture test (`hdiutil` / `diskutil`), skipping cleanly where a RAM disk can't be created
+- DeliveryProcessor Both-mode partial-failure path (WAV succeeds, MP3 encode fails) now covered by a test asserting the file lands in successes with a non-nil `mp3FailureMessage` and the WAV present at its output path
 
 ## [2.0.9] — 2026-06-02
 
