@@ -247,6 +247,88 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "the processing log should record the MP3 encoding failure")
     }
 
+    // MARK: - Mono delivery (mono sources)
+
+    /// (a) Mono source + mono delivery ON → a true single-channel WAV and MP3 that still
+    /// land on target — there's no upmix happening to create a dual-mono +3 LU artifact.
+    func testMonoDeliveryProducesSingleChannelOnTarget() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "mono_on.wav",
+            durationSeconds: 4.0, sampleRate: 44100, channels: 1
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .both
+        settings.mp3Bitrate = 160
+        settings.monoDelivery = true
+        settings.outputDirectoryPath = workDir.path
+
+        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
+        let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
+
+        let wavChannels = try await channelCount(ffprobe: tools.ffprobe, of: wav)
+        XCTAssertEqual(wavChannels, 1, "mono delivery should produce a single-channel WAV")
+        let mp3Channels = try await channelCount(ffprobe: tools.ffprobe, of: mp3)
+        XCTAssertEqual(mp3Channels, 1, "mono delivery should produce a single-channel MP3")
+
+        let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: wav)
+        XCTAssertEqual(measuredI, settings.targetLUFS, accuracy: 1.0,
+                       "mono delivery should still hit target (no dual-mono +3 LU artifact)")
+    }
+
+    /// (b) Mono source + mono delivery OFF (default) → existing dual-mono-stereo behavior
+    /// is completely unchanged. The regression guard that matters most.
+    func testMonoDeliveryOffUpmixesToDualMonoStereo() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "mono_off.wav",
+            durationSeconds: 4.0, sampleRate: 44100, channels: 1
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .wav
+        settings.monoDelivery = false   // default
+        settings.outputDirectoryPath = workDir.path
+
+        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
+
+        let wavChannels = try await channelCount(ffprobe: tools.ffprobe, of: wav)
+        XCTAssertEqual(wavChannels, 2, "default (mono delivery off) must still upmix a mono source to dual-mono stereo")
+        let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: wav)
+        XCTAssertEqual(measuredI, settings.targetLUFS, accuracy: 1.0,
+                       "upmix-before-loudnorm keeps a mono source on target, not +3 LU over")
+    }
+
+    /// (c) Stereo source → the mono-delivery control is inert regardless of its state: the
+    /// output stays stereo even with monoDelivery forced on. This is not a downmix feature.
+    func testStereoSourceIgnoresMonoDeliverySetting() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "stereo_src.wav",
+            durationSeconds: 4.0, sampleRate: 44100, channels: 2
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .wav
+        settings.monoDelivery = true    // on, but must be ignored for a stereo source
+        settings.outputDirectoryPath = workDir.path
+
+        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
+
+        let wavChannels = try await channelCount(ffprobe: tools.ffprobe, of: wav)
+        XCTAssertEqual(wavChannels, 2, "a stereo source must remain stereo regardless of the mono-delivery setting")
+    }
+
     // MARK: -
 
     /// Drives `DeliveryProcessor.process` while capturing the processing-log
@@ -274,6 +356,15 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         let dict = try XCTUnwrap(FFmpegRunner.parseLoudnormJSON(from: stderr))
         let inputI = try XCTUnwrap(dict["input_i"])
         return try XCTUnwrap(Double(inputI))
+    }
+
+    /// Channel count of audio stream a:0 via ffprobe.
+    private func channelCount(ffprobe: String, of url: URL) async throws -> Int {
+        let out = try await FFmpegRunner.captureStdout(exe: ffprobe, args: [
+            "-v", "error", "-select_streams", "a:0",
+            "-show_entries", "stream=channels", "-of", "default=nw=1:nk=1", url.path
+        ])
+        return try XCTUnwrap(Int(out.trimmingCharacters(in: .whitespacesAndNewlines)))
     }
 }
 

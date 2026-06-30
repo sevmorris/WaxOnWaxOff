@@ -14,6 +14,10 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
     var mp3Bitrate: Int = 160
     var sampleRate: Int = 44100
     var outputDirectoryPath: String? = nil
+    /// True single-channel delivery for mono sources — skips the dual-mono upmix.
+    /// Only applies when the source is itself mono; inert for stereo sources.
+    /// Default false preserves the existing dual-mono-stereo behavior.
+    var monoDelivery: Bool = false
 
     static let `default` = WaxOffSettings()
 
@@ -71,7 +75,8 @@ extension WaxOffSettings {
             outputMode:          try c.decodeIfPresent(OutputMode.self, forKey: .outputMode)          ?? d.outputMode,
             mp3Bitrate:          try c.decodeIfPresent(Int.self,        forKey: .mp3Bitrate)          ?? d.mp3Bitrate,
             sampleRate:          try c.decodeIfPresent(Int.self,        forKey: .sampleRate)          ?? d.sampleRate,
-            outputDirectoryPath: try c.decodeIfPresent(String.self,     forKey: .outputDirectoryPath) ?? d.outputDirectoryPath
+            outputDirectoryPath: try c.decodeIfPresent(String.self,     forKey: .outputDirectoryPath) ?? d.outputDirectoryPath,
+            monoDelivery:        try c.decodeIfPresent(Bool.self,       forKey: .monoDelivery)        ?? d.monoDelivery
         )
     }
 }

@@ -34,6 +34,16 @@ final class DeliveryViewModel {
     }
     var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
+    /// True when every loaded file with known channel info is single-channel. The mono
+    /// delivery control only applies to mono sources; for stereo, mixed, or an empty
+    /// queue it stays inert. (The pipeline independently ignores the setting for any
+    /// stereo source, so this only governs whether the control is enabled in the UI.)
+    var allLoadedSourcesMono: Bool {
+        let known = files.compactMap(\.fileInfo)
+        guard !known.isEmpty else { return false }
+        return known.allSatisfy { $0.channelCount == 1 }
+    }
+
     init() {
         self.settings = WaxOffSettings.load()
         if let preset = presetStore.selectedPreset {

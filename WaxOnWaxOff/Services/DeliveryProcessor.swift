@@ -126,6 +126,14 @@ actor DeliveryProcessor {
         let fileDuration = await probeFileDuration(ffprobe: tools.ffprobe, url: url)
         let channelCount = await probeChannelCount(ffprobe: tools.ffprobe, url: url)
         let isMono = channelCount == 1
+        // True single-channel delivery only when the source is itself mono and the user
+        // opted in. For mono delivery there is no dual-mono pair to create the +3 LU
+        // measurement quirk, so the upmix workaround is skipped entirely (in both passes)
+        // rather than applied and undone. A stereo source ignores the setting outright.
+        let deliverMono = isMono && settings.monoDelivery
+        let upmixToStereo = isMono && !deliverMono
+        let outputChannelCount = deliverMono ? 1 : 2
+        if deliverMono { onLog?("  mono delivery: single channel (dual-mono upmix skipped)", .verbose) }
 
         let outputDir = OutputDirectory.waxOffOutputDirectory(for: url, settings: settings) { message in
             onLog?("⚠ \(message)", .info)
@@ -144,7 +152,7 @@ actor DeliveryProcessor {
         onPhase?("Analyzing loudness…")
         try Task.checkCancellation()
         onLog?("  loudnorm: analyzing…", .verbose)
-        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, isMono: isMono, fileDuration: fileDuration)
+        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, upmixToStereo: upmixToStereo, fileDuration: fileDuration)
         if let m = measurements {
             onLog?("  \(m.formattedSummary)", .info)
             onLog?(String(format: "  offset: %.2f dB  |  thresh %.1f LUFS", m.targetOffset, m.inputThresh), .verbose)
@@ -171,7 +179,8 @@ actor DeliveryProcessor {
             input: url,
             output: wavTempURL,
             settings: settings,
-            isMono: isMono,
+            upmixToStereo: upmixToStereo,
+            outputChannelCount: outputChannelCount,
             measurements: measurements,
             fileDuration: fileDuration
         )
@@ -219,6 +228,7 @@ actor DeliveryProcessor {
                     input: sourceForMP3,
                     output: mp3TempURL,
                     settings: settings,
+                    outputChannelCount: outputChannelCount,
                     fileDuration: fileDuration
                 )
 
@@ -306,17 +316,18 @@ actor DeliveryProcessor {
         ffmpeg: String,
         input: URL,
         settings: WaxOffSettings,
-        isMono: Bool,
+        upmixToStereo: Bool,
         fileDuration: TimeInterval?
     ) async throws -> LoudnormMeasurements? {
         let lufs = formatNumber(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
         let lra  = formatNumber(settings.lra)
-        // Mono input is upmixed to dual-mono first so loudnorm measures the
-        // stereo signal — matching what renderWAV will produce. Phase rotation
-        // runs next so loudnorm's TP measurement reflects the post-rotation
+        // A mono source delivered as stereo is upmixed to dual-mono first so loudnorm
+        // measures the stereo signal — matching what renderWAV will produce. (Skipped
+        // for true mono delivery, where both passes operate on the native single channel.)
+        // Phase rotation runs next so loudnorm's TP measurement reflects the post-rotation
         // waveform; without that the pass-2 gain correction overshoots target.
-        let upmix = isMono ? "pan=stereo|c0=c0|c1=c0," : ""
+        let upmix = upmixToStereo ? "pan=stereo|c0=c0|c1=c0," : ""
         let filterChain = "\(upmix)allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
 
         let args = [
@@ -393,15 +404,17 @@ actor DeliveryProcessor {
         input: URL,
         output: URL,
         settings: WaxOffSettings,
-        isMono: Bool,
+        upmixToStereo: Bool,
+        outputChannelCount: Int,
         measurements: LoudnormMeasurements?,
         fileDuration: TimeInterval?
     ) async throws {
-        // Mono input is upmixed to dual-mono first — matching the analyzeAudio
-        // filter chain so measured_I / offset remain valid for the stereo signal.
+        // A mono source delivered as stereo is upmixed to dual-mono first — matching the
+        // analyzeAudio filter chain so measured_I / offset remain valid for the stereo
+        // signal. (Skipped for true mono delivery; both passes then use the native channel.)
         // Phase rotation always runs. Loudnorm only runs when measurements
         // are available — silent inputs skip it to avoid pass-2 errors.
-        let upmix = isMono ? "pan=stereo|c0=c0|c1=c0," : ""
+        let upmix = upmixToStereo ? "pan=stereo|c0=c0|c1=c0," : ""
         var filterChain = "\(upmix)allpass=f=200:t=q:w=0.707"
         // NOTE: loudnorm pass-2 runs at the source file's native sample rate — no pre-loudnorm
         // resample in this filter chain. If you add one here, update analyzeAudio to apply the
@@ -433,7 +446,7 @@ actor DeliveryProcessor {
             // usually wants it preserved.
             "-map_metadata", "0",
             "-ar", String(settings.sampleRate),
-            "-ac", "2",
+            "-ac", String(outputChannelCount),
             "-c:a", "pcm_s24le",
             "-f", "wav",
             output.path
@@ -447,6 +460,7 @@ actor DeliveryProcessor {
         input: URL,
         output: URL,
         settings: WaxOffSettings,
+        outputChannelCount: Int,
         fileDuration: TimeInterval?
     ) async throws {
         // 2× oversample → brick-wall limit → resample back
@@ -472,7 +486,7 @@ actor DeliveryProcessor {
             "-c:a", "libmp3lame",
             "-b:a", "\(settings.mp3Bitrate)k",
             "-ar", String(mp3SampleRate),
-            "-ac", "2",
+            "-ac", String(outputChannelCount),
             // Pull artist/album/etc through from the source, then override the
             // title so it tracks the filename the user is delivering (the
             // source's "title" tag is often a stale working name).

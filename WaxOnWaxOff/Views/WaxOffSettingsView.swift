@@ -43,11 +43,30 @@ struct WaxOffSettingsView: View {
                             Text("Both").tag(OutputMode.both)
                         }
                         .pickerStyle(.segmented)
-                        Text("Mono sources are upmixed to dual-mono stereo before processing")
+                        Text("Mono sources upmix to dual-mono stereo unless Mono delivery is selected")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
+
+                row("Channels") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        LabeledToggleSwitch(
+                            selection: $viewModel.settings.monoDelivery,
+                            leftLabel: "Mono",
+                            leftValue: true,
+                            rightLabel: "Stereo",
+                            rightValue: false
+                        )
+                        .frame(maxWidth: .infinity)
+                        Text("Deliver a mono source as a single channel instead of dual-mono stereo")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(!viewModel.allLoadedSourcesMono)
+                .opacity(viewModel.allLoadedSourcesMono ? 1 : 0.4)
+                .help(viewModel.allLoadedSourcesMono ? "" : "Available only when the loaded source is mono")
 
                 row("MP3 Bitrate") {
                     Picker("", selection: $viewModel.settings.mp3Bitrate) {
