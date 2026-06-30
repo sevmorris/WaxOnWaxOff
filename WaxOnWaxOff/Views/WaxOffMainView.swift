@@ -248,7 +248,7 @@ private struct DeliveryFileListView: View {
         guard file.fileInfo?.channelCount == 1 else { return nil }
         return ChannelBadge(
             label: "MONO",
-            help: "Mono input — will be upmixed to dual-mono stereo before processing"
+            help: "Mono input — upmixed to dual-mono stereo before processing, unless Mono delivery is on"
         )
     }
 }
