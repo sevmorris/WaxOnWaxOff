@@ -2,6 +2,21 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.1.0] — 2026-06-29
+
+**Processing**
+- WaxOn with Loudness Norm off now linearly peak-normalizes instead of brick-wall limiting: the true peak of the post-leveling signal is measured and a single attenuate-only gain brings it to the −1.0 dBTP ceiling (a transparent pass-through when the source is already under it). Source dynamics are preserved at ingest — limiting is no longer applied at the prep stage unless Loudness Norm is on, where the 2× oversampled limiter remains the inter-sample-peak backstop
+
+**Diagnostics**
+- WaxOff re-measures each rendered output (the WAV, and the MP3 when produced) after render and logs the delivered values — "delivered <name>: <I> LUFS · <TP> dBTP" at info level, raw measured loudness/true-peak at verbose. The WAV/MP3 render chains are unchanged; this is a verification-only pass
+
+**Interface**
+- Waveform dB axis switched to a fixed sparse tick set (0, −6, −12, −24, −48 dBFS); the previous 1-dB spacing crowded the top 6 dB and dropped labels inconsistently
+- WaxOn multi-file phase-rotation hint escalated from a passive note to an active recommendation — with 2+ files queued and phase rotation on, it now suggests applying phase rotation at the mix bus rather than per-track for same-room recordings; the default (phase rotation on) is unchanged
+
+**Structural**
+- Brand-accent and metering warning/critical colors routed through named semantic tokens (`brandAccent`, `meterWarning`, `meterCritical`); ~20 call sites across the view layer repointed with no change to any rendered color
+
 ## [2.0.9] — 2026-06-02
 
 **Correctness**
