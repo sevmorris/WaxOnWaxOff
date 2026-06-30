@@ -29,6 +29,30 @@ actor UpdateChecker {
         }
     }
 
+    /// The GitHub error envelope (`{"message": "...", ...}`) returned on non-200 responses.
+    private struct APIError: Decodable {
+        let message: String?
+    }
+
+    /// Maps a non-200 GitHub API response to an error. GitHub answers 403 (not 200)
+    /// when the unauthenticated hourly quota is exhausted, so a 403/429 whose body
+    /// carries a rate-limit message is surfaced as a rate-limit error rather than a
+    /// connectivity failure. Pure and `nonisolated` so it can be unit-tested in isolation.
+    nonisolated static func responseError(statusCode: Int, body: Data) -> UpdateFetchError {
+        if (statusCode == 403 || statusCode == 429), isRateLimitBody(body) {
+            return .rateLimited
+        }
+        return .badResponse
+    }
+
+    /// True when the response body is a GitHub error whose message mentions a rate
+    /// limit (covers both the primary hourly quota and secondary/abuse rate limits).
+    nonisolated static func isRateLimitBody(_ body: Data) -> Bool {
+        guard let decoded = try? JSONDecoder().decode(APIError.self, from: body),
+              let message = decoded.message else { return false }
+        return message.range(of: "rate limit", options: .caseInsensitive) != nil
+    }
+
     /// App release tags only (`v1.2.3`). Ignores `ffmpeg-deps-*` and other asset releases.
     private static func isAppReleaseTag(_ tag: String) -> Bool {
         guard tag.first == "v" else { return false }
@@ -76,7 +100,7 @@ actor UpdateChecker {
             throw URLError(.badServerResponse)
         }
         guard http.statusCode == 200 else {
-            throw UpdateFetchError.badResponse
+            throw Self.responseError(statusCode: http.statusCode, body: data)
         }
         return (data, http)
     }
@@ -99,11 +123,17 @@ actor UpdateChecker {
     }
 }
 
-private enum UpdateFetchError: LocalizedError {
+enum UpdateFetchError: LocalizedError {
     case badResponse
+    case rateLimited
 
     var errorDescription: String? {
-        "Could not reach GitHub. Check your internet connection."
+        switch self {
+        case .badResponse:
+            return "Could not reach GitHub. Check your internet connection."
+        case .rateLimited:
+            return "GitHub’s API rate limit was reached. Please try again in a little while."
+        }
     }
 }
 

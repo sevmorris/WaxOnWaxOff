@@ -5,10 +5,7 @@ release-blocking but worth addressing in a future session.
 
 ## Bugs
 
-- **Update checker 403 handling** — tracked as GitHub Issue. Update
-  checker treats a GitHub API rate-limit response (403) as a network
-  failure. Fix: detect the rate-limit message in the response body and
-  surface an accurate error string.
+_None currently tracked._
 
 ## Test gaps
 
