@@ -50,12 +50,6 @@ struct AudioStats: Equatable, Sendable {
     var hasElevatedTruePeak: Bool {
         truePeak > peak + 0.1
     }
-
-    /// True when the noise floor is high enough to potentially skew loudness measurements.
-    var hasHighNoiseFloor: Bool {
-        guard let nf = noiseFloor else { return false }
-        return nf > -50.0
-    }
 }
 
 enum FileStatus: Equatable, Sendable {
@@ -95,10 +89,6 @@ struct FileItem: Identifiable, Equatable {
     var isProcessed: Bool {
         if case .processed = status { return true }
         return false
-    }
-
-    var hasHighNoiseFloor: Bool {
-        stats?.hasHighNoiseFloor ?? false
     }
 
     var outputURL: URL? {

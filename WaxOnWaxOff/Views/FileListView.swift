@@ -67,6 +67,17 @@ struct FileRowView: View {
     let file: FileItem
     var isProcessing: Bool = false
     var channelBadge: ChannelBadge? = nil
+    /// When false (WaxOff), the noise-floor warning triangle is suppressed — the
+    /// high-noise-floor heuristic targets raw speech, not finished delivery mixes.
+    var applyFloorWarnings: Bool = true
+
+    /// The warning triangle uses the same mode-aware FLOOR classifier as the stats
+    /// panel: it fires only at a flagged severity, and never in WaxOff (where a mix may
+    /// legitimately carry continuous low-level content — music beds, room tone).
+    private var showsNoiseFloorWarning: Bool {
+        guard let nf = file.stats?.noiseFloor else { return false }
+        return FileInfoStatsView.floorSeverity(dBFS: nf, applyWarnings: applyFloorWarnings) != .normal
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -85,7 +96,7 @@ struct FileRowView: View {
                         .help(badge.help)
                 }
 
-                if file.hasHighNoiseFloor {
+                if showsNoiseFloorWarning {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(Color.meterWarning)
                         .font(.caption)

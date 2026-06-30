@@ -33,4 +33,22 @@ final class FileInfoStatsViewTests: XCTestCase {
         XCTAssertEqual(FileInfoStatsView.floorSeverity(dBFS: -45, applyWarnings: false), .normal)
         XCTAssertEqual(FileInfoStatsView.floorSeverity(dBFS: -90, applyWarnings: false), .normal)
     }
+
+    // MARK: File-list noise-floor badge
+
+    /// The file-list warning triangle fires when `floorSeverity(...) != .normal` — the
+    /// same classifier as the stats panel. In WaxOn it fires above −50 dBFS (warning or
+    /// critical); a clean floor shows no badge.
+    func testFileListBadgeFiresInWaxOnAboveMinus50() {
+        XCTAssertNotEqual(FileInfoStatsView.floorSeverity(dBFS: -30, applyWarnings: true), .normal)  // critical → badge
+        XCTAssertNotEqual(FileInfoStatsView.floorSeverity(dBFS: -45, applyWarnings: true), .normal)  // warning → badge
+        XCTAssertEqual(FileInfoStatsView.floorSeverity(dBFS: -55, applyWarnings: true), .normal)     // clean → no badge
+    }
+
+    /// In WaxOff the badge never fires, even for a high floor — a finished mix may
+    /// legitimately carry continuous low-level content.
+    func testFileListBadgeNeverFiresInWaxOff() {
+        XCTAssertEqual(FileInfoStatsView.floorSeverity(dBFS: -30, applyWarnings: false), .normal)    // no badge
+        XCTAssertEqual(FileInfoStatsView.floorSeverity(dBFS: -45, applyWarnings: false), .normal)    // no badge
+    }
 }

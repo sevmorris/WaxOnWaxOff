@@ -226,7 +226,8 @@ private struct DeliveryFileListView: View {
                 FileRowView(
                     file: file,
                     isProcessing: viewModel.isProcessing,
-                    channelBadge: Self.upmixBadge(for: file)
+                    channelBadge: Self.upmixBadge(for: file),
+                    applyFloorWarnings: false
                 )
                     .tag(file.id)
             }
