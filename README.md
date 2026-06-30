@@ -57,6 +57,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **EBU R128 Normalization:** Two-pass analysis + linear gain; no dynamic compression.
 * **True Peak Management:** Configurable ceiling (−3.0 to −0.5 dBTP).
 * **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
+* **Mono Delivery:** Optional true single-channel output for mono sources (defaults to dual-mono stereo); never downmixes a stereo source.
 
 **Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
 
