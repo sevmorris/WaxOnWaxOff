@@ -9,10 +9,6 @@ _None currently tracked._
 
 ## Test gaps
 
-- **moveAtomically cross-volume branch** — the copy → rename → cleanup
-  path has no test. Feasible via a RAM-disk fixture (`hdiutil attach
-  ram://`); use `XCTSkip` when unavailable.
-
 - **Both-mode partial-failure** — no test for the WAV-success + MP3-
   failure path in DeliveryProcessor. Drive via `run()` with
   `outputMode = .both` and `mp3Bitrate = 0`; assert result lands in
