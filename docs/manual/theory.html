@@ -486,7 +486,7 @@
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Loudnorm<br><span style="font-size:0.75rem;font-weight:400;">two-pass EBU R128</span></div>
         <div class="chain-arrow">→</div>
-        <div class="chain-node">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Limit → Resample</span></div>
+        <div class="chain-node">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Peak Control → Resample</span></div>
       </div>
     </div>
     <p style="font-size:0.85rem;color:var(--muted);">Solid border = always runs. Dashed border = optional stage (Phase Rotation and Dynamic Leveling default on/off respectively; Loudnorm defaults off). RNNoise runs only when Loudnorm is enabled — on a temporary copy during pass 1 analysis, after all prior stages; it does not touch the output signal. The final stage always enforces the fixed −1.0 dBTP ceiling — a 2× oversampled limiter when Loudness Norm is on, downward-only linear peak normalization when off. Output: 24-bit WAV.</p>
