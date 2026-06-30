@@ -212,8 +212,12 @@ actor AudioProcessor {
             postDynLevelURL = midURL
         }
 
-        // Loudness normalization (optional, two-pass EBU R128)
-        let limiterInput: URL
+        // Loudness normalization (optional, two-pass EBU R128). When enabled with finite
+        // measurements, the pass-2 linear normalize is fused into the final limiter filter
+        // chain below (one ffmpeg invocation, no intermediate `_norm.wav`) rather than
+        // rendered to its own file and re-read. Pass 1 (the analysis above) is unaffected.
+        let limiterInput = postDynLevelURL
+        let loudnormFilter: String?
         if settings.loudnormEnabled {
             let target = settings.loudnormTarget
             let tp = -1.0
@@ -280,7 +284,7 @@ actor AudioProcessor {
             // normalization step and pass the audio through to the limiter as-is.
             if !measurements.isFinite {
                 onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
-                limiterInput = postDynLevelURL
+                loudnormFilter = nil
             } else {
                 onLog?("  \(measurements.formattedSummary)", .info)
                 onLog?(String(format: "  target: %.0f LUFS  |  offset %.2f dB  |  thresh %.1f LUFS",
@@ -293,34 +297,29 @@ actor AudioProcessor {
                               measurements.targetOffset, measurements.inputI, target), .info)
                 onLog?("  loudnorm: normalizing…", .verbose)
 
-                let normURL = work.appendingPathComponent("\(stem)_norm.wav")
-                let normAf = measurements.linearPassFilter(targetLUFS: target, truePeakDB: tp, lra: 20)
-
-                try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
-                    "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                    "-i", postDynLevelURL.path, "-af", normAf,
-                    "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, normURL.path
-                ], fileDuration: fileDuration)
-
-                limiterInput = normURL
+                // Fused into the final limiter chain below instead of rendered separately.
+                loudnormFilter = measurements.linearPassFilter(targetLUFS: target, truePeakDB: tp, lra: 20)
             }
         } else {
-            limiterInput = postDynLevelURL
+            loudnormFilter = nil
         }
 
         try Task.checkCancellation()
 
         if settings.loudnormEnabled {
-            // Loudness Norm ON: 2× oversampled brick-wall limiter as the final stage.
-            // loudnorm's linear pass measures true peak but can still leave inter-sample
-            // peaks above the ceiling, so the limiter stays as the ISP backstop.
+            // Loudness Norm ON: the pass-2 linear loudnorm (when measurements were finite)
+            // and the 2× oversampled brick-wall limiter run as a single fused filter chain
+            // in one ffmpeg invocation — no intermediate normalize file. The limiter stays
+            // as the inter-sample-peak backstop: loudnorm's linear pass measures true peak
+            // but can still leave ISPs above the ceiling.
             let oversampleSr = sr * 2
 
-            let step2Af = [
+            let limiterAf = [
                 FFmpegFilters.aresample(to: oversampleSr),
                 "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
                 FFmpegFilters.aresample(to: sr)
             ].joined(separator: ",")
+            let step2Af = loudnormFilter.map { "\($0),\(limiterAf)" } ?? limiterAf
 
             onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
 

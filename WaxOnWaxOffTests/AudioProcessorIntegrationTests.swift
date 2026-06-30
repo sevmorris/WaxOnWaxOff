@@ -97,6 +97,79 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         XCTAssertEqual(measuredI, settings.loudnormTarget, accuracy: 2.0)
     }
 
+    /// Loudness Norm ON now fuses the pass-2 linear normalize and the limiter into a
+    /// single filter chain (no intermediate `_norm.wav`). This pins that the fusion is
+    /// loudness-equivalent to the prior two-process approach by running BOTH on the same
+    /// measured values and asserting they match within 0.1 dB on integrated loudness and
+    /// true peak — using the production filter builders (`linearPassFilter`, the limiter
+    /// chain), and bypassing the NR-for-measurement pass whose suppression of a pure tone
+    /// would otherwise confound a "hits target" assertion. The AudioProcessor end-to-end
+    /// wiring of the fused path is exercised separately by `testWaxOnLoudnormAt48kHzHitsTarget`.
+    func testFusedLoudnormLimiterEquivalentToTwoProcess() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "fuse_eq_in.wav",
+            durationSeconds: 5.0,
+            sampleRate: 44100
+        )
+
+        // Pass-1 analysis → measured values (same capture + parse path AudioProcessor uses).
+        let analysisStderr = try await FFmpegRunner.capture(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner",
+            "-i", input.path, "-af", "loudnorm=I=-23:TP=-1.0:LRA=20:print_format=json",
+            "-f", "null", "/dev/null"
+        ])
+        let dict = try XCTUnwrap(FFmpegRunner.parseLoudnormJSON(from: analysisStderr))
+        let measurements = try XCTUnwrap(LoudnormMeasurements(json: dict.mapValues { $0 as Any }))
+        try XCTSkipIf(!measurements.isFinite, "analysis produced non-finite measurements")
+
+        // Same filter fragments AudioProcessor builds on the loudnorm-on path.
+        let normAf = measurements.linearPassFilter(targetLUFS: -23, truePeakDB: -1.0, lra: 20)
+        let limiterAf = [
+            FFmpegFilters.aresample(to: 44100 * 2),
+            "alimiter=limit=\(FFmpegFilters.limiterCeilingAmplitude(dBFS: -1.0)):attack=5:release=50:level=disabled",
+            FFmpegFilters.aresample(to: 44100)
+        ].joined(separator: ",")
+
+        // Prior two-process approach: normalize → intermediate, then limit the intermediate.
+        let normURL = workDir.appendingPathComponent("two_norm.wav")
+        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", input.path, "-af", normAf,
+            "-c:a", "pcm_s24le", "-ar", "44100", "-ac", "1", normURL.path
+        ])
+        let twoProcessURL = workDir.appendingPathComponent("two_out.wav")
+        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", normURL.path, "-af", limiterAf,
+            "-map_metadata", "0", "-c:a", "pcm_s24le", "-ar", "44100", "-ac", "1", "-f", "wav", twoProcessURL.path
+        ])
+
+        // Fused approach: one process, loudnorm + limiter in a single -af chain.
+        let fusedURL = workDir.appendingPathComponent("fused_out.wav")
+        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", input.path, "-af", "\(normAf),\(limiterAf)",
+            "-map_metadata", "0", "-c:a", "pcm_s24le", "-ar", "44100", "-ac", "1", "-f", "wav", fusedURL.path
+        ])
+
+        let twoI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: twoProcessURL)
+        let fusedI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: fusedURL)
+        let twoTP = try await measureTruePeak(ffmpeg: tools.ffmpeg, of: twoProcessURL)
+        let fusedTP = try await measureTruePeak(ffmpeg: tools.ffmpeg, of: fusedURL)
+
+        // The fusion must not change the result.
+        XCTAssertEqual(fusedI, twoI, accuracy: 0.1,
+                       "fused integrated loudness must match the two-process approach")
+        XCTAssertEqual(fusedTP, twoTP, accuracy: 0.1,
+                       "fused true peak must match the two-process approach")
+        // And both must land on target / under ceiling (no NR confound on this raw path).
+        XCTAssertEqual(fusedI, -23.0, accuracy: 0.3, "fused output should hit the loudnorm target")
+        XCTAssertLessThanOrEqual(fusedTP, -1.0 + 0.1, "fused output must honor the −1.0 dBTP ceiling")
+    }
+
     // MARK: - Loudness Norm OFF: linear peak-normalize (attenuate-only)
 
     /// With Loudness Norm off, a source hotter than −1.0 dBTP is brought to the
