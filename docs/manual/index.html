@@ -841,7 +841,7 @@
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no compression, no change to stereo image. Output is always stereo (2-channel); mono input is upmixed to dual-mono at the start of the filter chain so both passes measure and normalize the stereo signal.</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no compression, no change to stereo image. Output is stereo (2-channel) by default; mono input is upmixed to dual-mono at the start of the filter chain so both passes measure and normalize the stereo signal. With mono delivery selected the upmix is skipped and both passes run on the native single channel instead.</span>
         </div>
       </li>
       <li>
