@@ -799,6 +799,11 @@
           <td>WAV is always 24-bit PCM. MP3 is CBR at the chosen bitrate. Both produces two output files.</td>
         </tr>
         <tr>
+          <td>Channels</td>
+          <td>Mono · Stereo · default Stereo</td>
+          <td>Mirrors WaxOn's channel toggle. Stereo (default) keeps the existing behavior — a stereo source passes through and a mono source is upmixed to dual-mono stereo. Mono delivers a mono source as a true single channel instead, skipping the upmix. Enabled only when every loaded source is mono — the control is batch-wide, not per-file — and grayed out otherwise. It never downmixes a stereo source; stereo content is unaffected regardless of this setting.</td>
+        </tr>
+        <tr>
           <td>MP3 Bitrate</td>
           <td>128 · 160 · 192 kbps</td>
           <td>CBR bitrate for MP3 output. 160 kbps is a good default for podcast delivery. Grayed out when Output is WAV only.</td>
@@ -869,7 +874,7 @@
     <p>Examples: <code>episode-42-final-lev-18LUFS.wav</code> &nbsp; <code>episode-42-final-lev-18LUFS.mp3</code></p>
 
     <h3>Channels</h3>
-    <p>WaxOff always outputs stereo (2-channel). Mono input is accepted — it is upmixed to dual-mono stereo before processing. There is no channel setting in WaxOff.</p>
+    <p>WaxOff outputs stereo (2-channel) by default. Mono input is accepted — by default it is upmixed to dual-mono stereo before processing, but the <strong>Channels</strong> control in WaxOff Settings can instead deliver a mono source as a true single channel. Stereo sources always remain stereo; the control has no effect on them.</p>
 
     <h3>Location</h3>
     <p>Output files are written alongside the source by default, or to your configured output directory. Existing files with the same name are overwritten.</p>
