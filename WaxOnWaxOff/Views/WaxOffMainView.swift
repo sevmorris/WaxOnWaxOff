@@ -168,7 +168,7 @@ struct WaxOffMainView: View {
                             .background(.black.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                        FileInfoStatsView(file: file)
+                        FileInfoStatsView(file: file, applyFloorWarnings: false)
                     }
                     .padding()
                 } else if let phase = viewModel.deliveryPhase {

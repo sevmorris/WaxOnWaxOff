@@ -2,6 +2,9 @@ import SwiftUI
 
 struct FileInfoStatsView: View {
     let file: FileItem
+    /// When false (WaxOff), the FLOOR stat is still shown but never warning/critical-
+    /// colored — the high-noise-floor heuristic targets raw speech, not finished mixes.
+    var applyFloorWarnings: Bool = true
 
     private var showingOutput: Bool { file.outputStats != nil || file.outputFileInfo != nil }
 
@@ -65,7 +68,9 @@ struct FileInfoStatsView: View {
                 if let nf = stats?.noiseFloor {
                     statBlock("FLOOR", String(format: "%.1f dBFS", nf),
                               valueColor: noiseFloorColor(nf),
-                              help: "Orange: high noise floor (> −50 dBFS)  •  Red: very high (> −40 dBFS)")
+                              help: applyFloorWarnings
+                                ? "Orange: high noise floor (> −50 dBFS)  •  Red: very high (> −40 dBFS)"
+                                : "Estimated noise floor. Not flagged in WaxOff — a finished mix may legitimately carry continuous low-level content (music beds, room tone).")
                 }
             }
         }
@@ -77,10 +82,25 @@ struct FileInfoStatsView: View {
         return .primary
     }
 
+    /// Severity of a measured noise floor (dBFS). Warnings only make sense for raw,
+    /// unedited speech (WaxOn); a finished delivery mix (WaxOff) may legitimately carry
+    /// continuous low-level content (music beds, room tone under a mix), so callers
+    /// pass `applyWarnings: false` there to classify everything as `.normal`.
+    enum FloorSeverity: Equatable { case normal, warning, critical }
+
+    static func floorSeverity(dBFS nf: Double, applyWarnings: Bool) -> FloorSeverity {
+        guard applyWarnings else { return .normal }
+        if nf > -40 { return .critical }
+        if nf > -50 { return .warning }
+        return .normal
+    }
+
     private func noiseFloorColor(_ nf: Double) -> Color {
-        if nf > -40 { return .meterCritical }
-        if nf > -50 { return .meterWarning }
-        return .primary
+        switch Self.floorSeverity(dBFS: nf, applyWarnings: applyFloorWarnings) {
+        case .normal:   return .primary
+        case .warning:  return .meterWarning
+        case .critical: return .meterCritical
+        }
     }
 
     @ViewBuilder
