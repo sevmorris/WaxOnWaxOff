@@ -310,24 +310,61 @@ actor AudioProcessor {
 
         try Task.checkCancellation()
 
-        let oversampleSr = sr * 2
+        if settings.loudnormEnabled {
+            // Loudness Norm ON: 2× oversampled brick-wall limiter as the final stage.
+            // loudnorm's linear pass measures true peak but can still leave inter-sample
+            // peaks above the ceiling, so the limiter stays as the ISP backstop.
+            let oversampleSr = sr * 2
 
-        let step2Af = [
-            FFmpegFilters.aresample(to: oversampleSr),
-            "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
-            FFmpegFilters.aresample(to: sr)
-        ].joined(separator: ",")
+            let step2Af = [
+                FFmpegFilters.aresample(to: oversampleSr),
+                "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
+                FFmpegFilters.aresample(to: sr)
+            ].joined(separator: ",")
 
-        onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
+            onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
 
-        try? fm.removeItem(at: tmpURL)
+            try? fm.removeItem(at: tmpURL)
 
-        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
-            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", limiterInput.path, "-af", step2Af,
-            "-map_metadata", "0",
-            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
-        ], fileDuration: fileDuration)
+            try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", limiterInput.path, "-af", step2Af,
+                "-map_metadata", "0",
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
+            ], fileDuration: fileDuration)
+        } else {
+            // Loudness Norm OFF: downward-only linear true-peak normalization instead of
+            // the limiter. Measure the post-filter/post-dynleveling true peak, then apply
+            // at most a single attenuation to the −1.0 dBTP ceiling. This preserves the
+            // ingest dynamics — when the source already sits within the ceiling the
+            // waveform passes through untouched (gain 0).
+            let ceiling = -1.0
+            onLog?("  loudnorm off: measuring true peak for linear normalization…", .verbose)
+            let measuredTP = try await measureTruePeak(exe: tools.ffmpeg, url: limiterInput, fileDuration: fileDuration)
+
+            let gainDB: Double
+            if let tp = measuredTP {
+                gainDB = min(0.0, ceiling - tp)
+                if gainDB < 0 {
+                    onLog?(String(format: "  true peak %.1f dBTP → %.1f dB linear gain to %.1f dBTP (no limiting)", tp, gainDB, ceiling), .info)
+                } else {
+                    onLog?(String(format: "  true peak %.1f dBTP within %.1f ceiling — passed through unmodified", tp, ceiling), .info)
+                }
+            } else {
+                gainDB = 0.0
+                onLog?("⚠ Could not measure true peak — passing through unmodified (no gain applied).", .info)
+            }
+
+            try? fm.removeItem(at: tmpURL)
+
+            // Single linear gain. At 0 dB this is a transparent copy (no limiting).
+            try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-i", limiterInput.path, "-af", "volume=\(String(format: "%.6f", gainDB))dB",
+                "-map_metadata", "0",
+                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
+            ], fileDuration: fileDuration)
+        }
 
         guard let attrs = try? fm.attributesOfItem(atPath: tmpURL.path),
               let size = attrs[.size] as? NSNumber,
@@ -341,6 +378,33 @@ actor AudioProcessor {
         onLog?("✓ \(outName)", .info)
         onLog?("  → \(finalURL.path)", .verbose)
         return JobResult(id: id, input: input, output: finalURL)
+    }
+
+    /// Measures the true peak (input_tp) of `url` via a loudnorm analysis pass,
+    /// reusing the same capture + JSON parsing path as the loudnorm-on route.
+    /// The target params don't affect the reported input_tp. Returns nil if the
+    /// pass fails or the measured true peak is non-finite (e.g. a silent clip) —
+    /// callers treat nil as "apply no gain". Cancellation is propagated.
+    private func measureTruePeak(exe: String, url: URL, fileDuration: TimeInterval?) async throws -> Double? {
+        let analyzeAf = "loudnorm=I=-23:TP=-1.0:LRA=20:print_format=json"
+        let output: String
+        do {
+            output = try await FFmpegRunner.capture(exe: exe, args: [
+                "-nostdin", "-hide_banner",
+                "-i", url.path, "-af", analyzeAf,
+                "-f", "null", "/dev/null"
+            ], fileDuration: fileDuration)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return nil
+        }
+        guard let dict = FFmpegRunner.parseLoudnormJSON(from: output),
+              let measurements = LoudnormMeasurements(json: dict.mapValues { $0 as Any }),
+              measurements.inputTP.isFinite else {
+            return nil
+        }
+        return measurements.inputTP
     }
 
     private func makeTemp(prefix: String) throws -> URL {
