@@ -512,7 +512,7 @@
       <li><strong>Output: …</strong> — processed; a green ✓ Complete indicator appears next to the filename and a folder icon reveals the output in Finder</li>
       <li><strong>Error</strong> — something went wrong; the message is shown inline</li>
     </ul>
-    <p>Files with a high estimated noise floor show an orange warning triangle next to the filename. Hover over the badge for detail. In WaxOff, mono sources show a <strong>MONO</strong> badge indicating the file will be upmixed to dual-mono stereo before processing.</p>
+    <p>In WaxOn, files with a high estimated noise floor show an orange warning triangle next to the filename. Hover over the badge for detail. In WaxOff, mono sources show a <strong>MONO</strong> badge indicating the file will be upmixed to dual-mono stereo before processing.</p>
 
     <p>WaxOn processes multiple files concurrently, scaling with available CPU cores. Files waiting their turn show a muted static progress bar so it's clear they are queued and not stalled.</p>
     <p>Select files and press <kbd>Delete</kbd> to remove them, or use <kbd>⌘⌥Delete</kbd> to clear the entire list.</p>
@@ -913,7 +913,7 @@
       <div class="label">LUFS</div>
       <div class="desc">Integrated loudness per ITU-R BS.1770-4. The broadcast and streaming standard. Computed with K-weighting and two-stage gating (absolute −70 LUFS, relative −10 LU).</div>
       <div class="label">FLOOR</div>
-      <div class="desc">Estimated noise floor in dBFS. The 10th percentile of per-block RMS values, representing the quietest sections of the file (room tone, background noise). Color-coded: orange above −50 dBFS (may affect loudness accuracy), red above −40 dBFS (likely affecting measurements). Only shown when enough audio blocks are available to estimate.</div>
+      <div class="desc">Estimated noise floor in dBFS. The 10th percentile of per-block RMS values, representing the quietest sections of the file (room tone, background noise). Color-coded in WaxOn: orange above −50 dBFS (may affect loudness accuracy), red above −40 dBFS (likely affecting measurements). In WaxOff the value is still shown but not color-coded — a finished delivery mix may legitimately carry continuous low-level content (music beds, room tone under a mix), so the raw-speech thresholds don't apply. Only shown when enough audio blocks are available to estimate.</div>
     </div>
 
     <div class="callout">
@@ -923,7 +923,7 @@
 
     <div class="callout">
       <strong>Noise Floor Warning</strong>
-      Files with a high estimated noise floor show a ⚠️ badge next to the filename in the file list. A high noise floor can inflate integrated loudness measurements, causing loudness normalization to underestimate the gain needed for the speech content. When Loudness Norm is enabled, WaxOn automatically applies RNNoise to the measurement pass (only — the output signal is never touched) to mitigate this. If the badge appears, the most reliable mitigation is to enable Loudness Norm so the auto-NR analysis runs.
+      In WaxOn, files with a high estimated noise floor show a ⚠️ badge next to the filename in the file list. A high noise floor can inflate integrated loudness measurements, causing loudness normalization to underestimate the gain needed for the speech content. When Loudness Norm is enabled, WaxOn automatically applies RNNoise to the measurement pass (only — the output signal is never touched) to mitigate this. If the badge appears, the most reliable mitigation is to enable Loudness Norm so the auto-NR analysis runs. The badge does not appear in WaxOff: the floor warning targets raw recordings, not finished delivery mixes that may carry continuous low-level content by design.
     </div>
   </section>
 
