@@ -2,6 +2,11 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.2.2] — 2026-07-01
+
+**Presets**
+- WaxOn's "Edit Prep EBU" preset replaced with "ATSC A/85" — retargeted from −23 to −24 LUFS to match the US broadcast/video dialog reference level (ATSC A/85). WaxOn's fixed −1.0 dBTP true-peak ceiling is unchanged and remains stricter than ATSC A/85's −2.0 dBTP requirement
+
 ## [2.2.1] — 2026-06-30
 
 **Interface**
