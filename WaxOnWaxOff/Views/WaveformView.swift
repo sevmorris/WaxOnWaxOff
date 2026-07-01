@@ -22,7 +22,7 @@ struct WaveformView: View {
 
     private func monoView(peaks: [Float]) -> some View {
         HStack(spacing: 4) {
-            dbScale.frame(width: 32)
+            dbScale(sectionCount: 1).frame(width: 32)
             ZStack {
                 dbGridLines
                 WaveformShape(peaks: peaks)
@@ -33,7 +33,7 @@ struct WaveformView: View {
 
     private func stereoView(data: WaveformData) -> some View {
         HStack(spacing: 4) {
-            dbScale.frame(width: 32)
+            dbScale(sectionCount: 2).frame(width: 32)
             VStack(spacing: 1) {
                 channelView(peaks: data.channelPeaks[0], label: "L")
                 Rectangle()
@@ -57,25 +57,46 @@ struct WaveformView: View {
         }
     }
 
-    private var dbScale: some View {
+    // The dB scale column, drawn left of the waveform(s). In mono a single label set spans
+    // the full canvas. In stereo the canvas is split into two stacked channel sections (see
+    // stereoView), so the label set is drawn once per section — each with Y positions
+    // computed relative to that section's height — so L (top) and R (bottom) each get their
+    // own 0 / −6 / −12 / −24 / −48 anchored to their own waveform. A single full-height set
+    // would leave R with no label at its 0 dBFS (the canvas midpoint).
+    private func dbScale(sectionCount: Int) -> some View {
         GeometryReader { geometry in
-            let midY = geometry.size.height / 2
-            let visible = visibleLabels(midY: midY)
-
+            let h = geometry.size.height
             ZStack {
-                ForEach(visible, id: \.db) { item in
-                    Text(formatDb(item.db))
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .position(x: 16, y: item.y)
-
-                    if item.db == 0 {
-                        Text(formatDb(item.db))
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .position(x: 16, y: geometry.size.height - item.y)
-                    }
+                if sectionCount == 2 {
+                    // Match stereoView's VStack: two equal sections separated by a 1 px
+                    // divider rect plus 1 px spacing on each side (3 px total).
+                    let gap: CGFloat = 3
+                    let sectionH = (h - gap) / 2
+                    labelColumn(sectionHeight: sectionH, top: 0)
+                    labelColumn(sectionHeight: sectionH, top: sectionH + gap)
+                } else {
+                    labelColumn(sectionHeight: h, top: 0)
                 }
+            }
+        }
+    }
+
+    /// One dB label set (0, −6, −12, −24, −48, plus the mirrored 0 at the section bottom)
+    /// positioned within a section of `sectionHeight` starting at vertical offset `top`.
+    /// `visibleLabels` runs per call, so its minimum-pixel-gap guard applies within each
+    /// channel's set independently.
+    private func labelColumn(sectionHeight: CGFloat, top: CGFloat) -> some View {
+        ForEach(visibleLabels(midY: sectionHeight / 2), id: \.db) { item in
+            Text(formatDb(item.db))
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .position(x: 16, y: top + item.y)
+
+            if item.db == 0 {
+                Text(formatDb(item.db))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .position(x: 16, y: top + (sectionHeight - item.y))
             }
         }
     }
