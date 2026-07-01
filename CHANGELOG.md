@@ -2,6 +2,11 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.2.1] — 2026-06-30
+
+**Interface**
+- Stereo waveform view draws the dB scale labels per channel — L and R each get their own 0 / −6 / −12 / −24 / −48 anchored to their own waveform, instead of a single full-height scale that left the R channel's 0 dBFS unlabeled. Mono is unchanged
+
 ## [2.2.0] — 2026-06-30
 
 **Processing**
