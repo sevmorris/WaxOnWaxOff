@@ -52,6 +52,9 @@ struct RotaryKnobView: View {
         }
         .accessibilityAddTraits(.isButton)
         .focusable()
+        // Keep the knob keyboard-focusable (arrow-key nudging below) but suppress the
+        // system's rectangular focus ring, which looks wrong around a circular control.
+        .focusEffectDisabled()
         .onKeyPress(.upArrow) {
             adjustValue(direction: 1)
             return .handled
