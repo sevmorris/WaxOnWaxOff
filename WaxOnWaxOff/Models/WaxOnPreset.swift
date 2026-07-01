@@ -47,14 +47,14 @@ struct WaxOnPreset: Identifiable, Codable, Equatable, PresetCodable {
         ),
         WaxOnPreset(
             id: UUID(knownValid: "A0000000-0000-0000-0000-000000000003"),
-            name: "Edit Prep EBU",
+            name: "ATSC A/85",
             settings: WaxOnSettings(
                 sampleRate: .s44100,
                 outputChannels: .mono,
                 channel: .left,
 
                 loudnormEnabled: true,
-                loudnormTarget: -23.0,
+                loudnormTarget: -24.0,
                 highPassEnabled: true
             )
         )
