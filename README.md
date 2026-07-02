@@ -4,9 +4,9 @@
 <p align="center">
   <strong>Podcast Audio Prep Utility</strong>
   <br />
-  <strong>Version:</strong> 2.2.3
+  <strong>Version:</strong> 2.2.4
   <br />
-  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.2.3.dmg"><strong>Download Latest (DMG)</strong></a>
+  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.2.4.dmg"><strong>Download Latest (DMG)</strong></a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/">App Page</a>
   ·
