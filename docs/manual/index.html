@@ -512,7 +512,9 @@
       <li><strong>Output: …</strong> — processed; a green ✓ Complete indicator appears next to the filename and a folder icon reveals the output in Finder</li>
       <li><strong>Error</strong> — something went wrong; the message is shown inline</li>
     </ul>
-    <p>In WaxOn, files with a high estimated noise floor show an orange warning triangle next to the filename. Hover over the badge for detail. In WaxOff, mono sources show a <strong>MONO</strong> badge; by default the file is upmixed to dual-mono stereo before processing, unless Mono delivery is selected.</p>
+    <p>In WaxOn, files with a high estimated noise floor show an orange warning triangle next to the filename. Hover over the badge for detail. WaxOn also flags channel conversions: a stereo source with Channels set to Mono shows a <strong>STEREO→MONO L</strong> (or <strong>R</strong>) badge, and a source with more than two channels shows <strong>MULTI→MONO</strong>. In WaxOff, mono sources show a <strong>MONO</strong> badge; by default the file is upmixed to dual-mono stereo before processing, unless Mono delivery is selected.</p>
+
+    <p>When two or more files are queued in WaxOn with Phase Rotation enabled, an advisory banner appears above the list: if the files were recorded simultaneously in the same room, consider applying phase rotation once at the mix bus instead of per-track. See <a href="theory.html#phase-rotation">Phase Rotation</a> in the Theory of Operation.</p>
 
     <p>WaxOn processes multiple files concurrently, scaling with available CPU cores. Files waiting their turn show a muted static progress bar so it's clear they are queued and not stalled.</p>
     <p>Select files and press <kbd>Delete</kbd> to remove them, or use <kbd>⌘⌥Delete</kbd> to clear the entire list.</p>
@@ -883,7 +885,7 @@
   <!-- File Stats -->
   <section id="file-stats">
     <h2>File Stats</h2>
-    <p>Selecting a file in either mode displays a stats strip below the waveform. Stats are computed asynchronously as files load and typically appear within a second or two of dropping a file in.</p>
+    <p>Selecting a file in either mode displays a stats strip below the waveform. Stats are computed asynchronously as files load and typically appear within a second or two of dropping a file in. After a file is processed, the strip switches to the output file's info and measurements, marked with an <strong>OUTPUT</strong> badge.</p>
     <p>The strip has two rows separated by a divider: file info on top, audio analysis below.</p>
 
     <h4>File Info Row</h4>
@@ -908,10 +910,12 @@
       <div class="desc">Root Mean Square level in dBFS. Represents average loudness over the entire file.</div>
       <div class="label">PEAK</div>
       <div class="desc">Sample peak level in dBFS. The highest sample value across all channels. Color-coded: orange at −3 dBFS and above, red at 0 dBFS.</div>
+      <div class="label">ISP (est.)</div>
+      <div class="desc">Estimated inter-sample peak in dBFS, from 2× linear interpolation between samples. Only shown when the estimate rises above the sample peak. A lower bound, not a full BS.1770 true-peak measurement — the real true peak may be higher; the Console's "measured" line after processing reports the broadcast-accurate value. Color-coded like PEAK.</div>
       <div class="label">CREST</div>
       <div class="desc">Crest factor (PEAK − RMS) in dB. Indicates dynamic range. Higher values mean more headroom between peaks and average level.</div>
       <div class="label">LUFS</div>
-      <div class="desc">Integrated loudness per ITU-R BS.1770-4. The broadcast and streaming standard. Computed with K-weighting and two-stage gating (absolute −70 LUFS, relative −10 LU).</div>
+      <div class="desc">Integrated loudness per ITU-R BS.1770-4. The broadcast and streaming standard. Computed with K-weighting and two-stage gating (absolute −70 LUFS, relative −10 LU). Labeled <strong>LUFS (src)</strong> for unprocessed files — the source's integrated loudness before any processing.</div>
       <div class="label">FLOOR</div>
       <div class="desc">Estimated noise floor in dBFS. The 10th percentile of per-block RMS values, representing the quietest sections of the file (room tone, background noise). Color-coded in WaxOn: orange above −50 dBFS (may affect loudness accuracy), red above −40 dBFS (likely affecting measurements). In WaxOff the value is still shown but not color-coded — a finished delivery mix may legitimately carry continuous low-level content (music beds, room tone under a mix), so the raw-speech thresholds don't apply. Only shown when enough audio blocks are available to estimate.</div>
     </div>
