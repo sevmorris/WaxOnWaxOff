@@ -38,11 +38,11 @@ The app runs in two stages that map onto the two moments in podcast production w
 *Use on raw recordings prior to non-destructive editing.*
 
 * **High-Pass Filter:** On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.
-* **Dynamic Leveling:** Optional `dynaudnorm` with adjustable aggressiveness (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
+* **Dynamic Leveling:** Optional `dynaudnorm` with adjustable strength (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
 * **Loudness Normalization:** Optional two-pass EBU R128 linear gain (dynamics fully preserved; default off). RNNoise may run on an analysis-only temp when this is on—see [Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html)—not on the exported WAV.
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** True peak held to a fixed −1.0 dBTP ceiling — 2× oversampled limiting when Loudness Norm is on; downward-only linear peak normalization (transparent when the source is already under ceiling) when off.
-* **Phase Alignment:** Optional 200 Hz allpass filter to reduce peak asymmetry and maximize headroom (default on).
+* **Phase Rotation:** Optional 200 Hz allpass filter to reduce peak asymmetry and maximize headroom (default on).
 
 **Output Logic:** `{name}-{44k|48k}waxon.wav` (24-bit)
 

@@ -616,14 +616,14 @@
           <td>Output sample rate. 48 kHz for video projects; 44.1 kHz for audio-only. Uses FFmpeg's high-quality resampler.</td>
         </tr>
         <tr>
-          <td>Output</td>
+          <td>Channels</td>
           <td>Mono · Stereo</td>
           <td>Stereo passes both channels through unchanged. Mono extracts a single channel from a stereo source.</td>
         </tr>
         <tr>
           <td>Channel</td>
           <td>Left · Right</td>
-          <td>Mono mode only. Which channel to extract. Use Left for a standard single-mic recording on channel 1. Grayed out when Output is Stereo.</td>
+          <td>Mono mode only. Which channel to extract. Use Left for a standard single-mic recording on channel 1. Grayed out when Channels is Stereo.</td>
         </tr>
         <tr>
           <td>High Pass</td>
@@ -961,7 +961,7 @@
     <p>−18 LUFS is a safe, conservative delivery target rather than a level the platforms themselves use: it sits below the major platform targets (Spotify −14, Apple Podcasts −16), so both boost it modestly rather than attenuate it. −16 LUFS gives a louder result but is still within typical platform limits. Going higher than −14 LUFS risks clipping or rejection by some platforms. When in doubt, use the Podcast Standard preset.</p>
 
     <h3>WaxOn: Mono vs. Stereo for Podcasts</h3>
-    <p>Most podcast editing workflows prefer mono tracks per speaker, which are easier to pan, balance, and process individually. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface captures both mics on a single stereo file, set Output to Stereo and process before bringing into your DAW.</p>
+    <p>Most podcast editing workflows prefer mono tracks per speaker, which are easier to pan, balance, and process individually. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface captures both mics on a single stereo file, set Channels to Stereo and process before bringing into your DAW.</p>
 
     <h3>Phase Rotation (WaxOn)</h3>
     <p>Leave Phase Rotation on unless you have a specific reason to turn it off. The 200 Hz allpass reduces the crest factor of voice recordings, recovering headroom for the limiter. The effect on speech is inaudible.</p>

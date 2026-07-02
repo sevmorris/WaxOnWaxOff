@@ -865,8 +865,8 @@
     <p>Dynamic Leveling handles recordings where level variation is structural — a panel discussion where audience questions are half the volume of the speakers, a live Q&amp;A where the presenter is near the mic and questioners are across the room, or a multi-person recording where mic placement was inconsistent. You need to lift the quiet material and tame the loud material simultaneously.</p>
     <p><code>dynaudnorm</code> is inherently a two-pass, lookahead-style leveler — it lifts quiet sections toward the target peak and attenuates loud ones. This is the right behavior for uneven source material, but it produces audible pumping on solo voice recordings with natural pauses: as the filter adjusts gain across the silence between sentences, the noise floor breathes in and out. WaxOn does not gate near-silent frames via <code>dynaudnorm</code>'s silence threshold (<code>t</code>) parameter, because an active threshold causes severe attenuation at speech-to-silence transitions: the Gaussian smoothing window interpolates between gated (unity-gain) and ungated frames, producing audible fade-outs on the trailing edge of every utterance. The trade-off is that the noise floor between words is boosted by up to the maximum gain factor — acceptable on the clean source material Dynamic Leveling targets. Dynamic Leveling is a specialty tool for multi-voice sources, not a general-purpose enhancement for solo recordings.</p>
 
-    <h3>The Aggressiveness Slider</h3>
-    <p>The Aggressiveness slider is a 0–1 control that maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
+    <h3>The Strength Knob</h3>
+    <p>The Strength knob is a 0–1 control that maps to three <code>dynaudnorm</code> parameters simultaneously:</p>
     <ul>
       <li><strong>Frame size (<code>f</code>)</strong>: 500 ms at Gentle, 150 ms at Aggressive. Shorter frames mean the filter can respond to level changes more quickly.</li>
       <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 15 frames at Aggressive (forced odd). Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
@@ -1130,7 +1130,7 @@
           <td>44.1 kHz</td>
         </tr>
         <tr>
-          <td>Output</td>
+          <td>Channels</td>
           <td>Mono · Stereo</td>
           <td>Mono</td>
         </tr>
