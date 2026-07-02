@@ -21,6 +21,11 @@
 
 WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, optional EBU R128 gain, true-peak control). It does **not** apply spectral noise reduction to the output file. When Loudness Norm is enabled, RNNoise runs only on an internal analysis pass so loudness measurement isn't skewed by room tone—not as a user-facing denoise stage. For plosives, clicks, and heavy noise, use a repair tool (e.g. iZotope RX) before WaxOn.
 
+<p align="center">
+  <img src="docs/images/waxon-waveform.png" width="49%" alt="WaxOn — waveform audit and signal conditioning" />
+  <img src="docs/images/waxoff-complete.png" width="49%" alt="WaxOff — EBU R128 broadcast delivery" />
+</p>
+
 The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
 
 - **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional EBU R128 normalization (dynamics fully preserved), and true-peak control to a fixed −1.0 dBTP ceiling — a 2× oversampled limiter when Loudness Norm is on, downward-only linear peak normalization when off. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder (e.g., `interview-44kwaxon.wav`).
