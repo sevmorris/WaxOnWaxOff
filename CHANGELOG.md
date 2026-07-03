@@ -2,6 +2,18 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.2.4] — 2026-07-01
+
+**Documentation**
+- Documentation audit remediation across the manual, theory doc, and README — nine findings fixed: MP3 channel claim made conditional under mono delivery, Strength step count corrected to 9 positions, naming drift resolved (Aggressiveness → Strength, Phase Alignment → Phase Rotation, Output → Channels), missing ISP (est.) stat / LUFS (src) label / OUTPUT badge and file-list channel badges documented, helper-line overgeneralization corrected, output-directory fallback chain completed (~/Desktop last resort), phase-label conditionality clarified
+- WaxOn presets table "Output" column renamed to "Channels" to match the UI label
+- Screenshots restored (WaxOn + WaxOff) with current v2.2.x UI
+
+## [2.2.3] — 2026-07-01
+
+**Interface**
+- Rotary knobs no longer show the square system focus ring when clicked — the ring is suppressed on the circular controls in both WaxOn and WaxOff; keyboard focusability and arrow-key nudging are unchanged
+
 ## [2.2.2] — 2026-07-01
 
 **Presets**
