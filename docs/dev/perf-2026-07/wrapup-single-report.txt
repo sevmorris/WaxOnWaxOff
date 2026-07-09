@@ -1,0 +1,5 @@
+WRAPUP-SINGLE-60MIN
+  blocking (file-written completion): 422.6 s   (projection ~426 s)
+  settled (run() return, verifies drained): 498.5 s   (projection ~501 s)
+  Swift tail done: 440.3 s
+  fully done: 498.5 s

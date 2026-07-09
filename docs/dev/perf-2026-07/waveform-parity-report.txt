@@ -1,0 +1,13 @@
+file | bitExact | maxSampleDelta | scalar_s | vdsp_s
+cal10.wav | YES | 0 | 10.91 | 2.19
+cal10_mono.wav | YES | 0 | 7.36 | 2.18
+isp_hot.wav | YES | 0 | 2.19 | 0.43
+rendered.wav | YES | 0 | 10.95 | 2.23
+rendered.mp3 | YES | 0 | 11.63 | 2.81
+npr_voice-lev-18LUFS.wav | YES | 0 | 65.63 | 13.24
+npr_voice-lev-18LUFS.mp3 | YES | 0 | 69.84 | 16.89
+rhino_music-lev-18LUFS.wav | YES | 0 | 33.91 | 6.75
+rhino_music-lev-18LUFS.mp3 | YES | 0 | 36.25 | 8.87
+bench/st30a.wav waveform: scalar 33.03 s -> vdsp 6.56 s (5.0x)
+bench/st60a.wav waveform: scalar 65.21 s -> vdsp 13.07 s (5.0x)
+st60a.wav combined (stats+waveform, both vDSP): 16.73 s

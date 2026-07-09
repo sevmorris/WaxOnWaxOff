@@ -1,0 +1,6 @@
+CAPGATE-RESULT cap=11 files=8
+  run() wall (delivery + deferred verifies): 381.7 s
+  perceived (incl. Swift tails):             381.7 s
+  last file-written completion:              277.8 s
+  throughput (perceived):                    1.258 files/min
+  heartbeat: ticks=3776  mean drift=1.1 ms  max drift=11.5 ms
