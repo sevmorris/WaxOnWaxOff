@@ -44,6 +44,14 @@ final class DeliveryViewModel {
         return known.allSatisfy { $0.channelCount == 1 }
     }
 
+    // nonisolated: with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
+    // deinit would be MainActor-isolated, and macOS 15's isolated-deinit runtime
+    // (swift_task_deinitOnExecutor, reached via the back-deploy shim) malloc-aborts
+    // tearing down its task-local scope when the last release happens outside a
+    // task — e.g. RootContentView's @State view model being discarded when the
+    // window closes. Nothing in teardown needs the actor, so opt out.
+    nonisolated deinit {}
+
     init() {
         self.settings = WaxOffSettings.load()
         if let preset = presetStore.selectedPreset {

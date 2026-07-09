@@ -60,6 +60,14 @@ final class WaxOnPresetStore {
         selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOnSelectedPresetID")
     }
 
+    // nonisolated: with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
+    // deinit would be MainActor-isolated, and macOS 15's isolated-deinit runtime
+    // (swift_task_deinitOnExecutor, reached via the back-deploy shim) malloc-aborts
+    // tearing down its task-local scope when the last release happens outside a
+    // task — e.g. this store is owned by the WaxOn view model and released with it
+    // when the window closes. Nothing in teardown needs the actor, so opt out.
+    nonisolated deinit {}
+
     var allPresets: [WaxOnPreset] { builtIn + presets }
 
     var selectedPreset: WaxOnPreset? {
@@ -124,6 +132,14 @@ final class WaxOffPresetStore {
         presets = PresetPersistence.load(key: "WaxOffUserPresets")
         selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOffSelectedPresetID")
     }
+
+    // nonisolated: with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
+    // deinit would be MainActor-isolated, and macOS 15's isolated-deinit runtime
+    // (swift_task_deinitOnExecutor, reached via the back-deploy shim) malloc-aborts
+    // tearing down its task-local scope when the last release happens outside a
+    // task — e.g. this store is owned by the WaxOff view model and released with it
+    // when the window closes. Nothing in teardown needs the actor, so opt out.
+    nonisolated deinit {}
 
     var allPresets: [WaxOffPreset] { builtIn + presets }
 

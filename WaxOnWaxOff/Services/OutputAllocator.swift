@@ -26,6 +26,14 @@ final class OutputAllocator: @unchecked Sendable {
         self.computeBaseName = computeBaseName
     }
 
+    // nonisolated: under SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
+    // deinit would be MainActor-isolated even though every other member is
+    // nonisolated, and macOS 15's isolated-deinit runtime malloc-aborts in
+    // task-local scope teardown when the last release happens off-task — this
+    // allocator is created per batch and released from within actor-isolated
+    // processing. Stored properties need no isolated teardown, so opt out.
+    nonisolated deinit {}
+
     /// Returns a unique output URL inside `directory` for the given `input`.
     /// The first call with a given base name claims it; subsequent calls for the
     /// same base name receive a tag-disambiguated variant.

@@ -210,7 +210,13 @@ enum FFmpegRunner {
                     process.standardError = FileHandle.nullDevice
                 }
 
-                final class DataBox: @unchecked Sendable { var value = Data() }
+                // nonisolated: same treatment as TimeoutFlag below — the box is
+                // captured by the pipe-reader closure on the utility queue and by
+                // the termination handler, so its last release happens off-task;
+                // an implicit MainActor deinit would malloc-abort in macOS 15's
+                // isolated-deinit runtime. All state is touched only from those
+                // nonisolated queues anyway, per the @unchecked Sendable marking.
+                nonisolated final class DataBox: @unchecked Sendable { var value = Data() }
                 let box = DataBox()
                 let readGroup = DispatchGroup()
                 readGroup.enter()
@@ -298,9 +304,11 @@ enum FFmpegRunner {
 
 /// Lock-guarded "did the watchdog fire?" flag, safe to read on the termination
 /// queue and write on the dispatch queue that runs the timeout work item.
-/// Everything is `nonisolated` because the dispatch queues that touch it are
-/// outside the MainActor default isolation.
-private final class TimeoutFlag: @unchecked Sendable {
+/// The class is `nonisolated` because the dispatch queues that touch it are
+/// outside the MainActor default isolation — and the implicit MainActor deinit it
+/// would otherwise get malloc-aborts in macOS 15's isolated-deinit runtime when
+/// the last release happens off-task (these flags are released on those queues).
+private nonisolated final class TimeoutFlag: @unchecked Sendable {
     nonisolated private let lock = NSLock()
     nonisolated(unsafe) private var fired = false
 

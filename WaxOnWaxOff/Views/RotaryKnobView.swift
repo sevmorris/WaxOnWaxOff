@@ -160,6 +160,15 @@ private struct ScrollWheelHost: NSViewRepresentable {
             super.init(frame: .zero)
         }
         required init?(coder: NSCoder) { fatalError() }
+
+        // nonisolated: with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
+        // deinit would be MainActor-isolated, and macOS 15's isolated-deinit runtime
+        // (swift_task_deinitOnExecutor, reached via the back-deploy shim) malloc-aborts
+        // tearing down its task-local scope when AppKit releases this backing view
+        // off-task as knobs appear and disappear. Nothing in teardown needs the
+        // actor, so opt out.
+        nonisolated deinit {}
+
         override func scrollWheel(with event: NSEvent) {
             guard abs(event.deltaY) > 0 else { return }
             onScroll(event.deltaY)
