@@ -247,10 +247,11 @@ enum AudioAnalyzer {
             }
 
             var analysis = VDSPAnalysisAccumulator(format: format, noiseFloorHighPassHz: noiseFloorHighPassHz, chunkCapacity: Int(chunkSize))
-            var waveform = WaveformAccumulator(
+            var waveform = VDSPWaveformAccumulator(
                 totalFrames: Int(frameCount),
                 channels: Int(format.channelCount),
-                targetSamples: targetSamples
+                targetSamples: targetSamples,
+                chunkCapacity: Int(chunkSize)
             )
 
             file.framePosition = 0
