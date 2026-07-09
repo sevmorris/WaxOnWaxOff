@@ -2,11 +2,51 @@ import Foundation
 
 /// Shared configuration constants for concurrent audio processing.
 enum ProcessingConfig {
-    /// Maximum number of concurrent ffmpeg jobs, scaled to available CPU.
-    /// Formula: max(2, activeProcessorCount / 2) — at least 2 workers, up to
-    /// half the active cores, leaving the remainder for the UI and OS.
+    /// Maximum number of concurrent ffmpeg jobs for WaxOn batch processing,
+    /// scaled to available CPU. Formula: max(2, activeProcessorCount / 2) —
+    /// at least 2 workers, up to half the active cores, leaving the
+    /// remainder for the UI and OS.
     static var maxConcurrentJobs: Int {
         max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
+    }
+
+    /// Maximum number of concurrent WaxOff delivery jobs. Each delivery job
+    /// is a chain of single-threaded ffmpeg filter graphs, so the old
+    /// cores/2 cap left half the machine idle on deep queues — measured
+    /// 626 s vs 370 s (1.69×) for an 8 × 30-min batch on a 12-core M3 Pro.
+    /// cores − 1 keeps one core of headroom for the UI and OS; the
+    /// 2×(cores/2) term keeps the raise proportional on small machines and
+    /// the floor of 2 preserves the old minimum. (12 cores: 6 → 11.
+    /// 8 cores: 4 → 7. 4 cores: 2 → 3.)
+    static var deliveryConcurrency: Int {
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        return max(2, min(cores - 1, 2 * (cores / 2)))
+    }
+
+    /// Maximum number of files analyzed simultaneously at load time (the
+    /// `.ready` gate in FileQueueCoordinator). Split from
+    /// `maxConcurrentJobs` for independent tuning; the initial value is
+    /// identical.
+    static var analysisConcurrency: Int {
+        max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
+    }
+
+    /// Size of the verification pool that drains deferred output
+    /// verifications concurrently with delivery. Fully independent of
+    /// `deliveryConcurrency` — verification must never consume a delivery
+    /// slot, but it may overlap delivery so deep batches don't serialize a
+    /// verification tail after the last render.
+    ///
+    /// Width matters most when the delivery cap meets or exceeds the queue
+    /// depth: every file then completes in a single wave, so ALL
+    /// verifications arrive at once and the pool is the only parallelism
+    /// available for the tail (a fixed pool of 3 measured a ~152 s tail on
+    /// an 8-file batch with the machine 70% idle). cores ÷ 2 soaks up the
+    /// idle cores after delivery drains; the cap of 6 bounds worst-case
+    /// oversubscription while delivery is still active, and the floor of 3
+    /// keeps small machines draining.
+    static var verificationConcurrency: Int {
+        min(6, max(3, ProcessInfo.processInfo.activeProcessorCount / 2))
     }
 }
 

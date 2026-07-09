@@ -247,6 +247,109 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "the processing log should record the MP3 encoding failure")
     }
 
+    // MARK: - Deferred verification (A1b, verification pool)
+
+    /// Batch path: a file's completion callback fires at file-written and
+    /// strictly precedes that file's own verification lines. Verification
+    /// drains in an independent pool concurrent with delivery, so lines from
+    /// one file may interleave with another file's delivery — global phase
+    /// ordering is deliberately NOT asserted. All six "delivered" lines
+    /// (3 WAV + 3 MP3) arrive before run() returns, correctly attributed.
+    func testFileCompletionPrecedesItsOwnVerificationLines() async throws {
+        let tools = try XCTUnwrap(tools)
+        var jobs: [DeliveryJobInput] = []
+        for i in 0..<3 {
+            let input = try IntegrationFFmpeg.makeSineWAV(
+                ffmpeg: tools.ffmpeg, directory: workDir, name: "defer_\(i).wav",
+                durationSeconds: 3.0, sampleRate: 44100
+            )
+            jobs.append(DeliveryJobInput(id: UUID(), url: input))
+        }
+        let idToName = Dictionary(uniqueKeysWithValues: jobs.map {
+            ($0.id, $0.url.deletingPathExtension().lastPathComponent)
+        })
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .both
+        settings.mp3Bitrate = 160
+        settings.outputDirectoryPath = workDir.path
+
+        let events = EventCollector()
+        let result = try await DeliveryProcessor().run(
+            inputs: jobs,
+            settings: settings,
+            onFileCompleted: { r in events.append("completed:\(idToName[r.id] ?? "?")") },
+            onLog: { message, _ in
+                if message.hasPrefix("  delivered ") { events.append("verify:\(message)") }
+            }
+        )
+
+        XCTAssertEqual(result.failures.count, 0)
+        XCTAssertEqual(result.successes.count, 3)
+
+        let ordered = events.snapshot()
+        let verifyLines = ordered.filter { $0.hasPrefix("verify:") }
+        XCTAssertEqual(verifyLines.count, 6, "3 WAV + 3 MP3 delivered lines must all arrive before run() returns")
+
+        for i in 0..<3 {
+            let name = "defer_\(i)"
+            XCTAssertEqual(verifyLines.filter { $0.contains("\(name)-lev-18LUFS.wav") }.count, 1)
+            XCTAssertEqual(verifyLines.filter { $0.contains("\(name)-lev-18LUFS.mp3") }.count, 1)
+            let completionIndex = try XCTUnwrap(ordered.firstIndex(of: "completed:\(name)"),
+                                                "missing completion event for \(name)")
+            let firstVerifyIndex = try XCTUnwrap(
+                ordered.firstIndex { $0.hasPrefix("verify:") && $0.contains("\(name)-lev") },
+                "missing verification lines for \(name)")
+            XCTAssertLessThan(completionIndex, firstVerifyIndex,
+                              "\(name): completion must precede its own verification lines")
+        }
+    }
+
+    /// Cancelling at the moment of completion skips this file's deferred
+    /// verifications cleanly: run() throws CancellationError and no
+    /// "delivered" line is ever logged (no orphaned work in either pool).
+    func testCancelAfterCompletionSkipsDeferredVerifications() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "defer_cancel.wav",
+            durationSeconds: 3.0, sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .both
+        settings.outputDirectoryPath = workDir.path
+
+        let events = EventCollector()
+        let taskBox = TaskBox()
+        // The box is populated on the next statement after Task creation —
+        // microseconds — while onFileCompleted fires only after several ffmpeg
+        // invocations complete (hundreds of ms), so the read below is safe.
+        let task = Task {
+            try await DeliveryProcessor().run(
+                inputs: [DeliveryJobInput(id: UUID(), url: input)],
+                settings: settings,
+                onFileCompleted: { _ in taskBox.cancel() },
+                onLog: { message, _ in
+                    if message.hasPrefix("  delivered ") { events.append(message) }
+                }
+            )
+        }
+        taskBox.set(task)
+
+        do {
+            _ = try await task.value
+            XCTFail("expected CancellationError from cancel during the verification phase")
+        } catch is CancellationError {
+            // expected
+        }
+        XCTAssertTrue(events.snapshot().isEmpty,
+                      "no deferred verification may run after cancellation")
+    }
+
     // MARK: - Mono delivery (mono sources)
 
     /// (a) Mono source + mono delivery ON → a true single-channel WAV and MP3 that still
@@ -365,6 +468,39 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
             "-show_entries", "stream=channels", "-of", "default=nw=1:nk=1", url.path
         ])
         return try XCTUnwrap(Int(out.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+}
+
+/// Thread-safe ordered event sink for callbacks firing from the processor's
+/// concurrency domain (completions, log lines) so ordering can be asserted.
+private final class EventCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events: [String] = []
+
+    func append(_ event: String) {
+        lock.lock(); defer { lock.unlock() }
+        events.append(event)
+    }
+
+    func snapshot() -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        return events
+    }
+}
+
+/// Holds the test's Task handle so a processor callback can cancel it.
+private final class TaskBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<DeliveryBatchRunResult, Error>?
+
+    func set(_ t: Task<DeliveryBatchRunResult, Error>) {
+        lock.lock(); defer { lock.unlock() }
+        task = t
+    }
+
+    func cancel() {
+        lock.lock(); defer { lock.unlock() }
+        task?.cancel()
     }
 }
 

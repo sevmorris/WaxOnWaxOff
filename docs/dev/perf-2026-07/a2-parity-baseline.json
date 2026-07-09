@@ -1,0 +1,26 @@
+{
+  "cal10_mono.wav" : {
+    "channelPeaksHash" : "8a118691b5edcc8f",
+    "counts" : "500\/500\/1",
+    "crest" : "16.510746264221368",
+    "lufs" : "-33.89820959807156",
+    "noiseFloor" : "-40.615868519693066",
+    "peak" : "-16.937553315503202",
+    "peaksHash" : "8a118691b5edcc8f",
+    "rms" : "-33.448299579724569",
+    "samplesHash" : "0cf8bf30c7da9665",
+    "truePeak" : "-16.937553315503202"
+  },
+  "rendered.wav" : {
+    "channelPeaksHash" : "16e01ebadcc11a3c,16e01ebadcc11a3c",
+    "counts" : "500\/500\/2",
+    "crest" : "17.114181167375676",
+    "lufs" : "-17.968475941615026",
+    "noiseFloor" : "-27.656944842335754",
+    "peak" : "-3.3820232695568904",
+    "peaksHash" : "16e01ebadcc11a3c",
+    "rms" : "-20.496204436932565",
+    "samplesHash" : "b43a1dcb799f1ccc",
+    "truePeak" : "-3.3820232695568904"
+  }
+}

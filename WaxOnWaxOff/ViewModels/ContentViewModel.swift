@@ -165,7 +165,7 @@ final class ContentViewModel {
                             guard let id = result.id,
                                   let index = self.files.firstIndex(where: { $0.id == id }) else { return }
                             self.files[index].status = .processed(outputURL: result.output)
-                            self.fileQueue.generateOutputWaveform(id: id, url: result.output)
+                            // Stats + output waveform from a single shared decode.
                             self.fileQueue.analyzeOutputFile(id: id, url: result.output)
                         }
                     },

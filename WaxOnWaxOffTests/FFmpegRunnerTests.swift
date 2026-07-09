@@ -48,6 +48,61 @@ final class FFmpegRunnerTests: XCTestCase {
         XCTAssertEqual(dict?["target_offset"], "4")
     }
 
+    func testParseEbur128FrameMetadataTakesFinalFrameValues() {
+        // Realistic two-frame excerpt of `ametadata=mode=print:file=-` output.
+        // The final frame's whole-file values must win, and the LRA.low /
+        // LRA.high / true_peaks_chN keys must not collide with the LRA= /
+        // true_peak= prefixes.
+        let stdout = """
+        frame:5998 pts:26451180 pts_time:599.8
+        lavfi.r128.M=-16.012
+        lavfi.r128.S=-17.388
+        lavfi.r128.I=-19.001
+        lavfi.r128.LRA=6.100
+        lavfi.r128.LRA.low=-22.710
+        lavfi.r128.LRA.high=-16.330
+        lavfi.r128.true_peaks_ch0=0.500
+        lavfi.r128.true_peaks_ch1=0.500
+        lavfi.r128.true_peak=0.500
+        frame:5999 pts:26455590 pts_time:599.9
+        lavfi.r128.M=-15.943
+        lavfi.r128.S=-17.254
+        lavfi.r128.I=-18.657
+        lavfi.r128.LRA=6.370
+        lavfi.r128.LRA.low=-22.710
+        lavfi.r128.LRA.high=-16.340
+        lavfi.r128.true_peaks_ch0=0.615
+        lavfi.r128.true_peaks_ch1=0.610
+        lavfi.r128.true_peak=0.615
+        """
+        let m = FFmpegRunner.parseEbur128FrameMetadata(from: stdout)
+        XCTAssertEqual(m?.integrated, -18.657)
+        XCTAssertEqual(m?.lra, 6.37, "LRA.low/LRA.high must not shadow the LRA= key")
+        // 20·log10(0.615) — full-precision dBTP from the linear frame value
+        XCTAssertEqual(try XCTUnwrap(m?.truePeakDB), -4.2225, accuracy: 0.001)
+    }
+
+    func testParseEbur128FrameMetadataSilenceMapsToNegativeInfinity() {
+        let stdout = """
+        frame:1 pts:4410 pts_time:0.1
+        lavfi.r128.I=-70.000
+        lavfi.r128.LRA=0.000
+        lavfi.r128.true_peak=0.000
+        """
+        let m = FFmpegRunner.parseEbur128FrameMetadata(from: stdout)
+        XCTAssertEqual(m?.truePeakDB, -Double.infinity,
+                       "zero linear peak (digital silence) must map to -inf dBTP, not crash log10")
+    }
+
+    func testParseEbur128FrameMetadataReturnsNilWhenKeysMissing() {
+        XCTAssertNil(FFmpegRunner.parseEbur128FrameMetadata(from: "no metadata here"))
+        XCTAssertNil(FFmpegRunner.parseEbur128FrameMetadata(from: """
+        frame:1 pts:4410 pts_time:0.1
+        lavfi.r128.I=-18.000
+        lavfi.r128.LRA=6.000
+        """), "missing true_peak key must fail the parse, not fabricate a value")
+    }
+
     func testFilterEscapeHandlesSyntaxCharacters() {
         XCTAssertEqual(FFmpegRunner.filterEscape("path/to/file"), "path/to/file")
         XCTAssertEqual(FFmpegRunner.filterEscape("a:b"), "a\\:b")

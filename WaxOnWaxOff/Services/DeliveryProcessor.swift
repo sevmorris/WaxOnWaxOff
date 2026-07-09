@@ -37,6 +37,12 @@ struct DeliveryBatchRunResult: Sendable {
 
 // MARK: - DeliveryProcessor
 
+/// A deferred, advisory verification of one delivered output. Yielded to the
+/// verification pool when its file completes and drained concurrently with
+/// the rest of the batch — in the pool's own slots, never a delivery slot.
+/// Never throws — verification is logging only.
+typealias DeferredVerification = @Sendable () async -> Void
+
 actor DeliveryProcessor {
 
     func run(
@@ -58,34 +64,81 @@ actor DeliveryProcessor {
             "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
         }
 
-        let outcomes: [Result<DeliveryJobResult, DeliveryJobFailure>] = try await runBoundedConcurrent(
-            inputs: inputs,
-            limit: ProcessingConfig.maxConcurrentJobs
-        ) { input in
-            do {
-                try Task.checkCancellation()
-                onFileStarted?(input.id)
-                let (outputs, mp3Fail) = try await self.process(
-                    url: input.url,
-                    settings: settings,
-                    tools: tools,
-                    allocator: allocator,
-                    onPhase: { phase in onPhase?(input.id, phase) },
-                    onLog: onLog
+        // Verifications flow from delivery jobs into an independent bounded
+        // pool that drains them concurrently with delivery. The pool is sized
+        // by verificationConcurrency and never shares a slot with delivery in
+        // either direction: delivery fills its own runBoundedConcurrent limit,
+        // and the drain runs in a sibling child task with its own bound. A
+        // file's row completes at file-written; its verification lines trail,
+        // possibly interleaved with other files' delivery; run() does not
+        // return until both children finish, so the batch is only reported
+        // complete once every verification line is in.
+        let (verificationStream, verificationSink) = AsyncStream<DeferredVerification>.makeStream()
+
+        enum Child: Sendable {
+            case outcomes([Result<DeliveryJobResult, DeliveryJobFailure>])
+            case drained
+        }
+
+        var outcomes: [Result<DeliveryJobResult, DeliveryJobFailure>] = []
+        try await withThrowingTaskGroup(of: Child.self) { group in
+            group.addTask {
+                // Ensure the drain's stream always terminates, including when
+                // delivery throws (cancellation) — otherwise the sibling child
+                // would wait on the stream forever.
+                defer { verificationSink.finish() }
+                let outcomes = try await runBoundedConcurrent(
+                    inputs: inputs,
+                    limit: ProcessingConfig.deliveryConcurrency
+                ) { input -> Result<DeliveryJobResult, DeliveryJobFailure> in
+                    do {
+                        try Task.checkCancellation()
+                        onFileStarted?(input.id)
+                        let (outputs, mp3Fail, verifications) = try await self.process(
+                            url: input.url,
+                            settings: settings,
+                            tools: tools,
+                            allocator: allocator,
+                            onPhase: { phase in onPhase?(input.id, phase) },
+                            onLog: onLog
+                        )
+                        let result = DeliveryJobResult(id: input.id, outputURLs: outputs, mp3FailureMessage: mp3Fail)
+                        // Completion fires at file-written; this file's
+                        // verifications enter the pool strictly afterwards.
+                        onFileCompleted?(result)
+                        for verification in verifications {
+                            verificationSink.yield(verification)
+                        }
+                        return .success(result)
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                        onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
+                        let failure = DeliveryJobFailure(id: input.id, message: message)
+                        onFileFailed?(failure)
+                        return .failure(failure)
+                    }
+                }
+                return .outcomes(outcomes)
+            }
+            group.addTask {
+                try await Self.drainVerifications(
+                    verificationStream,
+                    poolSize: ProcessingConfig.verificationConcurrency
                 )
-                let result = DeliveryJobResult(id: input.id, outputURLs: outputs, mp3FailureMessage: mp3Fail)
-                onFileCompleted?(result)
-                return .success(result)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
-                let failure = DeliveryJobFailure(id: input.id, message: message)
-                onFileFailed?(failure)
-                return .failure(failure)
+                return .drained
+            }
+
+            for try await child in group {
+                if case .outcomes(let o) = child { outcomes = o }
             }
         }
+
+        // Preserve cancel semantics: a cancellation that lands after the last
+        // delivery and drain complete must still surface as CancellationError,
+        // not as a normal batch result.
+        try Task.checkCancellation()
 
         var successes: [DeliveryJobResult] = []
         var failures: [DeliveryJobFailure] = []
@@ -96,6 +149,31 @@ actor DeliveryProcessor {
             }
         }
         return DeliveryBatchRunResult(successes: successes, failures: failures)
+    }
+
+    /// Runs verifications from `stream` with at most `poolSize` in flight.
+    /// Verifications never throw; the only throw path is cancellation, which
+    /// stops un-started work at the checkCancellation gate while FFmpegRunner
+    /// SIGTERMs any pass already in flight.
+    private static func drainVerifications(
+        _ stream: AsyncStream<DeferredVerification>,
+        poolSize: Int
+    ) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            var active = 0
+            for await verification in stream {
+                if active >= poolSize {
+                    try await group.next()
+                    active -= 1
+                }
+                group.addTask {
+                    try Task.checkCancellation()
+                    await verification()
+                }
+                active += 1
+            }
+            try await group.waitForAll()
+        }
     }
 
     func process(
@@ -109,7 +187,14 @@ actor DeliveryProcessor {
         let allocator = OutputAllocator { [lufsTag] input in
             "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
         }
-        let (outputs, _) = try await process(url: url, settings: settings, tools: tools, allocator: allocator, onPhase: onPhase, onLog: onLog)
+        let (outputs, _, verifications) = try await process(url: url, settings: settings, tools: tools, allocator: allocator, onPhase: onPhase, onLog: onLog)
+        // Single-file entry point: run the deferred verifications before
+        // returning so callers (and tests) still observe the "delivered" log
+        // lines within the call, matching the batch path's guarantee that
+        // verification completes before the run is reported finished.
+        for verification in verifications {
+            await verification()
+        }
         return outputs
     }
 
@@ -120,8 +205,9 @@ actor DeliveryProcessor {
         allocator: OutputAllocator,
         onPhase: (@Sendable (String) -> Void)? = nil,
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
-    ) async throws -> ([URL], String?) {
+    ) async throws -> ([URL], String?, [DeferredVerification]) {
         let ffmpeg = tools.ffmpeg
+        var verifications: [DeferredVerification] = []
         // Probe source duration for proportional ffmpeg timeouts (FFmpegRunner.effectiveTimeoutSeconds).
         let fileDuration = await probeFileDuration(ffprobe: tools.ffprobe, url: url)
         let channelCount = await probeChannelCount(ffprobe: tools.ffprobe, url: url)
@@ -203,7 +289,9 @@ actor DeliveryProcessor {
             outputURLs.append(wavFinalURL)
             onLog?("✓ \(wavFinalURL.lastPathComponent)", .info)
             onLog?("  → \(wavFinalURL.path)", .verbose)
-            await verifyDelivered(ffmpeg: ffmpeg, output: wavFinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)
+            verifications.append { [ffmpeg] in
+                await self.verifyDeliveredWAV(ffmpeg: ffmpeg, output: wavFinalURL, fileDuration: fileDuration, onLog: onLog)
+            }
         }
 
         // Phase 3: Encode MP3 (if needed)
@@ -241,21 +329,33 @@ actor DeliveryProcessor {
                 outputURLs.append(mp3FinalURL)
                 onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
                 onLog?("  → \(mp3FinalURL.path)", .verbose)
-                await verifyDelivered(ffmpeg: ffmpeg, output: mp3FinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)
+                // MP3 verification intentionally stays on loudnorm's measurement
+                // pass (unlike the WAV path above): its internal 192 kHz resample
+                // resolves inter-sample peaks of lossy-decoded audio that
+                // ebur128's fixed 4× interpolator underreads — measured 0.156 dB
+                // low on a real music episode's MP3 versus an 8×/16× oversampled
+                // reference that matched loudnorm within 0.003 dB. See commit
+                // ef58d71 and docs/dev/perf-2026-07/meter-agreement.md for the
+                // full evidence table. Do not "unify" the two verification paths.
+                verifications.append { [ffmpeg] in
+                    await self.verifyDelivered(ffmpeg: ffmpeg, output: mp3FinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)
+                }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 if settings.outputMode == .both {
-                    // WAV is already at wavFinalURL — partial success.
+                    // WAV is already at wavFinalURL — partial success. The WAV's
+                    // deferred verification still runs; no MP3 verification was
+                    // queued since the encode never produced a file.
                     let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                     onLog?("⚠ MP3 encoding failed: \(msg)", .info)
-                    return (outputURLs, msg)
+                    return (outputURLs, msg, verifications)
                 }
                 throw error  // mp3-only mode: total failure
             }
         }
 
-        return (outputURLs, nil)
+        return (outputURLs, nil, verifications)
     }
 
     // MARK: - Private
@@ -352,10 +452,55 @@ actor DeliveryProcessor {
         return measurements.isFinite ? measurements : nil
     }
 
-    /// Post-render verification: re-measure a finished output file and log its
-    /// integrated loudness and true peak. Purely advisory — the render already
-    /// succeeded and the file is delivered, so this never throws and a
-    /// measurement hiccup only downgrades to a verbose note.
+    /// Post-render verification for the WAV output: re-measure the delivered
+    /// file with `ebur128=peak=true` and log its integrated loudness and true
+    /// peak. Purely advisory — never throws; a measurement hiccup only
+    /// downgrades to a verbose note. Values are read at full precision from
+    /// the filter's frame metadata (the stderr Summary block only prints one
+    /// decimal). ebur128 is used here because loudnorm's measurement mode
+    /// costs ~5× as much (internal 192 kHz resample) for an advisory readout;
+    /// on linear PCM the two meters agree within 0.01 dB. The MP3 path keeps
+    /// loudnorm — see the comment at its call site.
+    private func verifyDeliveredWAV(
+        ffmpeg: String,
+        output: URL,
+        fileDuration: TimeInterval?,
+        onLog: (@Sendable (String, LogLevel) -> Void)?
+    ) async {
+        guard let m = await measureWAVOutput(ffmpeg: ffmpeg, output: output, fileDuration: fileDuration) else {
+            onLog?("  could not verify \(output.lastPathComponent) — output loudness/true-peak not measured", .verbose)
+            return
+        }
+        onLog?(String(format: "  delivered %@: %.1f LUFS · %.1f dBTP", output.lastPathComponent, m.integrated, m.truePeakDB), .info)
+        onLog?(String(format: "  measured %@: I=%.2f LUFS  TP=%.2f dBTP  LRA=%.2f LU",
+                      output.lastPathComponent, m.integrated, m.truePeakDB, m.lra), .verbose)
+    }
+
+    /// EBU R128 measurement of a delivered WAV via ebur128 with true-peak mode
+    /// (4× oversampled per BS.1770), full-precision values from frame metadata
+    /// printed to stdout. Returns nil if the pass or parse fails.
+    private func measureWAVOutput(
+        ffmpeg: String,
+        output: URL,
+        fileDuration: TimeInterval?
+    ) async -> FFmpegRunner.Ebur128Reading? {
+        let args = [
+            "-hide_banner", "-nostats", "-y",
+            "-i", output.path, "-map", "0:a:0",
+            "-af", "ebur128=peak=true:metadata=1,ametadata=mode=print:file=-",
+            "-f", "null", "-"
+        ]
+        guard let stdout = try? await FFmpegRunner.captureStdout(exe: ffmpeg, args: args, fileDuration: fileDuration),
+              let m = FFmpegRunner.parseEbur128FrameMetadata(from: stdout)
+        else { return nil }
+        return m
+    }
+
+    /// Post-render verification for the MP3 output: re-measure with a loudnorm
+    /// measurement pass and log integrated loudness and true peak. Purely
+    /// advisory — the render already succeeded and the file is delivered, so
+    /// this never throws and a measurement hiccup only downgrades to a verbose
+    /// note. (Kept on loudnorm deliberately; see the call-site comment.)
     private func verifyDelivered(
         ffmpeg: String,
         output: URL,
