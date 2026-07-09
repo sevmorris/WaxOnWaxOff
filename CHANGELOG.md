@@ -2,6 +2,17 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.3.0] — 2026-07-09
+
+**Performance**
+- WaxOff delivery is substantially faster with identical output: a 60-minute "Both" run completes ~26% sooner, and deep batches finish up to 2.25× faster (delivery now scales to nearly all CPU cores instead of half)
+- File rows complete the moment their outputs are written; the post-render verification readout runs in the background and its console lines trail in per file
+- File analysis on load is ~20× faster (Accelerate/vDSP), so long files reach "ready" in seconds instead of minutes; the post-processing stats/waveform refresh shares a single decode and is similarly vectorized
+- Delivered-WAV verification uses FFmpeg's ebur128 meter at full precision; MP3 verification deliberately stays on loudnorm, whose true-peak measurement proved more accurate on hot lossy audio (see docs/dev/perf-2026-07/)
+
+**Developer**
+- Hidden WaxPerfLog flag (`defaults write io.github.sevmorris.WaxOnWaxOff WaxPerfLog -bool YES`) emits per-stage timings to the unified log (category "Perf") for future performance audits
+
 ## [2.2.4] — 2026-07-01
 
 **Documentation**
