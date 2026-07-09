@@ -27,11 +27,22 @@ enum ProcessingConfig {
     }
 
     /// Size of the verification pool that drains deferred output
-    /// verifications concurrently with delivery. Deliberately small and
-    /// fully independent of `deliveryConcurrency` — verification must never
-    /// consume a delivery slot, but it may overlap delivery so deep batches
-    /// don't serialize a verification tail after the last render.
-    static var verificationConcurrency: Int { 3 }
+    /// verifications concurrently with delivery. Fully independent of
+    /// `deliveryConcurrency` — verification must never consume a delivery
+    /// slot, but it may overlap delivery so deep batches don't serialize a
+    /// verification tail after the last render.
+    ///
+    /// Width matters most when the delivery cap meets or exceeds the queue
+    /// depth: every file then completes in a single wave, so ALL
+    /// verifications arrive at once and the pool is the only parallelism
+    /// available for the tail (a fixed pool of 3 measured a ~152 s tail on
+    /// an 8-file batch with the machine 70% idle). cores ÷ 2 soaks up the
+    /// idle cores after delivery drains; the cap of 6 bounds worst-case
+    /// oversubscription while delivery is still active, and the floor of 3
+    /// keeps small machines draining.
+    static var verificationConcurrency: Int {
+        min(6, max(3, ProcessInfo.processInfo.activeProcessorCount / 2))
+    }
 }
 
 /// Runs `body` over each element in `inputs` with at most `limit` tasks executing concurrently.
