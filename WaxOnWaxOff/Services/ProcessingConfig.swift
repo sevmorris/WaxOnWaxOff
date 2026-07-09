@@ -10,12 +10,17 @@ enum ProcessingConfig {
         max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
     }
 
-    /// Maximum number of concurrent WaxOff delivery jobs (and their deferred
-    /// verification passes). Split from `maxConcurrentJobs` so the delivery
-    /// cap can be tuned independently of WaxOn processing and of the
-    /// load-time analysis gate; the initial value is identical.
+    /// Maximum number of concurrent WaxOff delivery jobs. Each delivery job
+    /// is a chain of single-threaded ffmpeg filter graphs, so the old
+    /// cores/2 cap left half the machine idle on deep queues — measured
+    /// 626 s vs 370 s (1.69×) for an 8 × 30-min batch on a 12-core M3 Pro.
+    /// cores − 1 keeps one core of headroom for the UI and OS; the
+    /// 2×(cores/2) term keeps the raise proportional on small machines and
+    /// the floor of 2 preserves the old minimum. (12 cores: 6 → 11.
+    /// 8 cores: 4 → 7. 4 cores: 2 → 3.)
     static var deliveryConcurrency: Int {
-        max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        return max(2, min(cores - 1, 2 * (cores / 2)))
     }
 
     /// Maximum number of files analyzed simultaneously at load time (the
