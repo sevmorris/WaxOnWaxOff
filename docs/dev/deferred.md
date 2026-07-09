@@ -60,6 +60,6 @@ _None currently tracked._
 
 ## Record only, no action
 
-- **[perf-2026-07] Commit-narrative asymmetry** — `ead64e2` narrates
+- **[perf-2026-07] Commit-narrative asymmetry** — `265ce4a` narrates
   removing the "verifying N output files" verbose marker; its addition
-  in `2d6b4eb` is visible only in that commit's diff. Cosmetic.
+  in `9dfca8d` is visible only in that commit's diff. Cosmetic.

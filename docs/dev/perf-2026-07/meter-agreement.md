@@ -1,9 +1,9 @@
-# Meter agreement: loudnorm measurement vs ebur128 — gate evidence for 4c9ce5b
+# Meter agreement: loudnorm measurement vs ebur128 — gate evidence for ef58d71
 
 Corpus: synthetic (10-min pink-noise stereo/mono, fs/4+45° hot-ISP sine, a
 rendered −18 LUFS delivery WAV and its MP3) plus two real recordings processed
-through the actual pipeline at default settings ("npr_voice": 60-min mono
-broadcast, voice-dominant; "rhino_music": 31-min stereo band recording).
+through the actual pipeline at default settings ("real_voice_60min_mono": 60-min mono
+broadcast, voice-dominant; "real_music_31min_stereo": 31-min stereo band recording).
 Recorded from the fix-session gate runs of 2026-07-08/09 (M3 Pro, bundled
 FFmpeg 8.0). Re-runnable via meter_agreement.sh in this directory.
 
@@ -16,10 +16,10 @@ FFmpeg 8.0). Re-runnable via meter_agreement.sh in this directory.
 | hot-ISP fs/4 sine | −0.15/−2.87/0.00 | −0.1/−2.9/0.0 | 0.05 | 0.03 | pass |
 | rendered WAV | −18.02/−3.40/6.30 | −18.0/−3.4/6.4 | 0.02 | 0.00 | pass |
 | rendered MP3 | −18.68/−4.22/6.30 | −18.7/−4.2/6.4 | 0.02 | 0.02 | pass |
-| npr_voice WAV | −18.00/−3.64/3.60 | −18.0/−3.6/3.6 | 0.00 | 0.04 | pass |
-| npr_voice MP3 | −18.44/−4.08/3.70 | −18.4/−4.1/3.6 | 0.04 | 0.02 | pass |
-| rhino_music WAV | −18.10/−1.00/16.20 | −18.1/−1.0/16.0 | 0.00 | 0.00 | pass |
-| **rhino_music MP3** | **−18.54/−1.98/16.20** | **−18.5/−2.1/16.0** | 0.04 | **0.12** | **FAIL** |
+| real_voice_60min_mono WAV | −18.00/−3.64/3.60 | −18.0/−3.6/3.6 | 0.00 | 0.04 | pass |
+| real_voice_60min_mono MP3 | −18.44/−4.08/3.70 | −18.4/−4.1/3.6 | 0.04 | 0.02 | pass |
+| real_music_31min_stereo WAV | −18.10/−1.00/16.20 | −18.1/−1.0/16.0 | 0.00 | 0.00 | pass |
+| **real_music_31min_stereo MP3** | **−18.54/−1.98/16.20** | **−18.5/−2.1/16.0** | 0.04 | **0.12** | **FAIL** |
 
 Tolerance: ΔI ≤ 0.1 LU, ΔTP ≤ 0.1 dBTP.
 
@@ -27,10 +27,10 @@ Tolerance: ΔI ≤ 0.1 LU, ΔTP ≤ 0.1 dBTP.
 
 | file | loudnorm TP | ebur128 TP (frame metadata) | ΔTP |
 |---|---|---|---|
-| rhino_music MP3 | −1.98 | −2.136 | **0.156** (genuine, not display rounding) |
-| rhino_music WAV | −1.00 | −1.002 | 0.002 |
-| npr_voice MP3 | −4.08 | −4.082 | 0.002 |
-| npr_voice WAV | −3.64 | −3.649 | 0.009 |
+| real_music_31min_stereo MP3 | −1.98 | −2.136 | **0.156** (genuine, not display rounding) |
+| real_music_31min_stereo WAV | −1.00 | −1.002 | 0.002 |
+| real_voice_60min_mono MP3 | −4.08 | −4.082 | 0.002 |
+| real_voice_60min_mono WAV | −3.64 | −3.649 | 0.009 |
 
 Oversampled reference on the failing file (decode → aresample filter_size=512
 cutoff=0.985 → astats peak):
@@ -57,7 +57,7 @@ MP3 decode differentiated the interpolators.
 | mono pink noise | −33.97/−16.94 | −33.903/−16.954 | 0.067 | 0.014 |
 | hot-ISP sine | −0.15/−2.87 | −0.110/−2.865 | 0.040 | 0.005 |
 | rendered WAV | −18.02/−3.40 | −17.973/−3.401 | 0.047 | 0.001 |
-| npr_voice WAV | −18.00/−3.64 | −17.964/−3.649 | 0.036 | 0.009 |
-| rhino_music WAV | −18.10/−1.00 | −18.065/−1.002 | 0.035 | 0.002 |
+| real_voice_60min_mono WAV | −18.00/−3.64 | −17.964/−3.649 | 0.036 | 0.009 |
+| real_music_31min_stereo WAV | −18.10/−1.00 | −18.065/−1.002 | 0.035 | 0.002 |
 
 All within tolerance; max ΔI 0.067 LU, max ΔTP 0.040 dB.

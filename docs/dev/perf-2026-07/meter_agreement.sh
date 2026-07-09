@@ -2,7 +2,8 @@
 # Meter-agreement gate: loudnorm measurement mode vs ebur128 peak=true.
 # Usage: meter_agreement.sh file1 [file2 ...]
 set -euo pipefail
-FF=/Users/sev/Projects/WaxOnWaxOff/WaxOnWaxOff/ffmpeg
+# Bundled ffmpeg, resolved relative to this script (docs/dev/perf-2026-07/ → repo root).
+FF="$(cd "$(dirname "$0")/../../.." && pwd)/WaxOnWaxOff/ffmpeg"
 
 printf "%-28s %9s %9s %9s | %9s %9s %9s | %6s %6s\n" "file" "ln_I" "ln_TP" "ln_LRA" "eb_I" "eb_TP" "eb_LRA" "dI" "dTP"
 for f in "$@"; do

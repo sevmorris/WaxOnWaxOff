@@ -6,14 +6,14 @@ Machine for all numbers: M3 Pro, 12 cores (6P+6E), bundled FFmpeg 8.0 arm64.
 
 | file | proves | gate for |
 |---|---|---|
-| [meter-agreement.md](meter-agreement.md) | loudnorm↔ebur128 delta tables, the rhino-MP3 failure, 8×/16× oversampled reference, WAV-side re-run | `4c9ce5b` (hybrid WAV verification) |
-| [a2-parity-baseline.json](a2-parity-baseline.json) | pre-merge full-precision stats + FNV-1a waveform bucket hashes the merged single-decode pass was compared against (bit-exact) | `89637f0` (single-decode merge) |
-| [vdsp-parity-report.txt](vdsp-parity-report.txt) | vDSP vs scalar analyzer: 0.000000 deltas across the 9-file corpus; per-file timings; 60-min speedup 82.3 → 3.96 s | `51c1a26` (vDSP analyzer) |
-| [waveform-parity-report.txt](waveform-parity-report.txt) | bit-exact waveform buckets across the corpus; 5.0× speedup; combined-pass timing | `43bb426` (vDSP waveform) |
-| [capgate-history.md](capgate-history.md) | all 8×30-min batch runs incl. the two failed cap-raise gates and the pool-sizing lesson | `ead64e2`, `0efa96a`, `9ae7084` |
-| [capgate-final.txt](capgate-final.txt) | raw report of the final passing cap gate (381.7 s = 1.64×) | `9ae7084` (cap raise) |
+| [meter-agreement.md](meter-agreement.md) | loudnorm↔ebur128 delta tables, the real-music-MP3 failure, 8×/16× oversampled reference, WAV-side re-run | `ef58d71` (hybrid WAV verification) |
+| [a2-parity-baseline.json](a2-parity-baseline.json) | pre-merge full-precision stats + FNV-1a waveform bucket hashes the merged single-decode pass was compared against (bit-exact) | `3c927c6` (single-decode merge) |
+| [vdsp-parity-report.txt](vdsp-parity-report.txt) | vDSP vs scalar analyzer: 0.000000 deltas across the 9-file corpus; per-file timings; 60-min speedup 82.3 → 3.96 s | `8dfecbe` (vDSP analyzer) |
+| [waveform-parity-report.txt](waveform-parity-report.txt) | bit-exact waveform buckets across the corpus; 5.0× speedup; combined-pass timing | `eb12e0e` (vDSP waveform) |
+| [capgate-history.md](capgate-history.md) | all 8×30-min batch runs incl. the two failed cap-raise gates and the pool-sizing lesson | `265ce4a`, `965732e`, `cccaa60` |
+| [capgate-final.txt](capgate-final.txt) | raw report of the final passing cap gate (381.7 s = 1.64×) | `cccaa60` (cap raise) |
 | [wrapup-single-report.txt](wrapup-single-report.txt) | single 60-min confirmation: blocking 422.6 s vs ~426 projected, settled 498.5 s vs ~501 projected | wrap-up |
-| [meter_agreement.sh](meter_agreement.sh) | re-runnable loudnorm-vs-ebur128 comparison script (edit the hardcoded ffmpeg path if the checkout moves) | tooling |
+| [meter_agreement.sh](meter_agreement.sh) | re-runnable loudnorm-vs-ebur128 comparison script (resolves the bundled ffmpeg relative to its own location) | tooling |
 
 ## Regenerating the benchmark corpus
 
@@ -34,10 +34,14 @@ true peak):
       -f lavfi -i "aevalsrc=0.95*sin(2*PI*11025*t+PI/4):sample_rate=44100:duration=120" \
       -ac 2 -c:a pcm_s16le isp_hot.wav
 
-Real-material corpus: copies of "NPR Dec 15 1998.wav" (voice-dominant) and
-"Rhino Chasers.wav" (music) from ~/Music/Everything is Changing field
-recordings, processed through WaxOff at defaults ("Both") to produce the
-delivered WAV+MP3 pairs the meter tables reference.
+Real-material corpus: two local recordings that are not part of this repo —
+a 60-minute mono voice-dominant broadcast recording and a 31-minute stereo
+band recording — processed through WaxOff at defaults ("Both") to produce
+the delivered WAV+MP3 pairs the meter tables reference. The labels
+`real_voice_60min_mono` and `real_music_31min_stereo` used throughout these
+reports are sanitized placeholders for those files; any substitute with the
+same character (long real voice recording, ISP-hot real music near the MP3
+pre-encode ceiling) reproduces the findings.
 
 Oversampled true-peak reference used to arbitrate the meters:
 
