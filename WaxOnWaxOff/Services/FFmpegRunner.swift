@@ -112,6 +112,43 @@ enum FFmpegRunner {
         return result.isEmpty ? nil : result
     }
 
+    // MARK: - ebur128 Frame-Metadata Parsing
+
+    /// Whole-file values from an `ebur128=peak=true:metadata=1,ametadata=mode=print:file=-`
+    /// pass, taken from the final 100 ms frame's metadata block — the frame
+    /// stream carries full-precision values (3 decimals for loudness, linear
+    /// amplitude for true peak), unlike the 1-decimal stderr Summary block.
+    struct Ebur128Reading: Sendable {
+        let integrated: Double   // lavfi.r128.I — LUFS
+        let lra: Double          // lavfi.r128.LRA — LU
+        let truePeakDB: Double   // 20·log10(lavfi.r128.true_peak) — dBTP, 4× oversampled per BS.1770
+    }
+
+    /// Parse the last-seen `lavfi.r128.*` values from an ametadata print stream
+    /// (one block per 100 ms frame; the final block holds the whole-file
+    /// integrated values, so last occurrence wins). Returns nil if any of the
+    /// three keys never appears. A non-positive linear peak (digital silence)
+    /// maps to -inf dBTP, matching what loudnorm reports for silent input.
+    nonisolated static func parseEbur128FrameMetadata(from output: String) -> Ebur128Reading? {
+        var integrated: Double?
+        var lra: Double?
+        var peakLinear: Double?
+
+        for line in output.split(separator: "\n") {
+            if line.hasPrefix("lavfi.r128.I=") {
+                integrated = Double(line.dropFirst("lavfi.r128.I=".count)) ?? integrated
+            } else if line.hasPrefix("lavfi.r128.LRA=") {
+                lra = Double(line.dropFirst("lavfi.r128.LRA=".count)) ?? lra
+            } else if line.hasPrefix("lavfi.r128.true_peak=") {
+                peakLinear = Double(line.dropFirst("lavfi.r128.true_peak=".count)) ?? peakLinear
+            }
+        }
+
+        guard let integrated, let lra, let peakLinear else { return nil }
+        let truePeakDB = peakLinear > 0 ? 20 * log10(peakLinear) : -Double.infinity
+        return Ebur128Reading(integrated: integrated, lra: lra, truePeakDB: truePeakDB)
+    }
+
     // MARK: - Private
 
     private enum CaptureTarget { case stderr, stdout }

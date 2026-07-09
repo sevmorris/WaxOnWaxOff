@@ -203,7 +203,7 @@ actor DeliveryProcessor {
             outputURLs.append(wavFinalURL)
             onLog?("✓ \(wavFinalURL.lastPathComponent)", .info)
             onLog?("  → \(wavFinalURL.path)", .verbose)
-            await verifyDelivered(ffmpeg: ffmpeg, output: wavFinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)
+            await verifyDeliveredWAV(ffmpeg: ffmpeg, output: wavFinalURL, fileDuration: fileDuration, onLog: onLog)
         }
 
         // Phase 3: Encode MP3 (if needed)
@@ -241,6 +241,14 @@ actor DeliveryProcessor {
                 outputURLs.append(mp3FinalURL)
                 onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
                 onLog?("  → \(mp3FinalURL.path)", .verbose)
+                // MP3 verification intentionally stays on loudnorm's measurement
+                // pass (unlike the WAV path above): its internal 192 kHz resample
+                // resolves inter-sample peaks of lossy-decoded audio that
+                // ebur128's fixed 4× interpolator underreads — measured 0.156 dB
+                // low on a real music episode's MP3 versus an 8×/16× oversampled
+                // reference that matched loudnorm within 0.003 dB. See this
+                // commit's message for the full evidence table. Do not "unify"
+                // the two verification paths.
                 await verifyDelivered(ffmpeg: ffmpeg, output: mp3FinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)
             } catch is CancellationError {
                 throw CancellationError()
@@ -352,10 +360,55 @@ actor DeliveryProcessor {
         return measurements.isFinite ? measurements : nil
     }
 
-    /// Post-render verification: re-measure a finished output file and log its
-    /// integrated loudness and true peak. Purely advisory — the render already
-    /// succeeded and the file is delivered, so this never throws and a
-    /// measurement hiccup only downgrades to a verbose note.
+    /// Post-render verification for the WAV output: re-measure the delivered
+    /// file with `ebur128=peak=true` and log its integrated loudness and true
+    /// peak. Purely advisory — never throws; a measurement hiccup only
+    /// downgrades to a verbose note. Values are read at full precision from
+    /// the filter's frame metadata (the stderr Summary block only prints one
+    /// decimal). ebur128 is used here because loudnorm's measurement mode
+    /// costs ~5× as much (internal 192 kHz resample) for an advisory readout;
+    /// on linear PCM the two meters agree within 0.01 dB. The MP3 path keeps
+    /// loudnorm — see the comment at its call site.
+    private func verifyDeliveredWAV(
+        ffmpeg: String,
+        output: URL,
+        fileDuration: TimeInterval?,
+        onLog: (@Sendable (String, LogLevel) -> Void)?
+    ) async {
+        guard let m = await measureWAVOutput(ffmpeg: ffmpeg, output: output, fileDuration: fileDuration) else {
+            onLog?("  could not verify \(output.lastPathComponent) — output loudness/true-peak not measured", .verbose)
+            return
+        }
+        onLog?(String(format: "  delivered %@: %.1f LUFS · %.1f dBTP", output.lastPathComponent, m.integrated, m.truePeakDB), .info)
+        onLog?(String(format: "  measured %@: I=%.2f LUFS  TP=%.2f dBTP  LRA=%.2f LU",
+                      output.lastPathComponent, m.integrated, m.truePeakDB, m.lra), .verbose)
+    }
+
+    /// EBU R128 measurement of a delivered WAV via ebur128 with true-peak mode
+    /// (4× oversampled per BS.1770), full-precision values from frame metadata
+    /// printed to stdout. Returns nil if the pass or parse fails.
+    private func measureWAVOutput(
+        ffmpeg: String,
+        output: URL,
+        fileDuration: TimeInterval?
+    ) async -> FFmpegRunner.Ebur128Reading? {
+        let args = [
+            "-hide_banner", "-nostats", "-y",
+            "-i", output.path, "-map", "0:a:0",
+            "-af", "ebur128=peak=true:metadata=1,ametadata=mode=print:file=-",
+            "-f", "null", "-"
+        ]
+        guard let stdout = try? await FFmpegRunner.captureStdout(exe: ffmpeg, args: args, fileDuration: fileDuration),
+              let m = FFmpegRunner.parseEbur128FrameMetadata(from: stdout)
+        else { return nil }
+        return m
+    }
+
+    /// Post-render verification for the MP3 output: re-measure with a loudnorm
+    /// measurement pass and log integrated loudness and true peak. Purely
+    /// advisory — the render already succeeded and the file is delivered, so
+    /// this never throws and a measurement hiccup only downgrades to a verbose
+    /// note. (Kept on loudnorm deliberately; see the call-site comment.)
     private func verifyDelivered(
         ffmpeg: String,
         output: URL,
