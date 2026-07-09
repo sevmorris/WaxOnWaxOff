@@ -80,7 +80,8 @@ enum AudioAnalyzer {
 
     /// - Parameter noiseFloorHighPassHz: HPF for noise-floor blocks — use 80 when WaxOn HPF is on, 20 when off.
     static func analyze(url: URL, noiseFloorHighPassHz: Double = 80) async throws -> AudioStats {
-        try await withCheckedThrowingContinuation { continuation in
+        let perfStart = ContinuousClock.now
+        let stats = try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let stats = try performAnalysis(url: url, noiseFloorHighPassHz: noiseFloorHighPassHz)
@@ -90,6 +91,8 @@ enum AudioAnalyzer {
                 }
             }
         }
+        PerfLog.record("AudioAnalyzer.analyze \(url.lastPathComponent)", seconds: PerfLog.seconds(since: perfStart))
+        return stats
     }
 
     private static func performAnalysis(url: URL, noiseFloorHighPassHz: Double) throws -> AudioStats {

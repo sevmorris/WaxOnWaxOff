@@ -10,7 +10,8 @@ struct WaveformData: Sendable, Equatable {
 
 enum WaveformGenerator {
     static func generate(url: URL, targetSamples: Int = 500) async throws -> WaveformData {
-        try await withCheckedThrowingContinuation { continuation in
+        let perfStart = ContinuousClock.now
+        let data = try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let data = try processAudio(url: url, targetSamples: targetSamples)
@@ -20,6 +21,8 @@ enum WaveformGenerator {
                 }
             }
         }
+        PerfLog.record("WaveformGenerator.generate \(url.lastPathComponent)", seconds: PerfLog.seconds(since: perfStart))
+        return data
     }
 
     private static func processAudio(url: URL, targetSamples: Int) throws -> WaveformData {

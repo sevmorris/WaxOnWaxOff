@@ -8,7 +8,9 @@ enum FFmpegRunner {
     ///   timeout proportionally: max(300 s, duration × 4). Pass nil to use the 900 s constant.
     static func run(exe: String, args: [String], fileDuration: TimeInterval? = nil) async throws {
         let t = effectiveTimeoutSeconds(for: fileDuration)
+        let perfStart = ContinuousClock.now
         let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr, timeoutSeconds: t)
+        PerfLog.record(PerfLog.ffmpegLabel(exe: exe, args: args), seconds: PerfLog.seconds(since: perfStart))
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
@@ -21,7 +23,9 @@ enum FFmpegRunner {
     /// - Parameter fileDuration: see `run(exe:args:fileDuration:)`.
     static func capture(exe: String, args: [String], fileDuration: TimeInterval? = nil) async throws -> String {
         let t = effectiveTimeoutSeconds(for: fileDuration)
+        let perfStart = ContinuousClock.now
         let (exitCode, stderr) = try await launch(exe: exe, args: args, capture: .stderr, timeoutSeconds: t)
+        PerfLog.record(PerfLog.ffmpegLabel(exe: exe, args: args), seconds: PerfLog.seconds(since: perfStart))
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
@@ -35,7 +39,9 @@ enum FFmpegRunner {
     /// - Parameter fileDuration: see `run(exe:args:fileDuration:)`.
     static func captureStdout(exe: String, args: [String], fileDuration: TimeInterval? = nil) async throws -> String {
         let t = effectiveTimeoutSeconds(for: fileDuration)
+        let perfStart = ContinuousClock.now
         let (exitCode, stdout) = try await launch(exe: exe, args: args, capture: .stdout, timeoutSeconds: t)
+        PerfLog.record(PerfLog.ffmpegLabel(exe: exe, args: args), seconds: PerfLog.seconds(since: perfStart))
         if exitCode != 0 {
             throw ProcessingError.ffmpegFailed(
                 code: exitCode,
