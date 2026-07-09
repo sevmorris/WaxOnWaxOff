@@ -64,66 +64,116 @@ actor DeliveryProcessor {
             "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
         }
 
-        let outcomes: [(Result<DeliveryJobResult, DeliveryJobFailure>, [DeferredVerification])] = try await runBoundedConcurrent(
-            inputs: inputs,
-            limit: ProcessingConfig.deliveryConcurrency
-        ) { input in
-            do {
-                try Task.checkCancellation()
-                onFileStarted?(input.id)
-                let (outputs, mp3Fail, verifications) = try await self.process(
-                    url: input.url,
-                    settings: settings,
-                    tools: tools,
-                    allocator: allocator,
-                    onPhase: { phase in onPhase?(input.id, phase) },
-                    onLog: onLog
+        // Verifications flow from delivery jobs into an independent bounded
+        // pool that drains them concurrently with delivery. The pool is sized
+        // by verificationConcurrency and never shares a slot with delivery in
+        // either direction: delivery fills its own runBoundedConcurrent limit,
+        // and the drain runs in a sibling child task with its own bound. A
+        // file's row completes at file-written; its verification lines trail,
+        // possibly interleaved with other files' delivery; run() does not
+        // return until both children finish, so the batch is only reported
+        // complete once every verification line is in.
+        let (verificationStream, verificationSink) = AsyncStream<DeferredVerification>.makeStream()
+
+        enum Child: Sendable {
+            case outcomes([Result<DeliveryJobResult, DeliveryJobFailure>])
+            case drained
+        }
+
+        var outcomes: [Result<DeliveryJobResult, DeliveryJobFailure>] = []
+        try await withThrowingTaskGroup(of: Child.self) { group in
+            group.addTask {
+                // Ensure the drain's stream always terminates, including when
+                // delivery throws (cancellation) — otherwise the sibling child
+                // would wait on the stream forever.
+                defer { verificationSink.finish() }
+                let outcomes = try await runBoundedConcurrent(
+                    inputs: inputs,
+                    limit: ProcessingConfig.deliveryConcurrency
+                ) { input -> Result<DeliveryJobResult, DeliveryJobFailure> in
+                    do {
+                        try Task.checkCancellation()
+                        onFileStarted?(input.id)
+                        let (outputs, mp3Fail, verifications) = try await self.process(
+                            url: input.url,
+                            settings: settings,
+                            tools: tools,
+                            allocator: allocator,
+                            onPhase: { phase in onPhase?(input.id, phase) },
+                            onLog: onLog
+                        )
+                        let result = DeliveryJobResult(id: input.id, outputURLs: outputs, mp3FailureMessage: mp3Fail)
+                        // Completion fires at file-written; this file's
+                        // verifications enter the pool strictly afterwards.
+                        onFileCompleted?(result)
+                        for verification in verifications {
+                            verificationSink.yield(verification)
+                        }
+                        return .success(result)
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                        onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
+                        let failure = DeliveryJobFailure(id: input.id, message: message)
+                        onFileFailed?(failure)
+                        return .failure(failure)
+                    }
+                }
+                return .outcomes(outcomes)
+            }
+            group.addTask {
+                try await Self.drainVerifications(
+                    verificationStream,
+                    poolSize: ProcessingConfig.verificationConcurrency
                 )
-                let result = DeliveryJobResult(id: input.id, outputURLs: outputs, mp3FailureMessage: mp3Fail)
-                // Completion fires at file-written; verification of this file's
-                // outputs runs in the post-delivery phase below.
-                onFileCompleted?(result)
-                return (.success(result), verifications)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                onLog?("✗ \(input.url.lastPathComponent): \(message)", .info)
-                let failure = DeliveryJobFailure(id: input.id, message: message)
-                onFileFailed?(failure)
-                return (.failure(failure), [])
+                return .drained
+            }
+
+            for try await child in group {
+                if case .outcomes(let o) = child { outcomes = o }
             }
         }
 
-        // Post-delivery verification phase. Runs only after every file has
-        // rendered, so verification passes never compete with delivery jobs
-        // for a concurrency slot. Lines land in the log tagged with their
-        // filename (possibly interleaved across files); run() does not return
-        // until all of them have finished, so the batch is only reported
-        // complete once every verification line is in. Cancellation propagates
-        // here like anywhere else: the checkCancellation stops un-started
-        // verifications and FFmpegRunner SIGTERMs any in flight.
-        let verifications = outcomes.flatMap { $0.1 }
-        if !verifications.isEmpty {
-            onLog?("  verifying \(verifications.count) output file\(verifications.count == 1 ? "" : "s")…", .verbose)
-            _ = try await runBoundedConcurrent(
-                inputs: verifications,
-                limit: ProcessingConfig.deliveryConcurrency
-            ) { verification in
-                try Task.checkCancellation()
-                await verification()
-            }
-        }
+        // Preserve cancel semantics: a cancellation that lands after the last
+        // delivery and drain complete must still surface as CancellationError,
+        // not as a normal batch result.
+        try Task.checkCancellation()
 
         var successes: [DeliveryJobResult] = []
         var failures: [DeliveryJobFailure] = []
-        for (outcome, _) in outcomes {
+        for outcome in outcomes {
             switch outcome {
             case .success(let r): successes.append(r)
             case .failure(let f): failures.append(f)
             }
         }
         return DeliveryBatchRunResult(successes: successes, failures: failures)
+    }
+
+    /// Runs verifications from `stream` with at most `poolSize` in flight.
+    /// Verifications never throw; the only throw path is cancellation, which
+    /// stops un-started work at the checkCancellation gate while FFmpegRunner
+    /// SIGTERMs any pass already in flight.
+    private static func drainVerifications(
+        _ stream: AsyncStream<DeferredVerification>,
+        poolSize: Int
+    ) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            var active = 0
+            for await verification in stream {
+                if active >= poolSize {
+                    try await group.next()
+                    active -= 1
+                }
+                group.addTask {
+                    try Task.checkCancellation()
+                    await verification()
+                }
+                active += 1
+            }
+            try await group.waitForAll()
+        }
     }
 
     func process(

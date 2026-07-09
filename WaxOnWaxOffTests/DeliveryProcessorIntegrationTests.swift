@@ -247,14 +247,15 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "the processing log should record the MP3 encoding failure")
     }
 
-    // MARK: - Deferred verification (A1b)
+    // MARK: - Deferred verification (A1b, verification pool)
 
-    /// Batch path: every file's completion callback fires at file-written,
-    /// strictly before any verification line is logged — verification is a
-    /// post-delivery phase, not part of the per-file pipeline. All six
-    /// "delivered" lines (3 WAV + 3 MP3) still arrive before run() returns,
-    /// correctly attributed by filename.
-    func testBatchCompletionsPrecedeAllDeferredVerificationLines() async throws {
+    /// Batch path: a file's completion callback fires at file-written and
+    /// strictly precedes that file's own verification lines. Verification
+    /// drains in an independent pool concurrent with delivery, so lines from
+    /// one file may interleave with another file's delivery — global phase
+    /// ordering is deliberately NOT asserted. All six "delivered" lines
+    /// (3 WAV + 3 MP3) arrive before run() returns, correctly attributed.
+    func testFileCompletionPrecedesItsOwnVerificationLines() async throws {
         let tools = try XCTUnwrap(tools)
         var jobs: [DeliveryJobInput] = []
         for i in 0..<3 {
@@ -264,6 +265,9 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
             )
             jobs.append(DeliveryJobInput(id: UUID(), url: input))
         }
+        let idToName = Dictionary(uniqueKeysWithValues: jobs.map {
+            ($0.id, $0.url.deletingPathExtension().lastPathComponent)
+        })
 
         var settings = WaxOffSettings()
         settings.targetLUFS = -18.0
@@ -276,7 +280,7 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         let result = try await DeliveryProcessor().run(
             inputs: jobs,
             settings: settings,
-            onFileCompleted: { r in events.append("completed:\(r.id)") },
+            onFileCompleted: { r in events.append("completed:\(idToName[r.id] ?? "?")") },
             onLog: { message, _ in
                 if message.hasPrefix("  delivered ") { events.append("verify:\(message)") }
             }
@@ -286,24 +290,26 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         XCTAssertEqual(result.successes.count, 3)
 
         let ordered = events.snapshot()
-        let firstVerifyIndex = try XCTUnwrap(ordered.firstIndex { $0.hasPrefix("verify:") },
-                                             "expected verification lines to be logged before run() returned")
-        let completions = ordered.filter { $0.hasPrefix("completed:") }
-        XCTAssertEqual(completions.count, 3)
-        XCTAssertTrue(ordered.prefix(firstVerifyIndex).filter { $0.hasPrefix("completed:") }.count == 3,
-                      "all three file completions must precede the first deferred verification line")
-
         let verifyLines = ordered.filter { $0.hasPrefix("verify:") }
         XCTAssertEqual(verifyLines.count, 6, "3 WAV + 3 MP3 delivered lines must all arrive before run() returns")
+
         for i in 0..<3 {
-            XCTAssertEqual(verifyLines.filter { $0.contains("defer_\(i)-lev-18LUFS.wav") }.count, 1)
-            XCTAssertEqual(verifyLines.filter { $0.contains("defer_\(i)-lev-18LUFS.mp3") }.count, 1)
+            let name = "defer_\(i)"
+            XCTAssertEqual(verifyLines.filter { $0.contains("\(name)-lev-18LUFS.wav") }.count, 1)
+            XCTAssertEqual(verifyLines.filter { $0.contains("\(name)-lev-18LUFS.mp3") }.count, 1)
+            let completionIndex = try XCTUnwrap(ordered.firstIndex(of: "completed:\(name)"),
+                                                "missing completion event for \(name)")
+            let firstVerifyIndex = try XCTUnwrap(
+                ordered.firstIndex { $0.hasPrefix("verify:") && $0.contains("\(name)-lev") },
+                "missing verification lines for \(name)")
+            XCTAssertLessThan(completionIndex, firstVerifyIndex,
+                              "\(name): completion must precede its own verification lines")
         }
     }
 
-    /// Cancelling after completion but before the verification phase skips all
-    /// deferred verifications cleanly: run() throws CancellationError and no
-    /// "delivered" line is ever logged (no orphaned verification work).
+    /// Cancelling at the moment of completion skips this file's deferred
+    /// verifications cleanly: run() throws CancellationError and no
+    /// "delivered" line is ever logged (no orphaned work in either pool).
     func testCancelAfterCompletionSkipsDeferredVerifications() async throws {
         let tools = try XCTUnwrap(tools)
         let input = try IntegrationFFmpeg.makeSineWAV(

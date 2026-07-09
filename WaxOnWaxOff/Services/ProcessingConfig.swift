@@ -25,6 +25,13 @@ enum ProcessingConfig {
     static var analysisConcurrency: Int {
         max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
     }
+
+    /// Size of the verification pool that drains deferred output
+    /// verifications concurrently with delivery. Deliberately small and
+    /// fully independent of `deliveryConcurrency` — verification must never
+    /// consume a delivery slot, but it may overlap delivery so deep batches
+    /// don't serialize a verification tail after the last render.
+    static var verificationConcurrency: Int { 3 }
 }
 
 /// Runs `body` over each element in `inputs` with at most `limit` tasks executing concurrently.
