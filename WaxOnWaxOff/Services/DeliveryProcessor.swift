@@ -37,9 +37,9 @@ struct DeliveryBatchRunResult: Sendable {
 
 // MARK: - DeliveryProcessor
 
-/// A deferred, advisory verification of one delivered output. Collected during
-/// the delivery phase and executed after every file has finished rendering, so
-/// verification never occupies a delivery slot or delays a queued file.
+/// A deferred, advisory verification of one delivered output. Yielded to the
+/// verification pool when its file completes and drained concurrently with
+/// the rest of the batch — in the pool's own slots, never a delivery slot.
 /// Never throws — verification is logging only.
 typealias DeferredVerification = @Sendable () async -> Void
 
