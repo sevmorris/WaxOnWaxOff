@@ -163,31 +163,28 @@ final class FileQueueCoordinator {
         }
     }
 
-    func generateOutputWaveform(id: UUID, url: URL) {
+    /// Post-render refresh: stats panel values, output waveform, and file info
+    /// for a rendered output. Stats and waveform share one decode of the file
+    /// (previously two separate full streams); file info is a header-only read.
+    func analyzeOutputFile(id: UUID, url: URL) {
+        let hpf = noiseFloorHighPassHz
         let task = Task {
-            do {
-                let waveform = try await WaveformGenerator.generate(url: url)
-                if let idx = files.firstIndex(where: { $0.id == id }) {
-                    files[idx].outputWaveform = waveform
+            async let combined = try? AudioAnalyzer.analyzeWithWaveform(url: url, noiseFloorHighPassHz: hpf)
+            async let info = try? AudioAnalyzer.info(url: url)
+            let (c, i) = await (combined, info)
+            if c == nil {
+                fileQueueLogger.debug("Output analysis failed: \(url.lastPathComponent, privacy: .public)")
+            }
+            if let idx = files.firstIndex(where: { $0.id == id }) {
+                if let c {
+                    files[idx].outputStats = c.stats
+                    files[idx].outputWaveform = c.waveform
                 }
-            } catch {
-                fileQueueLogger.debug("Output waveform failed: \(error.localizedDescription, privacy: .public)")
+                if let i { files[idx].outputFileInfo = i }
             }
             outputWaveformTasks.removeValue(forKey: id)
         }
         outputWaveformTasks[id] = task
-    }
-
-    func analyzeOutputFile(id: UUID, url: URL) {
-        Task {
-            async let stats = try? AudioAnalyzer.analyze(url: url, noiseFloorHighPassHz: noiseFloorHighPassHz)
-            async let info = try? AudioAnalyzer.info(url: url)
-            let (s, i) = await (stats, info)
-            if let idx = files.firstIndex(where: { $0.id == id }) {
-                if let s { files[idx].outputStats = s }
-                if let i { files[idx].outputFileInfo = i }
-            }
-        }
     }
 
     private func expandFolder(_ url: URL) -> [URL] {

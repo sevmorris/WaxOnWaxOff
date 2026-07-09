@@ -188,10 +188,10 @@ final class DeliveryViewModel {
                             guard let idx = self.files.firstIndex(where: { $0.id == result.id }),
                                   let primaryURL = result.outputURLs.first else { return }
                             self.files[idx].status = .processed(outputURL: primaryURL)
-                            self.fileQueue.generateOutputWaveform(id: result.id, url: primaryURL)
-                            // Refresh the stats panel against the rendered file so
-                            // the user can see what their WaxOff output landed at
-                            // — mirrors WaxOn's post-process behavior.
+                            // Refresh the stats panel and output waveform against
+                            // the rendered file (single shared decode) so the user
+                            // can see what their WaxOff output landed at — mirrors
+                            // WaxOn's post-process behavior.
                             self.fileQueue.analyzeOutputFile(id: result.id, url: primaryURL)
                         }
                     },
