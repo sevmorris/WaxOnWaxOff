@@ -66,7 +66,7 @@ actor DeliveryProcessor {
 
         let outcomes: [(Result<DeliveryJobResult, DeliveryJobFailure>, [DeferredVerification])] = try await runBoundedConcurrent(
             inputs: inputs,
-            limit: ProcessingConfig.maxConcurrentJobs
+            limit: ProcessingConfig.deliveryConcurrency
         ) { input in
             do {
                 try Task.checkCancellation()
@@ -108,7 +108,7 @@ actor DeliveryProcessor {
             onLog?("  verifying \(verifications.count) output file\(verifications.count == 1 ? "" : "s")…", .verbose)
             _ = try await runBoundedConcurrent(
                 inputs: verifications,
-                limit: ProcessingConfig.maxConcurrentJobs
+                limit: ProcessingConfig.deliveryConcurrency
             ) { verification in
                 try Task.checkCancellation()
                 await verification()

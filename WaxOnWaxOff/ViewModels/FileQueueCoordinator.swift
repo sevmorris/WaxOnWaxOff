@@ -64,10 +64,10 @@ final class FileQueueCoordinator {
     func commitFiles(_ urls: [URL]) {
         let newFiles = urls.map { FileItem(url: $0) }
         files.append(contentsOf: newFiles)
-        let limit = ProcessingConfig.maxConcurrentJobs
+        let limit = ProcessingConfig.analysisConcurrency
         Task { [weak self] in
             guard let self else { return }
-            // At most maxConcurrentJobs files start analysis simultaneously. Each
+            // At most analysisConcurrency files start analysis simultaneously. Each
             // slot calls the three per-file methods and then holds until the
             // analysis Task finishes, so ffprobe/AVFoundation concurrency is
             // actually bounded rather than just task-spawning being bounded.
