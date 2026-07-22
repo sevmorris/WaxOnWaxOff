@@ -911,7 +911,7 @@
       <div class="label">PEAK</div>
       <div class="desc">Sample peak level in dBFS. The highest sample value across all channels. Color-coded: orange at −3 dBFS and above, red at 0 dBFS.</div>
       <div class="label">ISP (est.)</div>
-      <div class="desc">Estimated inter-sample peak in dBFS, from 2× linear interpolation between samples. Only shown when the estimate rises above the sample peak. A lower bound, not a full BS.1770 true-peak measurement — the real true peak may be higher; the Console's "measured" line after processing reports the broadcast-accurate value. Color-coded like PEAK.</div>
+      <div class="desc">Estimated inter-sample peak in dBFS, from 2× linear interpolation between samples. Only shown when the estimate exceeds the sample peak by more than 0.1 dB. A lower bound, not a full BS.1770 true-peak measurement — the real true peak may be higher; the Console's "measured" line after processing reports the broadcast-accurate value. Color-coded like PEAK.</div>
       <div class="label">CREST</div>
       <div class="desc">Crest factor (PEAK − RMS) in dB. Indicates dynamic range. Higher values mean more headroom between peaks and average level.</div>
       <div class="label">LUFS</div>
