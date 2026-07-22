@@ -103,12 +103,13 @@ struct HelpView: View {
                         "Normalization pass — measured values are applied as a single linear gain. No dynamic processing; the stereo image and transients are unchanged.",
                         "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate."
                     ])
-                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3. Always stereo — mono sources are automatically upmixed to dual-mono stereo.")
+                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3. Stereo by default — mono sources upmix to dual-mono unless Mono delivery is selected in Settings.")
                 }
                 section("WaxOff — Settings") {
                     definition("Preset", "Applies a saved group of settings in one click. Three built-in presets are included; you can save your own via the Preset menu.")
                     definition("Sample Rate", "44.1 kHz or 48 kHz for the output WAV (and MP3 source).")
                     definition("Output", "WAV only, MP3 only, or both. WAV is always 24-bit PCM.")
+                    definition("Channels", "Mono or Stereo delivery for mono sources. Stereo (default) upmixes a mono source to dual-mono; Mono delivers a true single channel instead. Available only when every loaded source is mono; never downmixes a stereo source.")
                     definition("MP3 Bitrate", "CBR bitrate for MP3 output: 128, 160, or 192 kbps. Grayed out when Output is WAV only.")
                     definition("True Peak", "Maximum true peak ceiling: −3.0 to −0.5 dBTP. −1.0 dBTP is the standard for podcast streaming platforms.")
                     definition("Target LUFS", "Integrated loudness target: −24 to −14 LUFS. −18 LUFS is the podcast standard; −16 LUFS gives a louder result.")
