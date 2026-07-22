@@ -771,7 +771,7 @@
       <li><strong>Red (above −40 dBFS)</strong>: the noise floor is high enough to significantly skew loudness measurements. At this level, the noise is almost certainly audible to listeners as well. Consider dedicated noise reduction in iZotope RX or similar before processing in WaxOn.</li>
     </ul>
     <p>In WaxOn, files with an orange or red noise floor also show a ⚠️ warning badge in the file list.</p>
-    <p><strong>WaxOff suppresses both the color-coding and the badge.</strong> The thresholds above are calibrated for a raw, unedited speech floor — the gap between words where the mic captures only the room. A finished delivery mix legitimately carries continuous low-level content there: music beds, room tone deliberately left under the voice, sustained ambience. That content reads as a high floor without being a defect, so flagging it on a delivery file would be a false alarm. WaxOff still computes and displays the same FLOOR value — the measurement is identical to WaxOn's — and only withholds the warning/critical styling. WaxOn's thresholds (−50 / −40 dBFS) and behavior are unchanged.</p>
+    <p><strong>WaxOff suppresses both the color-coding and the badge.</strong> The thresholds above are calibrated for a raw, unedited speech floor — the gap between words where the mic captures only the room. A finished delivery mix legitimately carries continuous low-level content there: music beds, room tone deliberately left under the voice, sustained ambience. That content reads as a high floor without being a defect, so flagging it on a delivery file would be a false alarm. WaxOff still computes and displays the same FLOOR stat — measured with a fixed 80 Hz cutoff, matching WaxOn's default — and only withholds the warning/critical styling. WaxOn's thresholds (−50 / −40 dBFS) and behavior are unchanged.</p>
   </section>
 
   <!-- NR-for-Measurement -->
@@ -1073,7 +1073,7 @@
       <li><strong>Different implementations</strong>: pyloudnorm-aligned Swift analyzer vs FFmpeg's loudnorm — both BS.1770-compliant, but not bit-identical.</li>
       <li><strong>NR-for-measurement</strong>: WaxOn's processing pass 1 may measure a denoised copy; the stats panel always measures the original file.</li>
       <li><strong>Pre-processing in WaxOff</strong>: WaxOff's loudnorm analysis includes the 200 Hz allpass; the stats panel does not apply phase rotation before measuring LUFS.</li>
-      <li><strong>FLOOR vs LUFS</strong>: FLOOR uses 80 Hz high-pass filtered mono blocks; LUFS in the stats panel uses unfiltered K-weighted audio.</li>
+      <li><strong>FLOOR vs LUFS</strong>: FLOOR uses high-pass filtered mono blocks — 80 Hz or 20 Hz, tracking the WaxOn High Pass toggle at analysis time; fixed 80 Hz in WaxOff — while LUFS in the stats panel uses unfiltered K-weighted audio.</li>
     </ul>
     <p>Use the stats panel to compare files and spot problems (hot peaks, high noise floor, low LUFS). Trust the processing log's <code>measured:</code> line for what loudnorm actually computed.</p>
   </section>
@@ -1261,7 +1261,7 @@
         </tr>
         <tr>
           <td>Noise floor estimation</td>
-          <td>10th percentile of 80 Hz HPF mono block RMS identifies background noise level. Color-coded warnings alert users when noise may affect loudness accuracy.</td>
+          <td>10th percentile of HPF'd mono block RMS (cutoff tracks the WaxOn High Pass toggle: 80 Hz on, 20 Hz off; fixed 80 Hz in WaxOff) identifies background noise level. Color-coded warnings alert users when noise may affect loudness accuracy.</td>
         </tr>
         <tr>
           <td>LRA=20 in WaxOn / LRA=9 in WaxOff</td>
