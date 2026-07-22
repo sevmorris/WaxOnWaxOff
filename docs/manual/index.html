@@ -708,6 +708,7 @@
     <pre><code>{original-name}-{rate}waxon.wav</code></pre>
     <p>Examples: <code>episode-01-44kwaxon.wav</code> &nbsp; <code>guest-48kwaxon.wav</code></p>
     <p>If two files in the same batch would produce the same output name, a short hash tag is inserted before the type suffix — e.g. <code>episode-a1b2c3-44kwaxon.wav</code> — so neither overwrites the other.</p>
+    <p>Files whose names already match this pattern trigger an <strong>Already Processed?</strong> confirmation when added — re-processing a prep WAV can degrade audio quality.</p>
 
     <h3>Location</h3>
     <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code> — and if that folder can't be created or written, to the Desktop as a last resort. Existing files with the same name are overwritten.</p>
@@ -876,6 +877,7 @@
     <p>The <code>{target}</code> placeholder includes its sign — e.g. <code>-18</code> — so a target of −18 LUFS produces <code>…-lev-18LUFS.wav</code>.</p>
     <p>Examples: <code>episode-42-final-lev-18LUFS.wav</code> &nbsp; <code>episode-42-final-lev-18LUFS.mp3</code></p>
     <p>If two files in the same batch would produce the same output name, a short hash tag is inserted before the type suffix — e.g. <code>episode-a1b2c3-lev-18LUFS.wav</code> — so neither overwrites the other.</p>
+    <p>Files whose names already match this pattern trigger an <strong>Already Delivered?</strong> confirmation when added — running delivery again can over-limit or drift from the target loudness.</p>
 
     <h3>Channels</h3>
     <p>WaxOff outputs stereo (2-channel) by default. Mono input is accepted — by default it is upmixed to dual-mono stereo before processing, but the <strong>Channels</strong> control in WaxOff Settings can instead deliver a mono source as a true single channel. Stereo sources always remain stereo; the control has no effect on them.</p>
