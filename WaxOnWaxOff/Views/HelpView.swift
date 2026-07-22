@@ -99,11 +99,12 @@ struct HelpView: View {
                 }
                 section("WaxOff — Processing Pipeline") {
                     numberedList([
-                        "Analysis pass — FFmpeg's loudnorm filter measures integrated loudness, true peak, and loudness range.",
-                        "Normalization pass — measured values are applied as a single linear gain. No dynamic processing; the stereo image and transients are unchanged.",
-                        "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate."
+                        "Analysis pass — the audio runs through a 200 Hz allpass (phase rotation) and then FFmpeg's loudnorm filter, which measures integrated loudness, true peak, and loudness range. A mono source is upmixed to dual-mono stereo at the head of this chain, ahead of the allpass, unless Mono delivery is selected.",
+                        "Normalization pass — the same chain runs again with the measured values and a single linear gain. The 200 Hz allpass runs here too, so the render matches what was measured. No dynamic processing; the stereo image and transients are unchanged.",
+                        "Brick-wall limiter — a 2× oversampled true-peak limiter at your True Peak ceiling, as a safety backstop for inter-sample peaks loudnorm's linear mode missed. On a well-mixed source it doesn't engage.",
+                        "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate, through a separate pre-encode limiter set 1 dB below your True Peak to absorb lossy-decode overshoot. Always 44.1 kHz."
                     ])
-                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3. Stereo by default — mono sources upmix to dual-mono unless Mono delivery is selected in Settings.")
+                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3 — stereo by default, or a single channel when Mono delivery is selected for a mono source.")
                 }
                 section("WaxOff — Settings") {
                     definition("Preset", "Applies a saved group of settings in one click. Three built-in presets are included; you can save your own via the Preset menu.")
