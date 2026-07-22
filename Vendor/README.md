@@ -34,8 +34,10 @@ The bundled executables report:
 
 ```text
 ffmpeg version 8.0
-configuration: … --enable-gpl --arch=arm64 … (static build)
+configuration: --prefix=/Volumes/tempdisk/sw --extra-cflags=-fno-stack-check --arch=arm64 --cc=/usr/bin/clang --enable-gpl --enable-libvmaf --enable-libopenjpeg --enable-libopus --enable-libmp3lame --enable-libx264 --enable-libx265 --enable-libvvenc --enable-libvpx --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libtheora --enable-libvorbis --enable-libsnappy --enable-libaom --enable-libvidstab --enable-libzimg --enable-libsvtav1 --enable-libharfbuzz --enable-libkvazaar --pkg-config-flags=--static --enable-ffplay --enable-neon --enable-runtime-cpudetect --disable-indev=qtkit --disable-indev=x11grab_xcb
 ```
+
+The full configuration line above is the exact one the bundled binary reports (`ffmpeg -version`). `--enable-gpl` together with the GPL-licensed encoders in this build (`libx264`, `libx265`, `libvidstab`) is what makes the combined work GPL — see the license note below.
 
 | Field | Value |
 |-------|--------|
@@ -44,6 +46,8 @@ configuration: … --enable-gpl --arch=arm64 … (static build)
 | PGP signature | https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz.asc |
 | Git tag (reference) | `n8.0` — https://git.ffmpeg.org/gitweb/ffmpeg.git/log/refs/heads/release/8.0 |
 | License | **GPL-2.0-or-later** (this static build was configured with `--enable-gpl` and no `--enable-version3`; the effective license is GPL-2.0-or-later, not GPLv3) |
+
+**Compatibility with the app's own license.** WaxOn/WaxOff is licensed GPL-3.0 (top-level `LICENSE`). Bundling this **GPL-2.0-or-later** FFmpeg build into a GPL-3.0 application is compatible *because of the "or later"*: the terms permit distributing the combined work under GPL-3.0. A GPL-2.0-**only** FFmpeg build would have been incompatible with a GPL-3.0 app.
 
 FFmpeg does not publish a separate SHA-256 file for release tarballs; verify the archive with the **PGP signature** and the project’s release signing key (see https://ffmpeg.org/download.html#releases).
 
@@ -55,7 +59,9 @@ curl -LO https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz.asc
 gpg --verify ffmpeg-8.0.tar.xz.asc ffmpeg-8.0.tar.xz
 ```
 
-For a written offer or archived copy of the exact sources used to produce the bundled binaries, open a GitHub issue on [sevmorris/WaxOnWaxOff](https://github.com/sevmorris/WaxOnWaxOff/issues) with subject **GPL source request**.
+**Which GPL mechanism applies.** The FFmpeg binary is conveyed only by network download — bundled in the app DMG and hosted as raw assets on the `ffmpeg-deps-8.0-arm64` release, both offered from GitHub Releases. That is GPL-3.0 **§6(d)** ("offering access from a designated place"), not the §6(b) written-offer route, which is scoped to object code conveyed in or with a physical product. §6(d) permits the Corresponding Source to live on a third-party server with equivalent copying facilities, provided clear directions to it accompany the object code.
+
+The complete Corresponding Source for this build is upstream **FFmpeg 8.0** at [ffmpeg.org/releases/ffmpeg-8.0.tar.xz](https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz) (verify with the PGP signature above), built with the exact configuration shown above — available today, which satisfies §6(d)'s source-availability requirement. **Known gap:** §6(d) also requires those directions *next to the object code* on the download pages themselves; today they live here in `Vendor/README.md` rather than in the release descriptions. Closing that (directions in the release notes, or the source tarball attached to the `ffmpeg-deps-*` tag) is a release-process task tracked in [#5](https://github.com/sevmorris/WaxOnWaxOff/issues/5). For a copy of the corresponding source you can also open a GitHub issue with subject **GPL source request**.
 
 ### Updating the bundled **binary** build
 
@@ -78,7 +84,7 @@ The RNNoise algorithm is implemented directly in FFmpeg (`libavfilter/af_arnndn.
 |-------|--------|
 | Source | FFmpeg `libavfilter/af_arnndn.c` (compiled into the bundled `ffmpeg`) |
 | License | **BSD-2-Clause** |
-| Copyright | Mozilla; Xiph.Org Foundation; Jean-Marc Valin; Gregor Richards; Paul B Mahol (see the file header for the full notice) |
+| Copyright | Mozilla; Xiph.Org Foundation; CSIRO; Octasic Inc.; Jean-Marc Valin; Gregor Richards; Paul B Mahol (all seven notices verbatim in the file header) |
 | Algorithm lineage | RNNoise — https://github.com/xiph/rnnoise (Jean-Marc Valin) |
 
 Because this code is compiled inside the FFmpeg binary, its corresponding source is covered by the FFmpeg GPL source offer above. The BSD-2-Clause attribution requirement is independent of that offer and is satisfied by naming the copyright holders here.
