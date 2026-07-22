@@ -872,9 +872,10 @@
       <li><strong>Gaussian window (<code>g</code>)</strong>: 31 frames at Gentle, 15 frames at Aggressive (forced odd). Smaller windows mean the filter uses less surrounding context when computing gain — faster response, less smoothing.</li>
       <li><strong>Max gain (<code>m</code>)</strong>: 2× at Gentle, 6× at Aggressive (≈ +6 dB to +15.6 dB). Controls how much the filter will boost a quiet frame to reach the target peak.</li>
     </ul>
-    <p>One parameter is fixed across the slider range:</p>
+    <p>Two parameters are fixed across the slider range:</p>
     <ul>
       <li><code>p=0.95</code> — target peak amplitude per frame (≈ −0.4 dBFS).</li>
+      <li><code>c=0</code> — channel coupling off, so gain decisions stay per-channel. This is the default in modern FFmpeg, but it is pinned explicitly so behavior stays stable across FFmpeg upgrades.</li>
     </ul>
     <p>Gentle is the right starting point for most material. Aggressive is appropriate when level differences are extreme and the source already has significant background noise that boosting won't make materially worse.</p>
 
