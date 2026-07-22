@@ -108,7 +108,7 @@ struct HelpView: View {
                 }
                 section("WaxOff — Settings") {
                     definition("Preset", "Applies a saved group of settings in one click. Three built-in presets are included; you can save your own via the Preset menu.")
-                    definition("Sample Rate", "44.1 kHz or 48 kHz for the output WAV (and MP3 source).")
+                    definition("Sample Rate", "44.1 kHz or 48 kHz for the output WAV. MP3 is always encoded at 44.1 kHz regardless of this setting, so the control is grayed out when Output is MP3 only.")
                     definition("Output", "WAV only, MP3 only, or both. WAV is always 24-bit PCM.")
                     definition("Channels", "Mono or Stereo delivery for mono sources. Stereo (default) upmixes a mono source to dual-mono; Mono delivers a true single channel instead. Available only when every loaded source is mono; never downmixes a stereo source.")
                     definition("MP3 Bitrate", "CBR bitrate for MP3 output: 128, 160, or 192 kbps. Grayed out when Output is WAV only.")
