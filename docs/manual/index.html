@@ -620,12 +620,12 @@
         <tr>
           <td>Channels</td>
           <td>Mono · Stereo</td>
-          <td>Stereo passes both channels through unchanged. Mono extracts a single channel from a stereo source.</td>
+          <td>Stereo passes a stereo source's two channels through unchanged; sources with more or fewer channels are converted to two by FFmpeg's default matrix. Mono extracts a single channel from a stereo source.</td>
         </tr>
         <tr>
           <td>Channel</td>
           <td>Left · Right</td>
-          <td>Mono mode only. Which channel to extract. Use Left for a standard single-mic recording on channel 1. Grayed out when Channels is Stereo.</td>
+          <td>Mono mode only. Which channel to extract; ignored when the source is already mono (a console note is logged). Use Left for a standard single-mic recording on channel 1. Grayed out when Channels is Stereo.</td>
         </tr>
         <tr>
           <td>High Pass</td>

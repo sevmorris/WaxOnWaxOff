@@ -894,7 +894,7 @@
     <p>The WaxOn pipeline stage order is deliberate:</p>
     <ol>
       <li><strong>High-pass filter first</strong>: A high-pass at 80 Hz (when enabled) or 20 Hz (DC floor when off) runs before any gain stage. Low-frequency energy is disproportionately loud and would cause loudnorm to underestimate the actual loudness of content you care about, and cause the limiter to work harder than necessary on energy that isn't perceptually meaningful.</li>
-      <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. Multichannel sources (&gt;2 ch) downmix to mono with a warning. Stereo output passes both channels through unchanged. The loudnorm analysis then also measures the real output signal.</li>
+      <li><strong>Channel selection before phase rotation</strong>: If extracting mono from a stereo source, do it first so the allpass filter operates on the actual mono signal, not a wider stereo version of it. Multichannel sources (&gt;2 ch) downmix to mono with a warning. Stereo output passes a stereo source's two channels through unchanged. The loudnorm analysis then also measures the real output signal.</li>
       <li><strong>Phase rotation before normalization</strong>: Reduces crest factor so that the loudnorm analysis measures a waveform that more accurately represents what the limiter will see after normalization.</li>
       <li><strong>Dynamic leveling before normalization</strong>: Dynamic leveling runs after filtering. Bringing the overall level balance closer to even before the loudnorm analysis pass means the integrated loudness measurement reflects the typical level of the material rather than being skewed by large quiet sections or loud outliers.</li>
       <li><strong>Peak control last (always on)</strong>: After any optional loudness normalization. When Loudness Norm is on, a 2× oversampled limiter catches true peaks; when off, a downward-only linear peak normalization brings the true peak to the ceiling instead. The ceiling is fixed at −1.0 dBTP either way — not user-configurable in WaxOn (unlike WaxOff's true-peak knob).</li>
@@ -1218,7 +1218,7 @@
     </ul>
 
     <h3>Multichannel Input (&gt;2 channels)</h3>
-    <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output passes all channels through unchanged up to the output channel count setting.</p>
+    <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output on sources with more than two channels downmixes to two channels via FFmpeg's default matrix; a mono source is duplicated into both channels.</p>
 
     <h3>Missing RNNoise Model</h3>
     <p>If the bundled <code>rnnoise</code> resource cannot be loaded, WaxOn skips NR-for-measurement and runs loudnorm analysis on the unmodified intermediate. Processing continues; a warning notes that measurement may be noise-biased.</p>
