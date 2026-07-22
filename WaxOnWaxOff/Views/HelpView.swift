@@ -61,7 +61,7 @@ struct HelpView: View {
                         "Resampling to the target sample rate.",
                         "Dynamic leveling (if enabled) — dynaudnorm for panel recordings and multi-voice sources. Not recommended for solo voice.",
                         "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain. Pass 1 may use internal RNNoise for measurement accuracy only.",
-                        "Brick-wall limiting — always on; 2× oversampled true peak control at fixed −1.0 dBTP."
+                        "True-peak control — always on: 2× oversampled limiting at a fixed −1.0 dBTP when Loudness Norm is on, downward-only linear peak normalization when off."
                     ])
                     text("Output: 24-bit WAV.")
                 }
@@ -72,7 +72,7 @@ struct HelpView: View {
                     definition("High Pass", "On (80 Hz) removes rumble and proximity-effect bass; Off uses a 20 Hz DC floor only. DC offset is always removed.")
                     definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. On by default.")
                     definition("Dynamic Leveling", "Enables dynaudnorm. Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews — not for regular solo voice use. Aggressiveness controls how quickly and strongly the leveling responds.")
-                    definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and limiting are applied.")
+                    definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and downward-only peak normalization are applied.")
                     definition("Target", "Integrated loudness target when Loudness Norm is on. Default −30 LUFS, range −35 to −16 LUFS. Lower values leave more headroom for editing.")
                     definition("Output Dir", "Where processed files are saved. Defaults to the same folder as the source.")
                 }
