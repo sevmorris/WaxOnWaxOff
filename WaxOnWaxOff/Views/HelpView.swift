@@ -67,11 +67,11 @@ struct HelpView: View {
                 }
                 section("WaxOn — Settings") {
                     definition("Sample Rate", "44.1 kHz or 48 kHz. Match your DAW project setting.")
-                    definition("Output", "Mono or Stereo. Mono extracts a single channel; Stereo passes both channels through unchanged.")
+                    definition("Channels", "Mono or Stereo. Mono extracts a single channel; Stereo passes both channels through unchanged.")
                     definition("Channel", "Left or Right — which channel to extract in Mono mode.")
                     definition("High Pass", "On (80 Hz) removes rumble and proximity-effect bass; Off uses a 20 Hz DC floor only. DC offset is always removed.")
                     definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. On by default.")
-                    definition("Dynamic Leveling", "Enables dynaudnorm. Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews — not for regular solo voice use. Aggressiveness controls how quickly and strongly the leveling responds.")
+                    definition("Dynamic Leveling", "Enables dynaudnorm. Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews — not for regular solo voice use. Strength controls how quickly and strongly the leveling responds.")
                     definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and downward-only peak normalization are applied.")
                     definition("Target", "Integrated loudness target when Loudness Norm is on. Default −30 LUFS, range −35 to −16 LUFS. Lower values leave more headroom for editing.")
                     definition("Output Dir", "Where processed files are saved. Defaults to the same folder as the source.")
