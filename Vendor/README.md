@@ -43,7 +43,7 @@ configuration: … --enable-gpl --arch=arm64 … (static build)
 | Source archive | https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz |
 | PGP signature | https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz.asc |
 | Git tag (reference) | `n8.0` — https://git.ffmpeg.org/gitweb/ffmpeg.git/log/refs/heads/release/8.0 |
-| License | **GPLv3** (this static build was configured with `--enable-gpl`) |
+| License | **GPL-2.0-or-later** (this static build was configured with `--enable-gpl` and no `--enable-version3`; the effective license is GPL-2.0-or-later, not GPLv3) |
 
 FFmpeg does not publish a separate SHA-256 file for release tarballs; verify the archive with the **PGP signature** and the project’s release signing key (see https://ffmpeg.org/download.html#releases).
 
@@ -66,17 +66,34 @@ For a written offer or archived copy of the exact sources used to produce the bu
 
 ---
 
-## RNNoise model (`WaxOnWaxOff/rnnoise`)
+## RNNoise (measurement-only denoising)
 
-WaxOn uses the bundled RNNoise weights file (no extension) for **measurement-only** denoising during loudnorm pass 1.
+WaxOn runs RNNoise during the loudnorm pass-1 analysis only — never on the exported audio — via FFmpeg's built-in `arnndn` filter, which reads a bundled weights file. Two distinct third-party components are involved; they have different licenses and sources.
+
+### `arnndn` filter code
+
+The RNNoise algorithm is implemented directly in FFmpeg (`libavfilter/af_arnndn.c`) and compiled into the bundled `ffmpeg` binary. The app does **not** ship or link Xiph's `librnnoise`.
 
 | Field | Value |
 |-------|--------|
-| Project | https://github.com/xiph/rnnoise |
-| License | BSD 3-Clause |
-| Format | Mono 48 kHz speech model (used via FFmpeg `arnndn`) |
+| Source | FFmpeg `libavfilter/af_arnndn.c` (compiled into the bundled `ffmpeg`) |
+| License | **BSD-2-Clause** |
+| Copyright | Mozilla; Xiph.Org Foundation; Jean-Marc Valin; Gregor Richards; Paul B Mahol (see the file header for the full notice) |
+| Algorithm lineage | RNNoise — https://github.com/xiph/rnnoise (Jean-Marc Valin) |
 
-Source for the model weights is maintained in the upstream RNNoise repository. The app bundles a binary copy of the model file, not the full training codebase.
+Because this code is compiled inside the FFmpeg binary, its corresponding source is covered by the FFmpeg GPL source offer above. The BSD-2-Clause attribution requirement is independent of that offer and is satisfied by naming the copyright holders here.
+
+### Model weights file (`WaxOnWaxOff/rnnoise`)
+
+A separate binary weights file (no extension) supplies the trained model to `arnndn`.
+
+| Field | Value |
+|-------|--------|
+| Source | https://github.com/GregorR/rnnoise-models |
+| Format | rnnoise-nu (`rnnoise-nu model file version 1`) — mono 48 kHz speech model |
+| Status | Upstream states the model files "are not creative and thus none of it is subject to copyright." Reproduced here as the upstream project's position, not as a legal determination by this project. |
+
+The app bundles a binary copy of the weights file, not the training codebase.
 
 ---
 
