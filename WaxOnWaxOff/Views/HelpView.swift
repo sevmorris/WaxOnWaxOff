@@ -120,7 +120,7 @@ struct HelpView: View {
                     definition("Podcast Standard", "−18 LUFS, −1.0 dBTP, Both WAV + MP3 at 160 kbps, 44.1 kHz. Correct for most podcast hosts.")
                     definition("Podcast Loud", "−16 LUFS, −1.0 dBTP, Both WAV + MP3 at 160 kbps, 44.1 kHz. Louder perceived volume, still within platform limits.")
                     definition("WAV Only (Mastering)", "−18 LUFS, −1.0 dBTP, WAV only at 48 kHz. For delivery to a mastering engineer or video platform.")
-                    text("Save your own presets via the Preset menu › Save Current Settings…. Custom presets persist across relaunches and can be deleted from the same menu.")
+                    text("Save your own presets via the Preset menu › Save Current Settings…. Custom presets persist across relaunches and can be deleted via Manage Presets… in the same menu.")
                 }
 
                 dividerRow
