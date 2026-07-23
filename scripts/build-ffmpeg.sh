@@ -68,7 +68,7 @@ cd "ffmpeg-${FFMPEG_VERSION}"
 ./configure \
     --prefix="$WORK/ffmpeg-install" \
     --cc=/usr/bin/clang --arch=arm64 \
-    --extra-cflags="-mmacosx-version-min=${DEPTARGET} -fno-stack-check -I$WORK/lame-install/include" \
+    --extra-cflags="-mmacosx-version-min=${DEPTARGET} -fno-stack-check -ffp-contract=off -I$WORK/lame-install/include" \
     --extra-ldflags="-mmacosx-version-min=${DEPTARGET} -L$WORK/lame-install/lib" \
     --enable-static --disable-shared --pkg-config-flags=--static \
     --enable-libmp3lame \
@@ -77,6 +77,14 @@ cd "ffmpeg-${FFMPEG_VERSION}"
 # -fno-stack-check: macOS clang enables -fstack-check by default; it breaks
 # FFmpeg's codegen. Carried unconditionally — an input-dependent codegen bug is
 # not something a parity corpus can clear, so this is never dropped on a passing run.
+#
+# -ffp-contract=off: REQUIRED for bit-exact parity with the previous build. Clang
+# contracts a*b+c into FMA by default; inside the recursive IIR biquads (highpass,
+# allpass) the different rounding accumulates through the feedback path. Measured:
+# with contraction on, highpass nulled at -84.29 dBFS and allpass at -90.31 dBFS
+# against the old binary; with it off, both null at -inf (bit-identical), as does
+# the full WaxOn stage-1 chain. Throughput was identical (0.53s vs 0.53s over 5
+# runs of a 20s file) — FMA contraction buys nothing in audio biquad filtering.
 make -j"$(sysctl -n hw.ncpu)" >/dev/null
 make install >/dev/null
 
