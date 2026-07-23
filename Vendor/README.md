@@ -47,7 +47,7 @@ The full configuration line above is the exact one the bundled binary reports (`
 | Git tag (reference) | `n8.0` — https://git.ffmpeg.org/gitweb/ffmpeg.git/log/refs/heads/release/8.0 |
 | License | **GPL-2.0-or-later** (this static build was configured with `--enable-gpl` and no `--enable-version3`; the effective license is GPL-2.0-or-later, not GPLv3) |
 
-**Compatibility with the app's own license.** WaxOn/WaxOff is licensed GPL-3.0 (top-level `LICENSE`). Bundling this **GPL-2.0-or-later** FFmpeg build into a GPL-3.0 application is compatible *because of the "or later"*: the terms permit distributing the combined work under GPL-3.0. A GPL-2.0-**only** FFmpeg build would have been incompatible with a GPL-3.0 app.
+**Relationship to the app's own license.** WaxOn/WaxOff is licensed GPL-3.0 (top-level `LICENSE`). The app invokes `ffmpeg`/`ffprobe` as **separate executables** (via `Process()`), so they are aggregated with the app rather than linked into it — under GPL's mere-aggregation provision the app's GPL-3.0 license and the FFmpeg binary's own license apply independently, and there is no combined-work compatibility question between them. (The binary's own license is **GPL-2.0-or-later** — built with `--enable-gpl` and no `--enable-version3`.)
 
 FFmpeg does not publish a separate SHA-256 file for release tarballs; verify the archive with the **PGP signature** and the project’s release signing key (see https://ffmpeg.org/download.html#releases).
 
