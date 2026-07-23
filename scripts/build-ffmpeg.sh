@@ -72,19 +72,26 @@ cd "ffmpeg-${FFMPEG_VERSION}"
     --extra-ldflags="-mmacosx-version-min=${DEPTARGET} -L$WORK/lame-install/lib" \
     --enable-static --disable-shared --pkg-config-flags=--static \
     --enable-libmp3lame \
+    --disable-autodetect \
+    --enable-zlib \
     --disable-ffplay \
     --enable-neon --enable-runtime-cpudetect >/dev/null
 # -fno-stack-check: macOS clang enables -fstack-check by default; it breaks
 # FFmpeg's codegen. Carried unconditionally — an input-dependent codegen bug is
 # not something a parity corpus can clear, so this is never dropped on a passing run.
 #
-# -ffp-contract=off: REQUIRED for bit-exact parity with the previous build. Clang
-# contracts a*b+c into FMA by default; inside the recursive IIR biquads (highpass,
-# allpass) the different rounding accumulates through the feedback path. Measured:
-# with contraction on, highpass nulled at -84.29 dBFS and allpass at -90.31 dBFS
-# against the old binary; with it off, both null at -inf (bit-identical), as does
-# the full WaxOn stage-1 chain. Throughput was identical (0.53s vs 0.53s over 5
-# runs of a 20s file) — FMA contraction buys nothing in audio biquad filtering.
+# -ffp-contract=off: build reproducibility. Clang contracts a*b+c into FMA by
+# default, and the contraction it chooses varies with compiler version. Inside a
+# recursive IIR biquad (highpass, allpass) that difference accumulates through the
+# feedback path, so the SAME source compiled by two clang versions produces
+# measurably different audio. Disabling contraction makes the filter output depend
+# on the source alone, not on which toolchain built it. Keep this flag on any
+# FFmpeg version — it is not tied to a particular release or a one-off comparison.
+#
+# Evidence (2026-07, clang 13.1.6 vs 17.0.0): with contraction on, highpass nulled
+# at -84.29 dBFS and allpass at -90.31 dBFS; with it off both null at -inf, and
+# decoded-PCM MD5s match across the whole corpus. No throughput cost measured
+# (0.53s vs 0.53s, 5x a 20s file).
 make -j"$(sysctl -n hw.ncpu)" >/dev/null
 make install >/dev/null
 
@@ -92,7 +99,20 @@ BIN="$WORK/ffmpeg-install/bin"
 
 # --- Verification gates (fail-closed) -------------------------------------------
 echo "▶ verifying"
+# The binary must actually RUN before any grep-based check means anything: if it
+# cannot execute (e.g. a missing dylib), cfg is empty and every "flag absent"
+# assertion passes vacuously. Assert execution first.
+"$BIN/ffmpeg" -hide_banner -version >/dev/null 2>&1 || { echo "FAIL: built ffmpeg does not execute" >&2; exit 1; }
 cfg="$("$BIN/ffmpeg" -hide_banner -version | grep '^configuration:')"
+[ -n "$cfg" ] || { echo "FAIL: no configuration string from built ffmpeg" >&2; exit 1; }
+# No non-system dynamic dependencies. --disable-autodetect stops configure from
+# silently linking whatever happens to be installed on the build machine (a
+# Homebrew libxcb/X11 chain got linked this way and made the signed binary
+# fail to load on any machine without that exact Homebrew build).
+for b in ffmpeg ffprobe; do
+    extern="$(otool -L "$BIN/$b" | tail -n +2 | grep -vE '/usr/lib/|/System/Library/' || true)"
+    [ -z "$extern" ] || { echo "FAIL: $b has non-system dynamic deps:" >&2; echo "$extern" >&2; exit 1; }
+done
 for bad in enable-gpl enable-nonfree enable-version3; do
     printf '%s' "$cfg" | grep -q -- "--$bad" && { echo "FAIL: --$bad present" >&2; exit 1; }
 done
