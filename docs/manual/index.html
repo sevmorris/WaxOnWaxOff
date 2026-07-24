@@ -686,7 +686,7 @@
       <li>
         <div>
           <strong>Loudness Normalization <span class="tag">Optional</span></strong>
-          <span>Two-pass EBU R128. First pass measures integrated loudness, true peak, LRA, and threshold. Second pass applies linear gain to hit the configured target. Linear mode preserves the natural dynamic shape of the recording: no compression, no transient changes. The analysis pass runs RNNoise on a temporary copy for measurement accuracy — preventing broadband noise from inflating the LUFS reading; the output pipeline is unaffected. See <a href="theory.html#nr-measurement">Theory of Operation</a>.</span>
+          <span>Two-pass EBU R128. First pass measures integrated loudness, true peak, LRA, and threshold. Second pass applies linear gain to hit the configured target. Linear mode preserves the natural dynamic shape of the recording: no compression, no transient changes. (If true-peak headroom won't allow a constant gain, loudnorm falls back to dynamic normalization for that file — see Theory of Operation.) The analysis pass runs RNNoise on a temporary copy for measurement accuracy — preventing broadband noise from inflating the LUFS reading; the output pipeline is unaffected. See <a href="theory.html#nr-measurement">Theory of Operation</a>.</span>
         </div>
       </li>
       <li>
@@ -718,7 +718,7 @@
   <section id="waxoff-overview">
     <h2>WaxOff Mode <span class="mode-badge mode-waxoff">WaxOff</span></h2>
     <p>WaxOff finalizes your edited podcast mix for distribution. It applies phase rotation (200 Hz allpass) for headroom recovery, EBU R128 loudness normalization, and a 2× oversampled brick-wall limiter as a true-peak safety backstop. It delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
-    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment from loudnorm to hit the target loudness — no compression, no changes to stereo image. Phase rotation is applied unconditionally as a transparent crest-factor reduction. The brick-wall limiter only engages when inter-sample peaks slip past loudnorm's TP analysis; on a well-mixed source it leaves the audio untouched. See the <a href="theory.html#phase-rotation">Theory of Operation</a> for detail. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
+    <p>WaxOff assumes your mix is already balanced and edited. It normally applies a single linear gain adjustment from loudnorm to hit the target loudness — no compression, no changes to stereo image. On a mix whose loudness range is wider than the internal 9 LU setting, loudnorm falls back to dynamic normalization instead, and the delivered file reads under target. Phase rotation is applied unconditionally as a transparent crest-factor reduction. The brick-wall limiter only engages when inter-sample peaks slip past loudnorm's TP analysis; on a well-mixed source it leaves the audio untouched. See the <a href="theory.html#phase-rotation">Theory of Operation</a> for detail. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -845,7 +845,7 @@
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no compression, no change to stereo image. Output is stereo (2-channel) by default; mono input is upmixed to dual-mono at the start of the filter chain so both passes measure and normalize the stereo signal. With mono delivery selected the upmix is skipped and both passes run on the native single channel instead.</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This normally applies a single precise linear gain: no compression, no change to stereo image. If the mix's loudness range exceeds the configured LRA, loudnorm reverts to dynamic normalization for that file. Output is stereo (2-channel) by default; mono input is upmixed to dual-mono at the start of the filter chain so both passes measure and normalize the stereo signal. With mono delivery selected the upmix is skipped and both passes run on the native single channel instead.</span>
         </div>
       </li>
       <li>

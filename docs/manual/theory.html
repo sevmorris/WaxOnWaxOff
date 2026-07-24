@@ -566,8 +566,8 @@
 
     <h3>Loudness Range (LRA)</h3>
     <p>LRA measures the spread between loud and quiet sections of a program (its macro-dynamics) in Loudness Units. It is computed as the difference between the 95th and 10th percentiles of the short-term loudness distribution (after gating). EBU R128 does not mandate a specific LRA target but recommends keeping it below 18 LU for broadcast.</p>
-    <p>Both modes pass an LRA value to the <code>loudnorm</code> filter. In <strong>dynamic mode</strong> (<code>linear=false</code>), the LRA target controls how aggressively the filter constrains macro-dynamics — lower values compress more, higher values relax the constraint. Neither mode uses dynamic mode for pass 2: both WaxOn and WaxOff set <code>linear=true</code>, which applies a single constant gain offset and preserves the source's macro-dynamics regardless of the LRA parameter.</p>
-    <p>WaxOn hardcodes <code>LRA=20</code> (a permissive value used with linear mode so loudnorm acts purely as level adjustment). WaxOff passes <code>LRA=9</code> by default (<code>WaxOffSettings.lra</code>, no UI control) — this value is required by the filter string but does <em>not</em> constrain delivery dynamics in linear mode. Pass 1 still <em>measures</em> and logs <code>input_lra</code>, which is useful for assessing how dynamic a mix is before delivery.</p>
+    <p>Both modes pass an LRA value to the <code>loudnorm</code> filter. In <strong>dynamic mode</strong> (<code>linear=false</code>), the LRA target controls how aggressively the filter constrains macro-dynamics — lower values compress more, higher values relax the constraint. Neither mode <em>selects</em> dynamic mode for pass 2: both WaxOn and WaxOff set <code>linear=true</code>, which applies a single constant gain offset and preserves the source's macro-dynamics — whenever FFmpeg grants that request. It does not always; see <em>A limitation of <code>linear=true</code></em> below.</p>
+    <p>WaxOn hardcodes <code>LRA=20</code> (a permissive value used with linear mode so loudnorm acts purely as level adjustment). WaxOff passes <code>LRA=9</code> by default (<code>WaxOffSettings.lra</code>, no UI control) — this value is required by the filter string but does <em>not</em> constrain delivery dynamics in linear mode — though it is also the threshold that decides whether linear mode is granted at all. Pass 1 still <em>measures</em> and logs <code>input_lra</code>, which is useful for assessing how dynamic a mix is before delivery.</p>
   </section>
 
   <!-- Two-Pass -->
@@ -598,9 +598,12 @@
     <p>The <code>loudnorm</code> filter has two modes:</p>
     <ul>
       <li><strong>Dynamic mode</strong> (default, <code>linear=false</code>): applies time-varying gain. This is a form of dynamic range processing where quieter passages are boosted more and louder passages less. It introduces subtle distortion and changes the character of the audio. Intended for live streaming where only one pass is possible.</li>
-      <li><strong>Linear mode</strong> (<code>linear=true</code>): applies a single, constant gain offset across the entire file. No dynamic processing, no change to transients or stereo image. The measured <code>target_offset</code> tells the filter exactly what gain to apply.</li>
+      <li><strong>Linear mode</strong> (<code>linear=true</code>): applies a single, constant gain offset across the entire file. No dynamic processing, no change to transients or stereo image. The measured <code>target_offset</code> tells the filter exactly what gain to apply. This holds when FFmpeg grants linear mode; see the limitation below.</li>
     </ul>
-    <p>Both WaxOn and WaxOff use linear mode for pass 2. For mastering and delivery, this is the only correct approach. The goal is level adjustment, not dynamics processing.</p>
+    <p>Both WaxOn and WaxOff request linear mode for pass 2. For mastering and delivery, this is the only correct approach. The goal is level adjustment, not dynamics processing.</p>
+
+    <h3>A limitation of <code>linear=true</code></h3>
+    <p>Setting <code>linear=true</code> is a request, not a guarantee. FFmpeg grants it only when <strong>both</strong> conditions hold: the measured loudness range is at or below the configured <code>LRA</code>, and the linear gain would not push true peak past the <code>TP</code> target. If either fails, the filter silently falls back to <strong>dynamic</strong> normalization for that file — overriding what was asked for. Dynamic mode applies time-varying gain: it lands somewhat under the integrated target and <em>reduces the file's loudness range</em> toward the <code>LRA</code> value, which is precisely the macro-dynamic processing linear mode exists to avoid. The visible symptom is a delivered file reading noticeably below the target LUFS in the stats panel. WaxOff passes <code>LRA=9</code>, so mixes with music beds or wide level variation between speakers can take this path; WaxOn's <code>LRA=20</code> makes it much less likely, though the true-peak condition can still trigger it. The app does not currently detect or report the fallback (<a href="https://github.com/sevmorris/WaxOnWaxOff/issues/11">#11</a>).</p>
   </section>
 
   <!-- True Peak -->
@@ -666,7 +669,7 @@
         <li>2× oversampling at <code>2 × sample rate</code> for true-peak accuracy.</li>
       </ul>
       <p>The limiter is a safety backstop, not a loudness maximizer. WaxOff doesn't push gain above what loudnorm calculated; the limiter exists so the user can trust that the rendered WAV will not exceed the configured ceiling.</p>
-      <p>A consequence: if enough inter-sample peaks require attenuation, the output integrated loudness lands slightly below the configured LUFS target — typically less than 0.5 LU on well-mixed material. This is correct behavior. Slightly under target with a clean True Peak ceiling is better than exactly on target with inter-sample clipping risk at the streaming encoder.</p>
+      <p>A consequence: if enough inter-sample peaks require attenuation, the output integrated loudness lands slightly below the configured LUFS target — typically less than 0.5 LU on well-mixed material when pass 2 runs in linear mode. (When loudnorm falls back to dynamic normalization the shortfall is larger and comes from that fallback rather than the limiter — see <em>A limitation of <code>linear=true</code></em>.) This is correct behavior. Slightly under target with a clean True Peak ceiling is better than exactly on target with inter-sample clipping risk at the streaming encoder.</p>
     </details>
 
     <details class="callout callout-impl">
@@ -905,7 +908,7 @@
     <p>WaxOn's factory defaults bias toward a safe ingest path: High Pass and Phase Rotation on, Dynamic Leveling and Loudness Norm off. The built-in <strong>Edit Prep</strong> preset enables Loudness Norm at −30 LUFS for batch ingest. See <a href="#defaults">Defaults &amp; Parameters</a> for the full list of UI-exposed settings.</p>
 
     <h3>LRA=20 in WaxOn Loudnorm</h3>
-    <p>WaxOn's loudnorm hardcodes <code>LRA=20</code>. Combined with <code>linear=true</code> in pass 2, loudnorm applies a single constant gain offset — no macro-dynamic compression. The LRA value is a permissive filter parameter; the linear mode is what guarantees dynamics preservation.</p>
+    <p>WaxOn's loudnorm hardcodes <code>LRA=20</code>. Combined with <code>linear=true</code> in pass 2, loudnorm is asked to apply a single constant gain offset — no macro-dynamic compression. The LRA value is a permissive filter parameter; the linear mode is what is intended to guarantee dynamics preservation. WaxOn's permissive <code>LRA=20</code> makes the dynamic fallback unlikely, but the true-peak condition can still trigger it.</p>
     <p>This is intentional for ingest. WaxOn is a pre-editing tool. You want your recordings to arrive at your DAW at consistent levels, but with their original dynamic character intact. Any dynamic processing at this stage would fight against the compression and automation you'll apply during editing.</p>
 
     <h3>Default Loudnorm Target: −30 LUFS</h3>
@@ -918,7 +921,7 @@
       <li>The alimiter is the hard ceiling. It guarantees no output sample (at 2× sample rate) exceeds the limit.</li>
     </ul>
     <p>Setting both to the same value means loudnorm and the limiter are working toward the same goal. If loudnorm succeeds, the limiter barely engages. If loudnorm slightly overshoots, the limiter catches it. The two stages are complementary, not redundant. When Loudness Norm is off, the limiter does not run at all — a downward-only linear peak normalization brings the true peak to the same fixed −1.0 dBTP ceiling instead (a transparent pass-through when the source is already under it), so the ceiling is honored without any limiting.</p>
-    <p>There is a deliberate trade-off here: on dynamic source material where inter-sample peaks push past −1.0 dBTP after loudnorm, the limiter must attenuate those peaks and the output integrated loudness lands slightly below the configured target — typically less than 0.5 LU on well-recorded speech, more on heavily compressed or clipped sources. True Peak protection is the harder constraint; the LUFS target is the goal. For WaxOn's editing-prep purpose this is entirely acceptable: material landing 0.5–1 LU under target is fully usable, and the editor applies further gain and dynamics in the DAW anyway. The ceiling guarantee is what matters — it prevents digital overs at every downstream stage.</p>
+    <p>There is a deliberate trade-off here: on dynamic source material where inter-sample peaks push past −1.0 dBTP after loudnorm, the limiter must attenuate those peaks and the output integrated loudness lands slightly below the configured target — typically less than 0.5 LU on well-recorded speech when pass 2 runs in linear mode, more on heavily compressed or clipped sources. True Peak protection is the harder constraint; the LUFS target is the goal. For WaxOn's editing-prep purpose this is entirely acceptable: material landing 0.5–1 LU under target is fully usable, and the editor applies further gain and dynamics in the DAW anyway. The ceiling guarantee is what matters — it prevents digital overs at every downstream stage.</p>
   </section>
 
   <!-- WaxOff Design -->
@@ -935,7 +938,7 @@
 
     <h3>LRA=9 (measured, not constrained)</h3>
     <p>WaxOff passes <code>LRA=9</code> to the <code>loudnorm</code> filter string. The value lives in <code>WaxOffSettings.lra</code> (default 9.0) but has no UI control — it is not user-configurable in normal use.</p>
-    <p>Because WaxOff always uses <code>linear=true</code> for pass 2, this LRA target does <strong>not</strong> apply macro-dynamic compression at delivery. Pass 2 is a single linear gain offset; the mix's loud/quiet spread is preserved. Pass 1 still measures and reports <code>input_lra</code>, which appears in the processing log — useful for checking whether a finished mix sits in a typical podcast range (roughly 6–10 LU for well-balanced speech content). If dynamic loudnorm normalization were ever needed, it would require <code>linear=false</code>; WaxOff deliberately does not use that mode.</p>
+    <p>Because WaxOff always requests <code>linear=true</code> for pass 2, this LRA target is not <em>intended</em> to apply macro-dynamic compression at delivery. When the request is granted, pass 2 is a single linear gain offset and the mix's loud/quiet spread is preserved. Pass 1 still measures and reports <code>input_lra</code>, which appears in the processing log — useful for checking whether a finished mix sits in a typical podcast range (roughly 6–10 LU for well-balanced speech content). If dynamic loudnorm normalization were ever needed, it would require <code>linear=false</code>; WaxOff deliberately never selects that mode — though FFmpeg can fall back to it, see <em>A limitation of <code>linear=true</code></em>.</p>
 
     <h3>Delivery Targets</h3>
     <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px;">Platform targets below are approximate as of early 2026 — verify against current host and platform documentation before optimizing for a single service.</p>
@@ -1192,7 +1195,7 @@
         <tr>
           <td>LRA</td>
           <td>—</td>
-          <td>9 LU in code only; no effect in linear mode</td>
+          <td>9 LU in code only; no effect in linear mode — but it gates whether linear mode applies</td>
         </tr>
         <tr>
           <td>Output channels</td>
