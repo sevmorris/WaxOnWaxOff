@@ -39,7 +39,7 @@ struct WaxOnControlBar: View {
                 value: $viewModel.settings.dynamicLevelingAmount,
                 step: 0.125,
                 enabled: viewModel.settings.dynamicLevelingEnabled,
-                help: "Max gain: Gentle +6 dB · Aggressive +15 dB. Audition output before editing."
+                help: "Max gain: Gentle +6 dB · Aggressive +15.6 dB. Audition output before editing."
             )
 
             barDivider

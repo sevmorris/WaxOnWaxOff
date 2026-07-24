@@ -56,23 +56,23 @@ struct HelpView: View {
                 section("WaxOn — Processing Pipeline") {
                     numberedList([
                         "High-pass filter — On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.",
-                        "Channel handling — mono extracts left/right (or downmixes multichannel sources); stereo passes both channels through.",
+                        "Channel handling — mono extracts left/right (or downmixes multichannel sources); stereo passes a stereo source's two channels through (other channel counts are converted to two via FFmpeg's default matrix).",
                         "Optional phase rotation — 200 Hz allpass (default on).",
                         "Resampling to the target sample rate.",
                         "Dynamic leveling (if enabled) — dynaudnorm for panel recordings and multi-voice sources. Not recommended for solo voice.",
-                        "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain. Pass 1 may use internal RNNoise for measurement accuracy only.",
-                        "Brick-wall limiting — always on; 2× oversampled true peak control at fixed −1.0 dBTP."
+                        "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain (loudnorm can revert to dynamic normalization if true-peak headroom doesn't allow a constant gain). Pass 1 may use internal RNNoise for measurement accuracy only.",
+                        "True-peak control — always on: 2× oversampled limiting at a fixed −1.0 dBTP when Loudness Norm is on, downward-only linear peak normalization when off."
                     ])
                     text("Output: 24-bit WAV.")
                 }
                 section("WaxOn — Settings") {
                     definition("Sample Rate", "44.1 kHz or 48 kHz. Match your DAW project setting.")
-                    definition("Output", "Mono or Stereo. Mono extracts a single channel; Stereo passes both channels through unchanged.")
+                    definition("Channels", "Mono or Stereo. Mono extracts a single channel; Stereo passes a stereo source's two channels through unchanged (other channel counts are converted to two via FFmpeg's default matrix).")
                     definition("Channel", "Left or Right — which channel to extract in Mono mode.")
                     definition("High Pass", "On (80 Hz) removes rumble and proximity-effect bass; Off uses a 20 Hz DC floor only. DC offset is always removed.")
                     definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. On by default.")
-                    definition("Dynamic Leveling", "Enables dynaudnorm. Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews — not for regular solo voice use. Aggressiveness controls how quickly and strongly the leveling responds.")
-                    definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and limiting are applied.")
+                    definition("Dynamic Leveling", "Enables dynaudnorm. Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews — not for regular solo voice use. Strength controls how quickly and strongly the leveling responds.")
+                    definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and downward-only peak normalization are applied.")
                     definition("Target", "Integrated loudness target when Loudness Norm is on. Default −30 LUFS, range −35 to −16 LUFS. Lower values leave more headroom for editing.")
                     definition("Output Dir", "Where processed files are saved. Defaults to the same folder as the source.")
                 }
@@ -99,16 +99,18 @@ struct HelpView: View {
                 }
                 section("WaxOff — Processing Pipeline") {
                     numberedList([
-                        "Analysis pass — FFmpeg's loudnorm filter measures integrated loudness, true peak, and loudness range.",
-                        "Normalization pass — measured values are applied as a single linear gain. No dynamic processing; the stereo image and transients are unchanged.",
-                        "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate."
+                        "Analysis pass — the audio runs through a 200 Hz allpass (phase rotation) and then FFmpeg's loudnorm filter, which measures integrated loudness, true peak, and loudness range. A mono source is upmixed to dual-mono stereo at the head of this chain, ahead of the allpass, unless Mono delivery is selected.",
+                        "Normalization pass — the same chain runs again with the measured values and a single linear gain. The 200 Hz allpass runs here too, so the render matches what was measured. In this linear mode there is no dynamic processing and the stereo image and transients are unchanged. If the mix's loudness range exceeds 9 LU (a fixed internal value), or linear gain would breach the true-peak ceiling, loudnorm instead reverts to dynamic normalization for that file — which lands slightly under target and reduces the loudness range.",
+                        "Brick-wall limiter — a 2× oversampled true-peak limiter at your True Peak ceiling, as a safety backstop for inter-sample peaks loudnorm's linear mode missed. On a well-mixed source it doesn't engage.",
+                        "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate, through a separate pre-encode limiter set 1 dB below your True Peak to absorb lossy-decode overshoot. Always 44.1 kHz."
                     ])
-                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3. Always stereo — mono sources are automatically upmixed to dual-mono stereo.")
+                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3 — stereo by default, or a single channel when Mono delivery is selected for a mono source.")
                 }
                 section("WaxOff — Settings") {
                     definition("Preset", "Applies a saved group of settings in one click. Three built-in presets are included; you can save your own via the Preset menu.")
-                    definition("Sample Rate", "44.1 kHz or 48 kHz for the output WAV (and MP3 source).")
+                    definition("Sample Rate", "44.1 kHz or 48 kHz for the output WAV. MP3 is always encoded at 44.1 kHz regardless of this setting, so the control is grayed out when Output is MP3 only.")
                     definition("Output", "WAV only, MP3 only, or both. WAV is always 24-bit PCM.")
+                    definition("Channels", "Mono or Stereo delivery for mono sources. Stereo (default) upmixes a mono source to dual-mono; Mono delivers a true single channel instead. Available only when every loaded source is mono; never downmixes a stereo source.")
                     definition("MP3 Bitrate", "CBR bitrate for MP3 output: 128, 160, or 192 kbps. Grayed out when Output is WAV only.")
                     definition("True Peak", "Maximum true peak ceiling: −3.0 to −0.5 dBTP. −1.0 dBTP is the standard for podcast streaming platforms.")
                     definition("Target LUFS", "Integrated loudness target: −24 to −14 LUFS. −18 LUFS is the podcast standard; −16 LUFS gives a louder result.")
@@ -118,7 +120,7 @@ struct HelpView: View {
                     definition("Podcast Standard", "−18 LUFS, −1.0 dBTP, Both WAV + MP3 at 160 kbps, 44.1 kHz. Correct for most podcast hosts.")
                     definition("Podcast Loud", "−16 LUFS, −1.0 dBTP, Both WAV + MP3 at 160 kbps, 44.1 kHz. Louder perceived volume, still within platform limits.")
                     definition("WAV Only (Mastering)", "−18 LUFS, −1.0 dBTP, WAV only at 48 kHz. For delivery to a mastering engineer or video platform.")
-                    text("Save your own presets via the Preset menu › Save Current Settings…. Custom presets persist across relaunches and can be deleted from the same menu.")
+                    text("Save your own presets via the Preset menu › Save Current Settings…. Custom presets persist across relaunches and can be deleted via Manage Presets… in the same menu.")
                 }
 
                 dividerRow
