@@ -81,7 +81,7 @@ cd WaxOnWaxOff
 open WaxOnWaxOff.xcodeproj
 ```
 
-Xcode runs `scripts/fetch-ffmpeg.sh` automatically before each build, so the very first build will pull pinned `ffmpeg` and `ffprobe` (~100 MB combined) from a [GitHub release asset](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/ffmpeg-deps-8.0-arm64) and verify SHA-256s. You can also run the script standalone for CI or to re-verify checksums. See `Vendor/README.md` for the manifest and update instructions.
+Xcode runs `scripts/fetch-ffmpeg.sh` automatically before each build, so the very first build will pull pinned `ffmpeg` and `ffprobe` (~44 MB combined) from a [GitHub release asset](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/ffmpeg-deps-8.0-audio-arm64) and verify SHA-256s. You can also run the script standalone for CI or to re-verify checksums. Those binaries are built by `scripts/build-ffmpeg.sh` in this repository — audio-only, LGPL, no GPL components. See `Vendor/README.md` for the manifest, licenses, and update instructions.
 
 ## Technical Origin
 I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and internal per-channel RNNoise on the loudnorm analysis pass (WaxOn, when Loudness Norm is enabled) for measurement accuracy on noisy recordings — reflects deliberate choices, not defaults.
@@ -95,4 +95,4 @@ If WaxOn/WaxOff saves you time, [buy me a coffee](https://ko-fi.com/sevmo). Free
 Copyright © 2026 Seven Morris.
 Distributed under the [GNU General Public License v3.0](LICENSE).
 
-Bundled FFmpeg binaries and RNNoise model: see [`Vendor/README.md`](Vendor/README.md) for version, checksums, and GPL source offer.
+Bundled FFmpeg binaries and RNNoise model: see [`Vendor/README.md`](Vendor/README.md) for versions, checksums, licenses, and LGPL source directions.

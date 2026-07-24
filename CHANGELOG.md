@@ -2,6 +2,20 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
 
+## [2.4.0] — 2026-07-23
+
+**Bundled FFmpeg**
+- Bundled FFmpeg replaced — output verified bit-identical at identical settings. The app now ships an audio-only build of FFmpeg 8.0 produced from a recipe committed to this repository (`scripts/build-ffmpeg.sh`) instead of a third-party GPL binary. Parity was checked over a 17-fixture corpus: every WaxOn and WaxOff output matched the previous binary byte for byte
+- The binaries are ~44 MB combined, down from ~103 MB, because the video and image encoders are gone. Nothing in WaxOn or WaxOff used them
+- No GPL-licensed components remain: x264, x265 and libvidstab are not compiled in. FFmpeg core is LGPL-2.1-or-later, LAME (MP3 encoding) is LGPL-2.0-or-later, and the `arnndn` filter is BSD-2-Clause. Complete source directions are in `Vendor/README.md` and on the release pages
+- Build reproducibility: the recipe compiles with `-ffp-contract=off`. Without it the compiler is free to fuse multiply-add operations, and inside the recursive filters that difference accumulates — output would depend on the toolchain rather than on the source
+- The build refuses to ship a binary that links anything outside the system: `--disable-autodetect` plus a hard `otool -L` check. An earlier build silently picked up a Homebrew library and failed to launch on machines without it
+
+**Documentation**
+- Documentation audit remediation across the manual, theory doc, in-app Help, and README — 31 findings from a full claim-by-claim pass against the implementation
+- Corrected the `linear=true` claim in fourteen places. The docs stated that WaxOn and WaxOff never apply dynamic normalization; in fact `linear=true` is a request FFmpeg may refuse, and when it does, the filter falls back to dynamic normalization silently. The theory doc now carries a dedicated explanation of when that happens and what it looks like
+- Known gap, deliberately shipped: the app still gives no in-app signal when the fallback occurs. A file affected by it reads noticeably below its target LUFS in the stats panel with no explanation. Detection is tracked as [#11](https://github.com/sevmorris/WaxOnWaxOff/issues/11)
+
 ## [2.3.0] — 2026-07-09
 
 **Performance**

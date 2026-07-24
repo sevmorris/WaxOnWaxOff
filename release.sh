@@ -67,6 +67,18 @@ ok "Tag $TAG is available"
 
 # ── Version bump ──────────────────────────────────────────────────────────────
 step "Bumping version to $VERSION"
+# project.pbxproj carries MARKETING_VERSION once per build configuration. Taking
+# head -1 is only safe if they all agree — otherwise the bump reads one value,
+# rewrites only the configurations that happen to match it, and ships a build
+# whose version depends on which configuration Xcode chose. Assert first.
+VERSION_VALUES=$(grep -o 'MARKETING_VERSION = [^;]*;' "$PROJECT/project.pbxproj" | sort -u)
+VERSION_COUNT=$(printf '%s\n' "$VERSION_VALUES" | grep -c .)
+if [[ "$VERSION_COUNT" -ne 1 ]]; then
+    echo "$VERSION_VALUES" >&2
+    fail "MARKETING_VERSION disagrees across build configurations (${VERSION_COUNT} distinct values) — reconcile before releasing"
+fi
+ok "MARKETING_VERSION agrees across all $(grep -c 'MARKETING_VERSION' "$PROJECT/project.pbxproj") occurrences"
+
 CURRENT=$(grep MARKETING_VERSION "$PROJECT/project.pbxproj" | head -1 | grep -o '[0-9][0-9.]*')
 if [[ "$CURRENT" == "$VERSION" ]]; then
     ok "Already at $VERSION"
@@ -239,25 +251,38 @@ ok "Pushed $TAG to $REMOTE/$BRANCH"
 
 # ── GitHub release ────────────────────────────────────────────────────────────
 step "Creating GitHub release"
-PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1 || true)
-if [[ -n "$PREV_TAG" ]]; then
-    CHANGES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" \
-        | grep -v "^- Bump version" \
-        | grep -v "^- docs: update download link" || true)
+# A curated description at release-notes/v<version>.md wins over the generated
+# commit list. Use it when the release needs prose the log can't produce —
+# licensing notes, a known-gap disclosure, an explanation of what changed and
+# what deliberately didn't. Without one, fall back to subjects since the last tag.
+NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
+if [[ -f "$NOTES_FILE" ]]; then
+    ok "Using curated notes: release-notes/${TAG}.md"
+    gh release create "$TAG" "$DMG" \
+        --repo "$REPO" \
+        --title "WaxOn/WaxOff $TAG" \
+        --notes-file "$NOTES_FILE"
 else
-    CHANGES=$(git log --pretty=format:"- %s" \
-        | grep -v "^- Bump version" \
-        | grep -v "^- docs: update download link" || true)
-fi
-[[ -n "$CHANGES" ]] || CHANGES="- Initial release"
-RELEASE_NOTES="**[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**
+    PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1 || true)
+    if [[ -n "$PREV_TAG" ]]; then
+        CHANGES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" \
+            | grep -v "^- Bump version" \
+            | grep -v "^- docs: update download link" || true)
+    else
+        CHANGES=$(git log --pretty=format:"- %s" \
+            | grep -v "^- Bump version" \
+            | grep -v "^- docs: update download link" || true)
+    fi
+    [[ -n "$CHANGES" ]] || CHANGES="- Initial release"
+    RELEASE_NOTES="**[Manual](https://sevmorris.github.io/WaxOnWaxOff/)**
 
 ### Changes
 ${CHANGES}"
-gh release create "$TAG" "$DMG" \
-    --repo "$REPO" \
-    --title "WaxOn/WaxOff $TAG" \
-    --notes "$RELEASE_NOTES"
+    gh release create "$TAG" "$DMG" \
+        --repo "$REPO" \
+        --title "WaxOn/WaxOff $TAG" \
+        --notes "$RELEASE_NOTES"
+fi
 ok "Release published"
 
 # ── Remove old app releases (keep the ${KEEP_RELEASES} most recent v* tags) ───
