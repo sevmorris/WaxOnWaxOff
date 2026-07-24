@@ -34,8 +34,10 @@ The bundled executables report:
 
 ```text
 ffmpeg version 8.0
-configuration: … --enable-gpl --arch=arm64 … (static build)
+configuration: --prefix=/Volumes/tempdisk/sw --extra-cflags=-fno-stack-check --arch=arm64 --cc=/usr/bin/clang --enable-gpl --enable-libvmaf --enable-libopenjpeg --enable-libopus --enable-libmp3lame --enable-libx264 --enable-libx265 --enable-libvvenc --enable-libvpx --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libtheora --enable-libvorbis --enable-libsnappy --enable-libaom --enable-libvidstab --enable-libzimg --enable-libsvtav1 --enable-libharfbuzz --enable-libkvazaar --pkg-config-flags=--static --enable-ffplay --enable-neon --enable-runtime-cpudetect --disable-indev=qtkit --disable-indev=x11grab_xcb
 ```
+
+The full configuration line above is the exact one the bundled binary reports (`ffmpeg -version`). `--enable-gpl` together with the GPL-licensed encoders in this build (`libx264`, `libx265`, `libvidstab`) is what makes the combined work GPL — see the license note below.
 
 | Field | Value |
 |-------|--------|
@@ -43,7 +45,9 @@ configuration: … --enable-gpl --arch=arm64 … (static build)
 | Source archive | https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz |
 | PGP signature | https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz.asc |
 | Git tag (reference) | `n8.0` — https://git.ffmpeg.org/gitweb/ffmpeg.git/log/refs/heads/release/8.0 |
-| License | **GPLv3** (this static build was configured with `--enable-gpl`) |
+| License | **GPL-2.0-or-later** (this static build was configured with `--enable-gpl` and no `--enable-version3`; the effective license is GPL-2.0-or-later, not GPLv3) |
+
+**Relationship to the app's own license.** WaxOn/WaxOff is licensed GPL-3.0 (top-level `LICENSE`). The app invokes `ffmpeg`/`ffprobe` as **separate executables** (via `Process()`), so they are aggregated with the app rather than linked into it — under GPL's mere-aggregation provision the app's GPL-3.0 license and the FFmpeg binary's own license apply independently, and there is no combined-work compatibility question between them. (The binary's own license is **GPL-2.0-or-later** — built with `--enable-gpl` and no `--enable-version3`.)
 
 FFmpeg does not publish a separate SHA-256 file for release tarballs; verify the archive with the **PGP signature** and the project’s release signing key (see https://ffmpeg.org/download.html#releases).
 
@@ -55,7 +59,13 @@ curl -LO https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz.asc
 gpg --verify ffmpeg-8.0.tar.xz.asc ffmpeg-8.0.tar.xz
 ```
 
-For a written offer or archived copy of the exact sources used to produce the bundled binaries, open a GitHub issue on [sevmorris/WaxOnWaxOff](https://github.com/sevmorris/WaxOnWaxOff/issues) with subject **GPL source request**.
+**Which GPL mechanism applies.** The FFmpeg binary is conveyed only by network download — bundled in the app DMG and hosted as raw assets on the `ffmpeg-deps-8.0-arm64` release, both offered from GitHub Releases. That is GPL-3.0 **§6(d)** ("offering access from a designated place"), not the §6(b) written-offer route, which is scoped to object code conveyed in or with a physical product. §6(d) permits the Corresponding Source to live on a third-party server with equivalent copying facilities, provided clear directions to it accompany the object code.
+
+For FFmpeg's own source, the pointer is upstream **FFmpeg 8.0** at [ffmpeg.org/releases/ffmpeg-8.0.tar.xz](https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz) (verify with the PGP signature above), built with the exact configuration shown above.
+
+> **⚠ This source offer is known-incomplete.** Because this is a statically linked GPL build, the *complete* Corresponding Source must also include per-component source for the statically linked GPL libraries — **x264, x265, and libvidstab** (each GPL-2.0-or-later) — which is **not yet provided**. Their exact linked versions are not recoverable from the binary, and the origin build's source manifest is not available. This is being resolved (see [#7](https://github.com/sevmorris/WaxOnWaxOff/issues/7)); one likely resolution rebuilds FFmpeg audio-only with no GPL components, which removes the obligation entirely.
+
+A second, separate gap: §6(d) requires the source directions *next to the object code* on the download pages themselves; today they live here in `Vendor/README.md` rather than in the release descriptions. Closing that is a release-process task tracked in [#5](https://github.com/sevmorris/WaxOnWaxOff/issues/5). For a copy of the corresponding source you can also open a GitHub issue with subject **GPL source request**.
 
 ### Updating the bundled **binary** build
 
@@ -66,17 +76,34 @@ For a written offer or archived copy of the exact sources used to produce the bu
 
 ---
 
-## RNNoise model (`WaxOnWaxOff/rnnoise`)
+## RNNoise (measurement-only denoising)
 
-WaxOn uses the bundled RNNoise weights file (no extension) for **measurement-only** denoising during loudnorm pass 1.
+WaxOn runs RNNoise during the loudnorm pass-1 analysis only — never on the exported audio — via FFmpeg's built-in `arnndn` filter, which reads a bundled weights file. Two distinct third-party components are involved; they have different licenses and sources.
+
+### `arnndn` filter code
+
+The RNNoise algorithm is implemented directly in FFmpeg (`libavfilter/af_arnndn.c`) and compiled into the bundled `ffmpeg` binary. The app does **not** ship or link Xiph's `librnnoise`.
 
 | Field | Value |
 |-------|--------|
-| Project | https://github.com/xiph/rnnoise |
-| License | BSD 3-Clause |
-| Format | Mono 48 kHz speech model (used via FFmpeg `arnndn`) |
+| Source | FFmpeg `libavfilter/af_arnndn.c` (compiled into the bundled `ffmpeg`) |
+| License | **BSD-2-Clause** |
+| Copyright | Mozilla; Xiph.Org Foundation; CSIRO; Octasic Inc.; Jean-Marc Valin; Gregor Richards; Paul B Mahol (all seven notices verbatim in the file header) |
+| Algorithm lineage | RNNoise — https://github.com/xiph/rnnoise (Jean-Marc Valin) |
 
-Source for the model weights is maintained in the upstream RNNoise repository. The app bundles a binary copy of the model file, not the full training codebase.
+Because this code is compiled inside the FFmpeg binary, its corresponding source is covered by the FFmpeg GPL source offer above. The BSD-2-Clause attribution requirement is independent of that offer and is satisfied by naming the copyright holders here.
+
+### Model weights file (`WaxOnWaxOff/rnnoise`)
+
+A separate binary weights file (no extension) supplies the trained model to `arnndn`.
+
+| Field | Value |
+|-------|--------|
+| Source | https://github.com/GregorR/rnnoise-models |
+| Format | rnnoise-nu (`rnnoise-nu model file version 1`) — mono 48 kHz speech model |
+| Status | Upstream states the model files "are not creative and thus none of it is subject to copyright." Reproduced here as the upstream project's position, not as a legal determination by this project. |
+
+The app bundles a binary copy of the weights file, not the training codebase.
 
 ---
 

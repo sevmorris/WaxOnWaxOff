@@ -500,10 +500,10 @@
     <p>Both modes share the same window layout, divided into four areas.</p>
 
     <h3>Toolbar</h3>
-    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by a Preset picker, and then the action buttons (Process, Remove, Clear). The far right end of the toolbar holds the settings-sidebar toggle.</p>
+    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left, followed by a Preset picker, and then the action buttons (Process, Remove, Clear); while a batch is running, Process becomes Cancel. The far right end of the toolbar holds the settings-sidebar toggle.</p>
 
     <h3>File List</h3>
-    <p>The left panel shows all loaded files. Each row displays the filename and a status label. Drag rows to reorder; drag the vertical divider to resize the panel.</p>
+    <p>The left panel shows all loaded files. Each row displays the filename and a status label. Drag rows to reorder; drag the vertical divider to resize the panel. Folders can be dropped as well; they are scanned recursively for supported audio files.</p>
     <ul>
       <li><strong>Waiting</strong> — file queued, analysis pending</li>
       <li><strong>Calculating stats</strong> — audio stats are being computed</li>
@@ -531,7 +531,7 @@
     <p>A collapsible panel on the right edge of the window holds output format settings for the current mode (sample rate, channels, output directory). Toggle it open or closed with the sliders icon at the far right of the toolbar.</p>
 
     <h3>Processor Strip</h3>
-    <p>The bar across the bottom of the window holds all processing controls for the current mode — high-pass, phase rotation, dynamic leveling, loudness normalization in WaxOn; true peak and target loudness in WaxOff. Toggles glow orange when enabled. Knobs respond to vertical drag or the scroll wheel and snap to discrete steps; most controls show a short helper line beneath them, and every control has a hover tooltip. All values persist between sessions and are captured by presets.</p>
+    <p>The bar across the bottom of the window holds all processing controls for the current mode — high-pass, phase rotation, dynamic leveling, loudness normalization in WaxOn; true peak and target loudness in WaxOff. Toggles glow orange when enabled. Knobs respond to vertical drag, the scroll wheel, or arrow keys when focused, and snap to discrete steps; most controls show a short helper line beneath them, and every control has a hover tooltip. All values persist between sessions and are captured by presets.</p>
   </section>
 
   <!-- WaxOn Mode -->
@@ -595,10 +595,10 @@
 
     <p><strong>Defaults</strong> resets all WaxOn settings to factory values. A quick way to start fresh.</p>
     <p><strong>Edit Prep</strong> is optimized for single-mic podcast recordings destined for DAW editing. −30 LUFS leaves generous headroom for editing and processing.</p>
-    <p><strong>ATSC A/85</strong> targets the −24 LKFS dialog reference level used for US broadcast and video delivery. WaxOn's fixed −1.0 dBTP true-peak ceiling is stricter than ATSC A/85's −2.0 dBTP requirement, so the output stays comfortably within spec. Tracks feel natural at calibrated monitor levels and still leave headroom before typical delivery targets.</p>
+    <p><strong>ATSC A/85</strong> targets the −24 LKFS dialog reference level used for US broadcast and video delivery. Tracks feel natural at calibrated monitor levels and still leave loudness headroom before typical delivery targets. Two limits on what this preset guarantees: WaxOn's fixed −1.0 dBTP ceiling is the EBU R128 value and sits 1 dB above the −2 dBTP maximum A/85 recommends, and WaxOn measures BS.1770-4 integrated loudness rather than the dialogue-gated BS.1770-1 measurement A/85 specifies for long-form content. On solo speech these land close; for strict A/85 delivery, verify against your deliverable spec.</p>
 
     <h3>Custom Presets</h3>
-    <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets from the same menu.</p>
+    <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets via <strong>Manage Presets…</strong> in the same menu.</p>
   </section>
 
   <section id="waxon-settings">
@@ -620,12 +620,12 @@
         <tr>
           <td>Channels</td>
           <td>Mono · Stereo</td>
-          <td>Stereo passes both channels through unchanged. Mono extracts a single channel from a stereo source.</td>
+          <td>Stereo passes a stereo source's two channels through unchanged; sources with more or fewer channels are converted to two by FFmpeg's default matrix. Mono extracts a single channel from a stereo source.</td>
         </tr>
         <tr>
           <td>Channel</td>
           <td>Left · Right</td>
-          <td>Mono mode only. Which channel to extract. Use Left for a standard single-mic recording on channel 1. Grayed out when Channels is Stereo.</td>
+          <td>Mono mode only. Which channel to extract; ignored when the source is already mono (a console note is logged). Use Left for a standard single-mic recording on channel 1. Grayed out when Channels is Stereo.</td>
         </tr>
         <tr>
           <td>High Pass</td>
@@ -645,11 +645,11 @@
         <tr>
           <td>Strength</td>
           <td>Gentle → Aggressive · 9 positions · default Medium</td>
-          <td>Controls how quickly and strongly Dynamic Leveling responds. Lower settings use longer analysis frames and a smaller maximum gain (≈ +6 dB) for smoother, more conservative leveling; higher settings use shorter frames and a larger maximum gain (≈ +15 dB) for faster, more aggressive response. Audition output before editing. Dimmed when Dynamic Leveling is off.</td>
+          <td>Controls how quickly and strongly Dynamic Leveling responds. Lower settings use longer analysis frames and a smaller maximum gain (≈ +6 dB) for smoother, more conservative leveling; higher settings use shorter frames and a larger maximum gain (≈ +15.6 dB) for faster, more aggressive response. Audition output before editing. Dimmed when Dynamic Leveling is off.</td>
         </tr>
         <tr>
           <td>Loudness Norm</td>
-          <td>On · Off</td>
+          <td>On · Off · default Off</td>
           <td>Enables two-pass EBU R128 loudness normalization. The analysis pass applies RNNoise internally on a temp copy to prevent broadband noise from skewing the loudness measurement; the output signal is not affected. Off = filtering and linear peak normalization to the −1.0 dBTP ceiling only.</td>
         </tr>
         <tr>
@@ -680,13 +680,13 @@
       <li>
         <div>
           <strong>Dynamic Leveling <span class="tag">Optional</span></strong>
-          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet voices and tames loud ones. The Strength knob maps to three <code>dynaudnorm</code> parameters simultaneously: frame size (<code>f</code> 500→150 ms), Gaussian smoothing window (<code>g</code> 31→15 frames), and maximum gain factor (<code>m</code> 2.0→6.0, ≈ +6 to +15 dB). Best for panel recordings, live Q&amp;As, and multi-voice sources with inconsistent levels. Not recommended for solo voice — can cause pumping on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
+          <span>Bidirectional dynamic normalization using FFmpeg's <code>dynaudnorm</code>. Lifts quiet voices and tames loud ones. The Strength knob maps to three <code>dynaudnorm</code> parameters simultaneously: frame size (<code>f</code> 500→150 ms), Gaussian smoothing window (<code>g</code> 31→15 frames), and maximum gain factor (<code>m</code> 2.0→6.0, ≈ +6 to +15.6 dB). Best for panel recordings, live Q&amp;As, and multi-voice sources with inconsistent levels. Not recommended for solo voice — can cause pumping on recordings with natural pauses. See <a href="theory.html#dynamic-leveling">Dynamic Leveling</a> in the Theory of Operation.</span>
         </div>
       </li>
       <li>
         <div>
           <strong>Loudness Normalization <span class="tag">Optional</span></strong>
-          <span>Two-pass EBU R128. First pass measures integrated loudness, true peak, LRA, and threshold. Second pass applies linear gain to hit the configured target. Linear mode preserves the natural dynamic shape of the recording: no compression, no transient changes. The analysis pass runs RNNoise on a temporary copy for measurement accuracy — preventing broadband noise from inflating the LUFS reading; the output pipeline is unaffected. See <a href="theory.html#nr-measurement">Theory of Operation</a>.</span>
+          <span>Two-pass EBU R128. First pass measures integrated loudness, true peak, LRA, and threshold. Second pass applies linear gain to hit the configured target. Linear mode preserves the natural dynamic shape of the recording: no compression, no transient changes. (If true-peak headroom won't allow a constant gain, loudnorm falls back to dynamic normalization for that file — see Theory of Operation.) The analysis pass runs RNNoise on a temporary copy for measurement accuracy — preventing broadband noise from inflating the LUFS reading; the output pipeline is unaffected. See <a href="theory.html#nr-measurement">Theory of Operation</a>.</span>
         </div>
       </li>
       <li>
@@ -707,16 +707,18 @@
     <h3>Individual Files</h3>
     <pre><code>{original-name}-{rate}waxon.wav</code></pre>
     <p>Examples: <code>episode-01-44kwaxon.wav</code> &nbsp; <code>guest-48kwaxon.wav</code></p>
+    <p>If two files in the same batch would produce the same output name, a short hash tag is inserted before the type suffix — e.g. <code>episode-a1b2c3-44kwaxon.wav</code> — so neither overwrites the other.</p>
+    <p>Files whose names already match this pattern trigger an <strong>Already Processed?</strong> confirmation when added — re-processing a prep WAV can degrade audio quality.</p>
 
     <h3>Location</h3>
-    <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code> — and if that folder can't be created or written, to the Desktop as a last resort. Existing files with the same name are overwritten.</p>
+    <p>By default, output files are written alongside the source file. If a custom output directory is configured, all files go there. If neither location is writable, WaxOn falls back to <code>~/Music/WaxOnWaxOff/</code> — and if that folder can't be created or written, to the Desktop as a last resort (with a confirmation if more than one file in the batch would land there). Existing files with the same name are overwritten.</p>
   </section>
 
   <!-- WaxOff Mode -->
   <section id="waxoff-overview">
     <h2>WaxOff Mode <span class="mode-badge mode-waxoff">WaxOff</span></h2>
     <p>WaxOff finalizes your edited podcast mix for distribution. It applies phase rotation (200 Hz allpass) for headroom recovery, EBU R128 loudness normalization, and a 2× oversampled brick-wall limiter as a true-peak safety backstop. It delivers 24-bit WAV, MP3, or both, ready to upload to your podcast host.</p>
-    <p>WaxOff assumes your mix is already balanced and edited. It applies a single linear gain adjustment from loudnorm to hit the target loudness — no compression, no changes to stereo image. Phase rotation is applied unconditionally as a transparent crest-factor reduction. The brick-wall limiter only engages when inter-sample peaks slip past loudnorm's TP analysis; on a well-mixed source it leaves the audio untouched. See the <a href="theory.html#phase-rotation">Theory of Operation</a> for detail. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
+    <p>WaxOff assumes your mix is already balanced and edited. It normally applies a single linear gain adjustment from loudnorm to hit the target loudness — no compression, no changes to stereo image. On a mix whose loudness range is wider than the internal 9 LU setting, loudnorm falls back to dynamic normalization instead, and the delivered file reads under target. Phase rotation is applied unconditionally as a transparent crest-factor reduction. The brick-wall limiter only engages when inter-sample peaks slip past loudnorm's TP analysis; on a well-mixed source it leaves the audio untouched. See the <a href="theory.html#phase-rotation">Theory of Operation</a> for detail. If your mix sounds right, WaxOff just makes it loud enough and packages it for delivery.</p>
 
     <h3>Quick Start</h3>
     <ol>
@@ -776,7 +778,7 @@
     <p><strong>WAV Only (Mastering)</strong> outputs a 48 kHz WAV with no MP3. Use when handing off to a mastering engineer or delivering to a video platform.</p>
 
     <h3>Custom Presets</h3>
-    <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets from the same menu.</p>
+    <p>Configure your settings, then open the Preset menu and choose <strong>Save Current Settings…</strong>. Give the preset a name and it will persist across relaunches. Delete custom presets via <strong>Manage Presets…</strong> in the same menu.</p>
   </section>
 
   <section id="waxoff-settings">
@@ -793,11 +795,11 @@
         <tr>
           <td>Sample Rate</td>
           <td>44.1 kHz · 48 kHz</td>
-          <td>Output sample rate for the WAV. 44.1 kHz for podcast delivery; 48 kHz for video or mastering handoff. MP3 output is always encoded at 44.1 kHz regardless of this setting.</td>
+          <td>Output sample rate for the WAV. 44.1 kHz for podcast delivery; 48 kHz for video or mastering handoff. MP3 output is always encoded at 44.1 kHz regardless of this setting. Grayed out when Output is MP3 only.</td>
         </tr>
         <tr>
           <td>Output</td>
-          <td>WAV · MP3 · Both</td>
+          <td>WAV · MP3 · Both · default Both</td>
           <td>WAV is always 24-bit PCM. MP3 is CBR at the chosen bitrate. Both produces two output files.</td>
         </tr>
         <tr>
@@ -843,7 +845,7 @@
       <li>
         <div>
           <strong>Normalization Pass</strong>
-          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This applies a single precise linear gain: no compression, no change to stereo image. Output is stereo (2-channel) by default; mono input is upmixed to dual-mono at the start of the filter chain so both passes measure and normalize the stereo signal. With mono delivery selected the upmix is skipped and both passes run on the native single channel instead.</span>
+          <span>The same filter chain runs again with <code>linear=true</code> and the measured values from pass 1 injected. The 200 Hz allpass is applied here too so the rendered output matches what was measured. This normally applies a single precise linear gain: no compression, no change to stereo image. If the mix's loudness range exceeds the configured LRA, loudnorm reverts to dynamic normalization for that file. Output is stereo (2-channel) by default; mono input is upmixed to dual-mono at the start of the filter chain so both passes measure and normalize the stereo signal. With mono delivery selected the upmix is skipped and both passes run on the native single channel instead.</span>
         </div>
       </li>
       <li>
@@ -874,12 +876,14 @@
 {original-name}-lev{target}LUFS.mp3</code></pre>
     <p>The <code>{target}</code> placeholder includes its sign — e.g. <code>-18</code> — so a target of −18 LUFS produces <code>…-lev-18LUFS.wav</code>.</p>
     <p>Examples: <code>episode-42-final-lev-18LUFS.wav</code> &nbsp; <code>episode-42-final-lev-18LUFS.mp3</code></p>
+    <p>If two files in the same batch would produce the same output name, a short hash tag is inserted before the type suffix — e.g. <code>episode-a1b2c3-lev-18LUFS.wav</code> — so neither overwrites the other.</p>
+    <p>Files whose names already match this pattern trigger an <strong>Already Delivered?</strong> confirmation when added — running delivery again can over-limit or drift from the target loudness.</p>
 
     <h3>Channels</h3>
     <p>WaxOff outputs stereo (2-channel) by default. Mono input is accepted — by default it is upmixed to dual-mono stereo before processing, but the <strong>Channels</strong> control in WaxOff Settings can instead deliver a mono source as a true single channel. Stereo sources always remain stereo; the control has no effect on them.</p>
 
     <h3>Location</h3>
-    <p>Output files are written alongside the source by default, or to your configured output directory. Existing files with the same name are overwritten.</p>
+    <p>Output files are written alongside the source by default. If a custom output directory is configured, all files go there. If neither location is writable, WaxOff falls back to <code>~/Music/WaxOnWaxOff/</code> — and if that folder can't be created or written, to the Desktop as a last resort (with a confirmation if more than one file in the batch would land there). Existing files with the same name are overwritten.</p>
   </section>
 
   <!-- File Stats -->
@@ -911,7 +915,7 @@
       <div class="label">PEAK</div>
       <div class="desc">Sample peak level in dBFS. The highest sample value across all channels. Color-coded: orange at −3 dBFS and above, red at 0 dBFS.</div>
       <div class="label">ISP (est.)</div>
-      <div class="desc">Estimated inter-sample peak in dBFS, from 2× linear interpolation between samples. Only shown when the estimate rises above the sample peak. A lower bound, not a full BS.1770 true-peak measurement — the real true peak may be higher; the Console's "measured" line after processing reports the broadcast-accurate value. Color-coded like PEAK.</div>
+      <div class="desc">Estimated inter-sample peak in dBFS, from 2× linear interpolation between samples. Only shown when the estimate exceeds the sample peak by more than 0.1 dB. A lower bound, not a full BS.1770 true-peak measurement — the real true peak may be higher; the Console's "measured" line after processing reports the broadcast-accurate value. Color-coded like PEAK.</div>
       <div class="label">CREST</div>
       <div class="desc">Crest factor (PEAK − RMS) in dB. Indicates dynamic range. Higher values mean more headroom between peaks and average level.</div>
       <div class="label">LUFS</div>
