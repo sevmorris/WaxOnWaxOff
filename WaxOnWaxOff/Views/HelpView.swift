@@ -60,7 +60,7 @@ struct HelpView: View {
                         "Optional phase rotation — 200 Hz allpass (default on).",
                         "Resampling to the target sample rate.",
                         "Dynamic leveling (if enabled) — dynaudnorm for panel recordings and multi-voice sources. Not recommended for solo voice.",
-                        "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain. Pass 1 may use internal RNNoise for measurement accuracy only.",
+                        "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain (loudnorm can revert to dynamic normalization if true-peak headroom doesn't allow a constant gain). Pass 1 may use internal RNNoise for measurement accuracy only.",
                         "True-peak control — always on: 2× oversampled limiting at a fixed −1.0 dBTP when Loudness Norm is on, downward-only linear peak normalization when off."
                     ])
                     text("Output: 24-bit WAV.")
@@ -100,7 +100,7 @@ struct HelpView: View {
                 section("WaxOff — Processing Pipeline") {
                     numberedList([
                         "Analysis pass — the audio runs through a 200 Hz allpass (phase rotation) and then FFmpeg's loudnorm filter, which measures integrated loudness, true peak, and loudness range. A mono source is upmixed to dual-mono stereo at the head of this chain, ahead of the allpass, unless Mono delivery is selected.",
-                        "Normalization pass — the same chain runs again with the measured values and a single linear gain. The 200 Hz allpass runs here too, so the render matches what was measured. No dynamic processing; the stereo image and transients are unchanged.",
+                        "Normalization pass — the same chain runs again with the measured values and a single linear gain. The 200 Hz allpass runs here too, so the render matches what was measured. In this linear mode there is no dynamic processing and the stereo image and transients are unchanged. If the mix's loudness range exceeds 9 LU (a fixed internal value), or linear gain would breach the true-peak ceiling, loudnorm instead reverts to dynamic normalization for that file — which lands slightly under target and reduces the loudness range.",
                         "Brick-wall limiter — a 2× oversampled true-peak limiter at your True Peak ceiling, as a safety backstop for inter-sample peaks loudnorm's linear mode missed. On a well-mixed source it doesn't engage.",
                         "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate, through a separate pre-encode limiter set 1 dB below your True Peak to absorb lossy-decode overshoot. Always 44.1 kHz."
                     ])
