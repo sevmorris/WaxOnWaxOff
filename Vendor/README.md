@@ -2,77 +2,58 @@
 
 ## FFmpeg / ffprobe (bundled binaries)
 
-WaxOnWaxOff bundles **static FFmpeg 8.0** binaries for macOS **arm64 (Apple Silicon only)**. They are **not** stored in git (~100 MB combined). Instead:
+WaxOnWaxOff bundles a **static, audio-only FFmpeg 8.0** for macOS **arm64 (Apple Silicon only)**, built from a committed recipe in this repository. The binaries are **not** stored in git (~44 MB combined). Instead:
 
 | Artifact | Location |
 |----------|----------|
+| Build recipe (Corresponding Source) | `scripts/build-ffmpeg.sh` |
 | Binary checksums & release tag | `Vendor/ffmpeg-manifest.env` |
 | Download script | `scripts/fetch-ffmpeg.sh` |
-| GitHub release assets | Tag from manifest (e.g. `ffmpeg-deps-8.0-arm64`) |
+| GitHub release assets | Tag from manifest |
 
 Xcode runs `scripts/fetch-ffmpeg.sh` before each build; `release.sh` runs it before packaging.
 
-**Do not delete** the `ffmpeg-deps-*` GitHub release — CI and fresh clones fetch binaries from it. `release.sh` only prunes old `v*` app releases.
+**Do not delete** the `ffmpeg-deps-*` GitHub releases — CI and fresh clones fetch binaries from them, and older tags remain the corresponding artifact for previously released app versions.
 
-### Pinned binary build (manifest)
+### The build
 
-See `ffmpeg-manifest.env` for:
+`scripts/build-ffmpeg.sh` builds FFmpeg 8.0 against LAME 3.100, both pinned and SHA-256 verified, with **no `--enable-gpl`**, **no `--enable-nonfree`**, **no `--enable-version3`**, and no video or image external libraries. The only external library is `libmp3lame`, for MP3 encoding. The script asserts, fail-closed, that the resulting binaries execute, carry none of those three flags, link `libmp3lame`, target the project's deployment target, and have **no non-system dynamic dependencies**. Execution is asserted *before* the flag checks — a binary that cannot run emits no configuration string, and every "flag absent" assertion would otherwise pass vacuously.
 
-- `FFMPEG_VERSION`, `FFMPEG_ARCH`, `FFMPEG_DEPS_TAG`
-- SHA-256 of `ffmpeg` and `ffprobe` after download
+Two flags are load-bearing and documented inline in the script: `-fno-stack-check` (macOS clang codegen workaround) and `-ffp-contract=off` (FMA contraction varies by compiler version and accumulates through IIR biquad feedback paths; disabling it makes filter output depend on the source rather than on the toolchain).
 
-Verify locally:
-
-```bash
-./scripts/fetch-ffmpeg.sh   # skips network when checksums match
-shasum -a 256 WaxOnWaxOff/ffmpeg WaxOnWaxOff/ffprobe
-```
-
-### Corresponding **source code** (GPL offer)
-
-The bundled executables report:
-
-```text
-ffmpeg version 8.0
-configuration: --prefix=/Volumes/tempdisk/sw --extra-cflags=-fno-stack-check --arch=arm64 --cc=/usr/bin/clang --enable-gpl --enable-libvmaf --enable-libopenjpeg --enable-libopus --enable-libmp3lame --enable-libx264 --enable-libx265 --enable-libvvenc --enable-libvpx --enable-libwebp --enable-libass --enable-libfreetype --enable-fontconfig --enable-libtheora --enable-libvorbis --enable-libsnappy --enable-libaom --enable-libvidstab --enable-libzimg --enable-libsvtav1 --enable-libharfbuzz --enable-libkvazaar --pkg-config-flags=--static --enable-ffplay --enable-neon --enable-runtime-cpudetect --disable-indev=qtkit --disable-indev=x11grab_xcb
-```
-
-The full configuration line above is the exact one the bundled binary reports (`ffmpeg -version`). `--enable-gpl` together with the GPL-licensed encoders in this build (`libx264`, `libx265`, `libvidstab`) is what makes the combined work GPL — see the license note below.
+### License
 
 | Field | Value |
 |-------|--------|
 | Upstream release | **FFmpeg 8.0** (“Huffman”), released 2025-08-22 |
 | Source archive | https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz |
 | PGP signature | https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz.asc |
-| Git tag (reference) | `n8.0` — https://git.ffmpeg.org/gitweb/ffmpeg.git/log/refs/heads/release/8.0 |
-| License | **GPL-2.0-or-later** (this static build was configured with `--enable-gpl` and no `--enable-version3`; the effective license is GPL-2.0-or-later, not GPLv3) |
+| FFmpeg license | **LGPL-2.1-or-later** (no `--enable-gpl`; verified at `LICENSE.md:3-6` of the pinned source) |
+| LAME 3.100 | **LGPL-2.0-or-later** — https://lame.sourceforge.io/ (GNU *Library* GPL v2 "or later"; verified at `include/lame.h:6-9`) |
 
-**Relationship to the app's own license.** WaxOn/WaxOff is licensed GPL-3.0 (top-level `LICENSE`). The app invokes `ffmpeg`/`ffprobe` as **separate executables** (via `Process()`), so they are aggregated with the app rather than linked into it — under GPL's mere-aggregation provision the app's GPL-3.0 license and the FFmpeg binary's own license apply independently, and there is no combined-work compatibility question between them. (The binary's own license is **GPL-2.0-or-later** — built with `--enable-gpl` and no `--enable-version3`.)
+**No GPL components.** x264, x265 and libvidstab — the GPL-licensed encoders in the previous bundled build — are not compiled in. There is no GPL Corresponding Source obligation for this binary.
 
-FFmpeg does not publish a separate SHA-256 file for release tarballs; verify the archive with the **PGP signature** and the project’s release signing key (see https://ffmpeg.org/download.html#releases).
+**Relationship to the app's own license.** WaxOn/WaxOff is licensed GPL-3.0 (top-level `LICENSE`). The app invokes `ffmpeg`/`ffprobe` as **separate executables** (via `Process()`), so they are aggregated with the app rather than linked into it — under GPL's mere-aggregation provision the app's license and the binaries' licenses apply independently, and there is no combined-work question between them.
 
-To obtain source matching this major version:
+### One live source obligation, satisfied
 
-```bash
-curl -LO https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz
-curl -LO https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz.asc
-gpg --verify ffmpeg-8.0.tar.xz.asc ffmpeg-8.0.tar.xz
-```
+This is not "no obligation". The ffmpeg binary statically links LGPL components — FFmpeg's own core (LGPL-2.1-or-later) and **LAME** (LGPL-2.0-or-later) — and LGPL §6 requires their source be available when they are distributed statically linked.
 
-**Which GPL mechanism applies.** The FFmpeg binary is conveyed only by network download — bundled in the app DMG and hosted as raw assets on the `ffmpeg-deps-8.0-arm64` release, both offered from GitHub Releases. That is GPL-3.0 **§6(d)** ("offering access from a designated place"), not the §6(b) written-offer route, which is scoped to object code conveyed in or with a physical product. §6(d) permits the Corresponding Source to live on a third-party server with equivalent copying facilities, provided clear directions to it accompany the object code.
+It is satisfied by construction:
 
-For FFmpeg's own source, the pointer is upstream **FFmpeg 8.0** at [ffmpeg.org/releases/ffmpeg-8.0.tar.xz](https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz) (verify with the PGP signature above), built with the exact configuration shown above.
+- **The recipe** is `scripts/build-ffmpeg.sh`, committed here, pinning both versions with SHA-256 checksums and recording the exact configure line.
+- **FFmpeg 8.0 source**: https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz (verify with the PGP signature above).
+- **LAME 3.100 source**: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
 
-> **⚠ This source offer is known-incomplete.** Because this is a statically linked GPL build, the *complete* Corresponding Source must also include per-component source for the statically linked GPL libraries — **x264, x265, and libvidstab** (each GPL-2.0-or-later) — which is **not yet provided**. Their exact linked versions are not recoverable from the binary, and the origin build's source manifest is not available. This is being resolved (see [#7](https://github.com/sevmorris/WaxOnWaxOff/issues/7)); one likely resolution rebuilds FFmpeg audio-only with no GPL components, which removes the obligation entirely.
+Because the binaries are conveyed by network download (bundled in the app DMG, and as raw assets on the deps release), the applicable clause is GPL-3.0 §6(d) / the equivalent LGPL provision: source is offered from the same place, or from the upstream projects with directions accompanying the object code. Those directions appear in the release descriptions as well as here. You can also open a GitHub issue with subject **source request**.
 
-A second, separate gap: §6(d) requires the source directions *next to the object code* on the download pages themselves; today they live here in `Vendor/README.md` rather than in the release descriptions. Closing that is a release-process task tracked in [#5](https://github.com/sevmorris/WaxOnWaxOff/issues/5). For a copy of the corresponding source you can also open a GitHub issue with subject **GPL source request**.
+### Updating the bundled binary build
 
-### Updating the bundled **binary** build
-
-1. Replace `WaxOnWaxOff/ffmpeg` and `WaxOnWaxOff/ffprobe` locally (arm64, static, GPL flags documented).
-2. Update `ffmpeg-manifest.env` (version, tag, SHA-256 sums).
-3. Publish a new GitHub release with the tag from the manifest; upload assets named `ffmpeg` and `ffprobe`.
-4. Update the **source** table in this file if the upstream release version changes.
+1. Adjust pins in `scripts/build-ffmpeg.sh` if the FFmpeg or LAME version changes.
+2. Run `scripts/build-ffmpeg.sh`; it verifies flags, deployment target, dynamic dependencies and prints SHA-256s.
+3. Update `Vendor/ffmpeg-manifest.env` (version, tag, SHA-256 sums).
+4. Publish a new GitHub release with the tag from the manifest; upload assets named `ffmpeg` and `ffprobe`, and include the source directions in the release description.
+5. Re-run the parity harness (`scripts/parity-corpus-gen.sh`, `scripts/parity-check.sh`) against the previous binary before shipping.
 
 ---
 
@@ -87,11 +68,11 @@ The RNNoise algorithm is implemented directly in FFmpeg (`libavfilter/af_arnndn.
 | Field | Value |
 |-------|--------|
 | Source | FFmpeg `libavfilter/af_arnndn.c` (compiled into the bundled `ffmpeg`) |
-| License | **BSD-2-Clause** |
-| Copyright | Mozilla; Xiph.Org Foundation; CSIRO; Octasic Inc.; Jean-Marc Valin; Gregor Richards; Paul B Mahol (all seven notices verbatim in the file header) |
+| License | **BSD-2-Clause** (verified at `libavfilter/af_arnndn.c:10-19` of the pinned source — two conditions, no advertising clause) |
+| Copyright | Gregor Richards (2018); Mozilla (2017); Xiph.Org Foundation (2005–2009); CSIRO (2007–2008); Octasic Inc. (2008–2011); Jean-Marc Valin; Paul B Mahol (2019) — all seven notices at `af_arnndn.c:2-8` |
 | Algorithm lineage | RNNoise — https://github.com/xiph/rnnoise (Jean-Marc Valin) |
 
-Because this code is compiled inside the FFmpeg binary, its corresponding source is covered by the FFmpeg GPL source offer above. The BSD-2-Clause attribution requirement is independent of that offer and is satisfied by naming the copyright holders here.
+Because this code is compiled inside the FFmpeg binary, its source is covered by the FFmpeg source pointers above. The BSD-2-Clause attribution requirement is independent of that and is satisfied by naming the copyright holders here.
 
 ### Model weights file (`WaxOnWaxOff/rnnoise`)
 
@@ -104,6 +85,12 @@ A separate binary weights file (no extension) supplies the trained model to `arn
 | Status | Upstream states the model files "are not creative and thus none of it is subject to copyright." Reproduced here as the upstream project's position, not as a legal determination by this project. |
 
 The app bundles a binary copy of the weights file, not the training codebase.
+
+---
+
+## Historical builds
+
+App releases up to and including **v2.3.0** bundled a third-party static FFmpeg 8.0 built **with** `--enable-gpl`, linking x264, x265 and libvidstab. Those artifacts remain published, and the GPL Corresponding Source directions for them are on the `ffmpeg-deps-8.0-arm64` and `v2.3.0` release pages. They are superseded, not withdrawn.
 
 ---
 

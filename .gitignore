@@ -16,3 +16,6 @@ WaxOnWaxOff/ffprobe
 
 # Claude
 .claude/
+
+# Parity corpus (must live OUTSIDE the tree; backstop only)
+/parity-corpus/
