@@ -289,7 +289,16 @@ ok "Release published"
 # Never delete ffmpeg-deps-* — CI and fresh clones download binaries from that
 # release (see scripts/fetch-ffmpeg.sh). Pruning all releases by date removed
 # ffmpeg-deps-8.0-arm64 during the v2.0.6 cut.
-KEEP_RELEASES=5
+#
+# Raised 5 → 10 for the 2.4.0 cut. Every release through v2.3.0 bundles the
+# third-party GPL FFmpeg build, so those pages carry GPL Corresponding Source
+# obligations. Deleting a page does not end the obligation — it attaches to
+# distributions already made, and everyone who downloaded keeps their
+# entitlement — it only removes our means of satisfying it. At 5 this step
+# would have deleted v2.2.1 in the same run that adds source directions to the
+# others. Retention of GPL-bearing releases is a licensing decision (#12), not
+# something a tail -n +N should make mid-publish.
+KEEP_RELEASES=10
 step "Removing old app releases (keeping ${KEEP_RELEASES} most recent v* tags)"
 OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
     --jq '.[].tagName' | grep -E '^v[0-9]' | tail -n +$((KEEP_RELEASES + 1)) || true)

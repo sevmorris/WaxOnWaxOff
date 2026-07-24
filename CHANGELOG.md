@@ -12,7 +12,7 @@ All notable changes to WaxOn/WaxOff are documented here. Version numbers match G
 - The build refuses to ship a binary that links anything outside the system: `--disable-autodetect` plus a hard `otool -L` check. An earlier build silently picked up a Homebrew library and failed to launch on machines without it
 
 **Documentation**
-- Documentation audit remediation across the manual, theory doc, in-app Help, and README — 31 findings from a full claim-by-claim pass against the implementation
+- Documentation audit across the manual, theory doc, in-app Help, and README — a full claim-by-claim pass against the implementation raised 31 findings. 26 documentation corrections ship here; 1 is held pending [#4](https://github.com/sevmorris/WaxOnWaxOff/issues/4) (documenting the current behavior would publish a claim the code doesn't honor); 4 are code defects rather than doc errors, filed as [#2](https://github.com/sevmorris/WaxOnWaxOff/issues/2), [#3](https://github.com/sevmorris/WaxOnWaxOff/issues/3), [#4](https://github.com/sevmorris/WaxOnWaxOff/issues/4) and [#11](https://github.com/sevmorris/WaxOnWaxOff/issues/11)
 - Corrected the `linear=true` claim in fourteen places. The docs stated that WaxOn and WaxOff never apply dynamic normalization; in fact `linear=true` is a request FFmpeg may refuse, and when it does, the filter falls back to dynamic normalization silently. The theory doc now carries a dedicated explanation of when that happens and what it looks like
 - Known gap, deliberately shipped: the app still gives no in-app signal when the fallback occurs. A file affected by it reads noticeably below its target LUFS in the stats panel with no explanation. Detection is tracked as [#11](https://github.com/sevmorris/WaxOnWaxOff/issues/11)
 
