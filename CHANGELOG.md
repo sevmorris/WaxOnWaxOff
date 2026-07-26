@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to WaxOn/WaxOff are documented here. Version numbers match GitHub releases (`v*` tags).
+All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
 ## [2.4.0] — 2026-07-23
 
