@@ -722,7 +722,7 @@
     </ul>
     <p>The artifact profile when limits are exceeded is typically a subtle warbling or underwater quality, the same category of artifact produced by spectral subtraction noise gates, though usually less severe. On moderate-noise, clean-voice recordings, the algorithm is essentially transparent.</p>
 
-    <h3 id="rnnoise-stereo">Stereo Handling: Per-Channel Split</h3>
+    <h3>Stereo Handling: Per-Channel Split</h3>
     <p>RNNoise was designed and trained exclusively on <strong>mono 48 kHz speech</strong>. When FFmpeg's <code>arnndn</code> filter receives a stereo input, it creates separate denoiser instances per channel and processes them independently. In practice, this can produce unpredictable results: the per-channel recurrent states diverge, and one channel (typically the second) may be over-gated or heavily attenuated, even when both channels carry similar content and noise levels.</p>
     <p>The root cause is that the model's internal gain computation is frame-by-frame and depends on its recurrent hidden state. With stereo input, slight differences between channels (different mic angles, room reflections, or even minor level offsets from recording) can cause the model to classify one channel as "more noisy" than the other and gate it more aggressively. The model has no concept of channel correlation or stereo coherence.</p>
     <p>WaxOn solves this by <strong>splitting stereo audio into independent mono channels before applying RNNoise</strong>, then rejoining the denoised channels back into stereo.</p>
