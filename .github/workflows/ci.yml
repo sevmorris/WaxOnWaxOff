@@ -8,11 +8,12 @@ on:
 
 jobs:
   build-and-test:
-    # Project uses objectVersion 77 (Xcode 16+). macos-14 ships Xcode 15.4,
-    # which cannot open this pbxproj format.
+    # macos-15 carries Xcode 26.x. macos-14 tops out at Xcode 15.4, which can
+    # neither open this pbxproj (objectVersion 77) nor supply the Swift 6.2 the
+    # project requires — see the pin below for the real floor.
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
