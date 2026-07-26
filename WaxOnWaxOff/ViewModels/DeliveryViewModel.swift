@@ -2,7 +2,6 @@ import AppKit
 import Foundation
 import Observation
 import OSLog
-import SwiftUI
 
 private let logger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryVM")
 

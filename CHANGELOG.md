@@ -72,6 +72,38 @@ All notable changes to WaxOn/WaxOff are documented here. Version numbers match G
 - `moveAtomically` cross-volume branch (copy → rename → source cleanup) now covered by a RAM-disk fixture test (`hdiutil` / `diskutil`), skipping cleanly where a RAM disk can't be created
 - DeliveryProcessor Both-mode partial-failure path (WAV succeeds, MP3 encode fails) now covered by a test asserting the file lands in successes with a non-nil `mp3FailureMessage` and the WAV present at its output path
 
+## [2.1.0] — 2026-06-11
+
+**Correctness**
+- WaxOff accepts mono sources — a mono input is upmixed to dual-mono as the first filter in both the analysis and normalization passes, ahead of phase rotation and loudnorm, so the output lands on the configured target. 2.0.9 rejected mono files outright to avoid the ~3 LU overshoot caused by upmixing after normalization; upmixing first removes the cause instead of the file
+- Analyzer RLB high-pass numerator coefficients corrected — the stage-2 biquad normalized `b0/b1/b2` by `d2`, giving 1/d2 gain rather than unity, and integrated loudness read ~0.04–0.05 LU below reference in a sample-rate-dependent way. Per BS.1770-4 only the denominator is normalized
+- FFmpeg stream selection pinned to `-map 0:a:0` on the three invocations that read the original input, matching the stream the probe measures. Without it FFmpeg selects the highest-channel-count stream, so a file with stereo `a:0` and 5.1 `a:1` was probed as 2-channel and processed as 6
+- loudnorm pass-1 measurements clamped to their documented option ranges before pass 2 — a clipped or full-scale source can report `input_i` above 0 LUFS, which loudnorm rejects with an opaque error
+- WaxOn ignores the Left/Right channel pick on mono input — `pan=1c|c0=c1` referenced a channel that does not exist on a 1-channel source and failed at filter-graph configuration with nothing pointing at the Channel toggle as the cause
+- OGG, Opus and WMA removed from the accepted extensions — they pass the ffprobe stream check but AVFoundation cannot open them, leaving files permanently stuck in an analysis error with no path to processing
+
+**Robustness**
+- Cancelling a batch no longer reports a failure — FFmpeg installs its own SIGTERM handler and exits with code 255 and reason `.exit` rather than `.uncaughtSignal`, so the cancel branch was never reached and the job was recorded as an ffmpeg error. Crash detection on the non-cancelled path is unchanged
+- Fixed a crash when a process was terminated before it finished launching — `terminate()` from the watchdog and from the cancel handler is now guarded on a launch flag set only after `run()` succeeds
+- Probed durations are range-checked before conversion — a corrupt or crafted container header reporting a non-finite, negative, or astronomically large duration trapped on overflow, taking down the whole batch at start. Values outside a 30-day ceiling are discarded and the existing fallback applies
+- Commas and semicolons escaped in filtergraph values — both are chain and option separators, so either character in a path or metadata value broke the graph syntax
+- Disk-space pre-flight estimates decoded PCM size rather than container size — a 64 kbps MP3 is ~17× smaller than its decoded 24-bit PCM, so the check could under-report required space by an order of magnitude
+- Analysis concurrency bounded when files are dropped — N files previously launched 3N unbounded tasks (ffprobe, decode, waveform), creating file-descriptor and thread pressure proportional to batch size
+- Cross-volume output moves are atomic — copy to a same-directory temp, then rename
+- Per-file status is set on completion, cancellation state is preserved, a partial Both-mode result is reported rather than discarded, and a cancel guard was added
+- WaxOff fails closed when a file's analysis has not completed — a nil `fileInfo` now sets an error state directing the user to wait, instead of passing the file through to normalization
+
+**Documentation**
+- Theory of Operation synced with the implementation — mono handling, the FLOOR / High Pass toggle coupling, the ISP (est.) stat, and the RMS fold-down
+- Manual, theory doc and in-app Help updated to describe mono upmixing, and the removed formats dropped from the supported-format lists
+- theory.html hero paragraphs no longer capped at 600px while the rest of the page uses 960px
+
+**Structural**
+- Swift 6.2 concurrency warnings resolved in `OutputAllocator` and `FileQueueCoordinator`
+- Removed a duplicate MP3-failure log line, a redundant `fileExists` guard, and three stale audit labels
+- Corrected comments that overstated the startup temp purge (it covers only the running PID's subtree), the loudnorm JSON brace fallback, and the `=` stripping rationale in metadata values
+- Tests added for loudnorm measurement clamping, `effectiveTimeoutSeconds` bounds, and the spawn-failure launch guard
+
 ## [2.0.9] — 2026-06-02
 
 **Correctness**

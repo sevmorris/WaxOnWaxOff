@@ -648,15 +648,12 @@ actor DeliveryProcessor {
 // MARK: - Errors
 
 enum DeliveryError: Error, LocalizedError {
-    case analysisFailedNoMeasurements
     case outputNotCreated
     case processingFailed(String)
     case encodingFailed(String)
 
     var errorDescription: String? {
         switch self {
-        case .analysisFailedNoMeasurements:
-            return "Failed to analyze audio — no loudness measurements obtained."
         case .outputNotCreated:
             return "Output file was not created."
         case .processingFailed(let msg):
