@@ -53,7 +53,8 @@ actor FFmpegManager {
         let tempRoot = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
 
         // Remove stale versioned binary directories left by earlier app releases.
-        // Each is ~50 MB; cleaning them up avoids unbounded accumulation across updates.
+        // Each holds both binaries — ~44 MB since the 2.4.0 audio-only rebuild, ~103 MB
+        // before it — so cleaning them up avoids unbounded accumulation across updates.
         if let siblings = try? fm.contentsOfDirectory(atPath: tempRoot.path) {
             for name in siblings where name.hasPrefix("WaxOn-") && name != currentDirName {
                 try? fm.removeItem(at: tempRoot.appendingPathComponent(name))

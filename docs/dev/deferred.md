@@ -8,7 +8,16 @@ Items from the 2026-07 perf cycle (`perf/waxoff-2026-07`) are tagged
 
 ## Bugs
 
-_None currently tracked._
+Tracked as GitHub issues, not here. Open as of 2026-07-25:
+[#2](https://github.com/sevmorris/WaxOnWaxOff/issues/2) (>2-channel downmix
+unwarned under Stereo), [#3](https://github.com/sevmorris/WaxOnWaxOff/issues/3)
+(DiskSpaceChecker over-reserves), [#4](https://github.com/sevmorris/WaxOnWaxOff/issues/4)
+(MP3-only temp UUID in the ID3 title),
+[#11](https://github.com/sevmorris/WaxOnWaxOff/issues/11) (loudnorm's silent
+linear→dynamic fallback is undetectable).
+
+This file is for work deliberately deferred, not for defects. Anything
+actionable belongs in the issue tracker.
 
 ## Test gaps
 

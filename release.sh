@@ -289,7 +289,6 @@ sed -i '' "s|Manual — v[0-9][0-9.]*|Manual — ${TAG}|g" "$MANUAL_IDX"
 sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg|WaxOnWaxOff-${TAG}.dmg|g" "$PROJECT_DIR/README.md"
 sed -i '' "s|<strong>Version:</strong> [0-9][0-9.]*|<strong>Version:</strong> ${VERSION}|g" "$PROJECT_DIR/README.md"
 sed -i '' "s|\*\*Version:\*\* [0-9][0-9.]*|**Version:** ${VERSION}|g" "$PROJECT_DIR/README.md"
-sed -i '' "s|\[Download v[0-9][0-9.]* (DMG)\]|[Download ${TAG} (DMG)]|g" "$PROJECT_DIR/README.md"
 
 # Landing page: download button URLs and button text.
 sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg|WaxOnWaxOff-${TAG}.dmg|g" "$LANDING_IDX"

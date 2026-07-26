@@ -34,7 +34,7 @@ struct WaxOnControlBar: View {
 
             knobCell(
                 label: "STRENGTH",
-                valueLabel: aggressivenessLabel(viewModel.settings.dynamicLevelingAmount),
+                valueLabel: strengthLabel(viewModel.settings.dynamicLevelingAmount),
                 caption: "",
                 value: $viewModel.settings.dynamicLevelingAmount,
                 step: 0.125,
@@ -165,7 +165,7 @@ struct WaxOnControlBar: View {
             .frame(width: 1, height: 120)
     }
 
-    private func aggressivenessLabel(_ amount: Double) -> String {
+    private func strengthLabel(_ amount: Double) -> String {
         switch amount {
         case ..<0.25: return "Gentle"
         case ..<0.5:  return "Low"

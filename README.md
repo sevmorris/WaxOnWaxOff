@@ -75,6 +75,8 @@ The app ships with **App Sandbox disabled** so it can launch the bundled `ffmpeg
 
 ## Building from Source
 
+Requires **Xcode 26 or later (Swift 6.2+)**. The app opts several classes out of MainActor-isolated `deinit`, which is [SE-0371](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md), implemented in Swift 6.2; Xcode 16.4 and earlier gate it behind an experimental flag and fail to compile. CI builds on Xcode 26.3.
+
 ```bash
 git clone https://github.com/sevmorris/WaxOnWaxOff.git
 cd WaxOnWaxOff
