@@ -4,13 +4,13 @@ import OSLog
 import SwiftUI
 
 // Logger is Sendable and thread-safe — can be captured in @Sendable closures without annotation.
-private let fileQueueLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "FileQueue")
+nonisolated private let fileQueueLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "FileQueue")
 
 /// Shared drag-and-drop file list, analysis, and waveform generation for WaxOn and WaxOff.
 @Observable
 @MainActor
 final class FileQueueCoordinator {
-    static let defaultValidExtensions: Set<String> = [
+    nonisolated static let defaultValidExtensions: Set<String> = [
         "wav", "aif", "aiff", "aifc", "mp3", "flac", "m4a", "caf", "aac",
         "mp4", "mov"
     ]

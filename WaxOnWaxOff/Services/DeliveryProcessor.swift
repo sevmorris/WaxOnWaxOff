@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-private let deliveryProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
+nonisolated private let deliveryProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
 
 // MARK: - Batch types
 
@@ -17,7 +17,7 @@ struct DeliveryJobResult: Sendable {
     /// Callers should show the WAV as delivered and surface this message in the log.
     let mp3FailureMessage: String?
 
-    init(id: UUID, outputURLs: [URL], mp3FailureMessage: String? = nil) {
+    nonisolated init(id: UUID, outputURLs: [URL], mp3FailureMessage: String? = nil) {
         self.id = id
         self.outputURLs = outputURLs
         self.mp3FailureMessage = mp3FailureMessage
@@ -335,7 +335,7 @@ actor DeliveryProcessor {
                 // ebur128's fixed 4× interpolator underreads — measured 0.156 dB
                 // low on a real music episode's MP3 versus an 8×/16× oversampled
                 // reference that matched loudnorm within 0.003 dB. See commit
-                // ef58d71 and docs/dev/perf-2026-07/meter-agreement.md for the
+                // ef58d71 and dev/perf-2026-07/meter-agreement.md for the
                 // full evidence table. Do not "unify" the two verification paths.
                 verifications.append { [ffmpeg] in
                     await self.verifyDelivered(ffmpeg: ffmpeg, output: mp3FinalURL, settings: settings, fileDuration: fileDuration, onLog: onLog)

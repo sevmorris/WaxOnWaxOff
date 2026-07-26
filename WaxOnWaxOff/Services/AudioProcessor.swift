@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-private let audioProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "AudioProcessor")
+nonisolated private let audioProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "AudioProcessor")
 
 struct JobInput: Sendable {
     let id: UUID
