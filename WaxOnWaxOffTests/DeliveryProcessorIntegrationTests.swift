@@ -473,7 +473,7 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
 
 /// Thread-safe ordered event sink for callbacks firing from the processor's
 /// concurrency domain (completions, log lines) so ordering can be asserted.
-private final class EventCollector: @unchecked Sendable {
+nonisolated private final class EventCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var events: [String] = []
 
@@ -489,7 +489,7 @@ private final class EventCollector: @unchecked Sendable {
 }
 
 /// Holds the test's Task handle so a processor callback can cancel it.
-private final class TaskBox: @unchecked Sendable {
+nonisolated private final class TaskBox: @unchecked Sendable {
     private let lock = NSLock()
     private var task: Task<DeliveryBatchRunResult, Error>?
 
@@ -507,7 +507,7 @@ private final class TaskBox: @unchecked Sendable {
 /// Thread-safe sink for the `onLog` callback, which fires from the processor's
 /// concurrency domain. Lets a test collect log lines and inspect them after the
 /// awaited run completes.
-private final class LogCollector: @unchecked Sendable {
+nonisolated private final class LogCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var lines: [(message: String, level: LogLevel)] = []
 

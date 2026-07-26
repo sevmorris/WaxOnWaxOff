@@ -315,7 +315,7 @@ final class AudioProcessorIntegrationTests: XCTestCase {
 /// Thread-safe sink for the `onLog` callback, which fires from the processor's
 /// concurrency domain. Lets a test collect log lines and inspect them after the
 /// awaited run completes.
-private final class LogCollector: @unchecked Sendable {
+nonisolated private final class LogCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var lines: [(message: String, level: LogLevel)] = []
 
