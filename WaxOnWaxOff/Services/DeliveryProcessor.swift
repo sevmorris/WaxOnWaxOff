@@ -10,14 +10,14 @@ struct DeliveryJobInput: Sendable {
     let url: URL
 }
 
-struct DeliveryJobResult: Sendable {
+nonisolated struct DeliveryJobResult: Sendable {
     let id: UUID
     let outputURLs: [URL]
     /// Non-nil when the WAV rendered but MP3 encoding failed in `.both` mode.
     /// Callers should show the WAV as delivered and surface this message in the log.
     let mp3FailureMessage: String?
 
-    nonisolated init(id: UUID, outputURLs: [URL], mp3FailureMessage: String? = nil) {
+    init(id: UUID, outputURLs: [URL], mp3FailureMessage: String? = nil) {
         self.id = id
         self.outputURLs = outputURLs
         self.mp3FailureMessage = mp3FailureMessage
