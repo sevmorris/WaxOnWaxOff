@@ -48,17 +48,6 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
         String(format: "%.1f", truePeak)
     }
 
-    var lraString: String {
-        String(format: "%.0f", lra)
-    }
-
-    var mp3BitrateString: String {
-        "\(mp3Bitrate)k"
-    }
-
-    var sampleRateDisplay: String {
-        sampleRate == 44100 ? "44.1 kHz" : "48 kHz"
-    }
 }
 
 // Custom decoder so that adding a new property in a future version never
