@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # release.sh — Build, verify, package, and publish a WaxOn/WaxOff release.
 #
-# Usage: ./release.sh <version>
+# Usage: ./release.sh <version> [--allow-red-ci]
 #   e.g. ./release.sh 1.2.0
 #
 # Requires: xcodebuild, hdiutil, gh (GitHub CLI), git
@@ -11,13 +11,27 @@ set -euo pipefail
 REPO="sevmorris/WaxOnWaxOff"
 
 # ── Args ──────────────────────────────────────────────────────────────────────
-if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <version>"
+# One positional argument (the version) plus an optional flag in either position.
+# Anything else — including no arguments, or a second positional that isn't the
+# flag — still fails with usage, as it did before the flag existed.
+ALLOW_RED_CI=0
+ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --allow-red-ci) ALLOW_RED_CI=1 ;;
+        *)              ARGS+=("$arg") ;;
+    esac
+done
+
+if [[ ${#ARGS[@]} -ne 1 ]]; then
+    echo "Usage: $0 <version> [--allow-red-ci]"
     echo "  e.g. $0 1.2.0"
+    echo ""
+    echo "  --allow-red-ci  Release even when CI is not green for HEAD."
     exit 1
 fi
 
-VERSION="$1"
+VERSION="${ARGS[1]}"
 TAG="v${VERSION}"
 SCRIPT_DIR="${0:A:h}"
 PROJECT_DIR="$SCRIPT_DIR"
@@ -64,6 +78,70 @@ if git tag | grep -q "^${TAG}$"; then
     fail "Tag $TAG already exists — has this version been released?"
 fi
 ok "Tag $TAG is available"
+
+# ── CI gate ───────────────────────────────────────────────────────────────────
+# Refuse to cut a release from a commit CI has not proven green. This sits at the
+# end of preflight deliberately: everything below mutates or costs real time —
+# project.pbxproj is rewritten, the Xcode caches are cleared, a clean Release
+# build runs, the DMG is notarized, and the branch and tag are pushed. A red CI
+# should cost the operator one API call, not a notarization round-trip.
+#
+# HEAD is the right SHA to check. The working-tree-clean assertion above
+# guarantees HEAD fully describes what will be built, and the "Bump version" and
+# "docs: update download link" commits this script makes later do not exist yet —
+# so no run can exist for them. This gate proves the code CI tested is green; it
+# cannot vouch for those two release-mechanics commits, which reach CI only when
+# the push below triggers a fresh run.
+#
+# The filter is on the workflow's path, not its name: `name:` is a field inside
+# ci.yml that can be edited without anyone thinking about this gate. It is also
+# not optional — an unfiltered head_sha query also returns GitHub's built-in
+# "pages build and deployment" run, which is green on commits where CI is red.
+#
+# Multiple CI runs can exist for one SHA (a pull_request run and a push run, for
+# instance). The most recent by created_at wins.
+RELEASE_SHA=$(git rev-parse HEAD)
+step "Verifying CI for $RELEASE_SHA"
+
+# `gh` itself is already proven present by the tool loop above; authentication is not.
+CI_STATUS=""; CI_CONCLUSION=""; CI_URL=""; CI_PROBLEM=""; CI_RUN=""
+if ! gh auth status &>/dev/null; then
+    CI_PROBLEM="gh is not authenticated (run 'gh auth login')"
+elif ! CI_RUN=$(gh api "repos/${REPO}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100" \
+        --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml")]
+              | sort_by(.created_at) | last | select(. != null)
+              | "\(.status)\t\(.conclusion)\t\(.html_url)"' 2>/dev/null); then
+    CI_PROBLEM="could not query GitHub Actions — check network access and repository permissions"
+elif [[ -z "$CI_RUN" ]]; then
+    CI_PROBLEM="no CI run exists for this commit (has it been pushed to GitHub?)"
+else
+    CI_STATUS="${CI_RUN%%$'\t'*}"
+    CI_REST="${CI_RUN#*$'\t'}"
+    CI_CONCLUSION="${CI_REST%%$'\t'*}"
+    CI_URL="${CI_REST#*$'\t'}"
+    if [[ "$CI_STATUS" != "completed" ]]; then
+        CI_PROBLEM="CI has not finished — status '${CI_STATUS}', no conclusion yet"
+    elif [[ "$CI_CONCLUSION" != "success" ]]; then
+        CI_PROBLEM="CI concluded '${CI_CONCLUSION}'"
+    fi
+fi
+
+if [[ -n "$CI_PROBLEM" ]]; then
+    if (( ALLOW_RED_CI )); then
+        echo "\n  ⚠ --allow-red-ci — releasing past a failed CI gate" >&2
+        echo "      commit:  $RELEASE_SHA" >&2
+        echo "      reason:  $CI_PROBLEM" >&2
+        [[ -n "$CI_URL" ]] && echo "      run:     $CI_URL" >&2
+        ok "CI gate overridden"
+    else
+        echo "      commit:  $RELEASE_SHA" >&2
+        [[ -n "$CI_URL" ]] && echo "      run:     $CI_URL" >&2
+        fail "$CI_PROBLEM — refusing to release $TAG; re-run with --allow-red-ci to override"
+    fi
+else
+    ok "CI green for $RELEASE_SHA"
+    ok "$CI_URL"
+fi
 
 # ── Version bump ──────────────────────────────────────────────────────────────
 step "Bumping version to $VERSION"
