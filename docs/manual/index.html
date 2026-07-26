@@ -889,7 +889,7 @@
   <!-- File Stats -->
   <section id="file-stats">
     <h2>File Stats</h2>
-    <p>Selecting a file in either mode displays a stats strip below the waveform. Stats are computed asynchronously as files load and typically appear within a second or two of dropping a file in. After a file is processed, the strip switches to the output file's info and measurements, marked with an <strong>OUTPUT</strong> badge.</p>
+    <p>Selecting a file in either mode displays a stats strip below the waveform. Stats are computed asynchronously as files load, so the strip fills in after a file joins the list rather than on selection. Analysis reads each file end to end — integrated loudness can't be known without it — so longer files take longer, and a large batch is analyzed a few files at a time. After a file is processed, the strip switches to the output file's info and measurements, marked with an <strong>OUTPUT</strong> badge.</p>
     <p>The strip has two rows separated by a divider: file info on top, audio analysis below.</p>
 
     <h4>File Info Row</h4>
