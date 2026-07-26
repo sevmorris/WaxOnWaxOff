@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-private let loudnormLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "LoudnormMeasurements")
+nonisolated private let loudnormLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "LoudnormMeasurements")
 
 /// Pass-1 measurements emitted by FFmpeg's `loudnorm=…:print_format=json`,
 /// normalized to Doubles so callers don't re-parse them ad-hoc. Used by both

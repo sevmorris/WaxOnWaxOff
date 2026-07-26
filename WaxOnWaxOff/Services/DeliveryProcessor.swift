@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-private let deliveryProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
+nonisolated private let deliveryProcessorLogger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", category: "DeliveryProcessor")
 
 // MARK: - Batch types
 
@@ -17,7 +17,7 @@ struct DeliveryJobResult: Sendable {
     /// Callers should show the WAV as delivered and surface this message in the log.
     let mp3FailureMessage: String?
 
-    init(id: UUID, outputURLs: [URL], mp3FailureMessage: String? = nil) {
+    nonisolated init(id: UUID, outputURLs: [URL], mp3FailureMessage: String? = nil) {
         self.id = id
         self.outputURLs = outputURLs
         self.mp3FailureMessage = mp3FailureMessage
