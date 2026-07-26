@@ -96,6 +96,8 @@ App releases up to and including **v2.3.0** bundled a third-party static FFmpeg 
 
 ## Refresh after clone
 
+Requires **Xcode 26 or later (Swift 6.2+)** — see the build floor in the top-level `README.md`.
+
 ```bash
 ./scripts/fetch-ffmpeg.sh
 open WaxOnWaxOff.xcodeproj
