@@ -13,7 +13,17 @@ final class DeliveryViewModel {
         didSet { settings.save() }
     }
     var isProcessing = false
-    var deliveryPhase: String? = nil
+    /// Live processing phase per file, keyed by `FileItem.id`. Delivery runs
+    /// concurrently, so a single shared phase string would show whichever file
+    /// emitted last, attributed to none of them (#23). An entry goes in on
+    /// `onPhase` and comes out when that file reaches a terminal state —
+    /// completed or failed — not when the batch ends.
+    var filePhases: [UUID: String] = [:]
+    /// Completed verification passes for the current batch, or nil when none is
+    /// running. Batch-level, not per-file: a row reaches `.processed` when its
+    /// output is written, before its own verification runs, so verification
+    /// cannot be attributed to a row. No denominator — see `drainVerifications`.
+    var verificationsCompleted: Int? = nil
     var alertMessage: String?
     var showWaxoffWarning = false
     private var pendingWaxoffFiles: [URL] = []
@@ -192,6 +202,11 @@ final class DeliveryViewModel {
                     onFileCompleted: { [weak self] result in
                         guard let self else { return }
                         Task { @MainActor [self] in
+                            // Terminal state for this file: its phase entry goes
+                            // out here, not at batch end. Removed before the
+                            // status guard so a file with no output URL cannot
+                            // leave a stale entry behind.
+                            self.filePhases.removeValue(forKey: result.id)
                             guard let idx = self.files.firstIndex(where: { $0.id == result.id }),
                                   let primaryURL = result.outputURLs.first else { return }
                             self.files[idx].status = .processed(outputURL: primaryURL)
@@ -205,6 +220,9 @@ final class DeliveryViewModel {
                     onFileFailed: { [weak self] failure in
                         guard let self else { return }
                         Task { @MainActor [self] in
+                            // The other terminal state — same removal, or a
+                            // failed file keeps a phase on its row forever.
+                            self.filePhases.removeValue(forKey: failure.id)
                             guard let idx = self.files.firstIndex(where: { $0.id == failure.id }) else { return }
                             self.files[idx].status = .error("Processing failed — see Console")
                         }
@@ -213,7 +231,12 @@ final class DeliveryViewModel {
                         Task { @MainActor [weak self] in
                             guard let self,
                                   self.files.contains(where: { $0.id == id && $0.status == .processing }) else { return }
-                            self.deliveryPhase = phase
+                            self.filePhases[id] = phase
+                        }
+                    },
+                    onVerificationProgress: { [weak self] completed in
+                        Task { @MainActor [weak self] in
+                            self?.verificationsCompleted = completed
                         }
                     },
                     onLog: { [weak self] message, level in
@@ -247,7 +270,11 @@ final class DeliveryViewModel {
             }
 
             isProcessing = false
-            deliveryPhase = nil
+            verificationsCompleted = nil
+            // Safety net only. Phases are cleared per file on completion or
+            // failure above; this catches an entry orphaned by a path that
+            // reached neither — it is no longer what makes the readout correct.
+            filePhases.removeAll()
             processingTask = nil
         }
     }
@@ -257,7 +284,8 @@ final class DeliveryViewModel {
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
-        deliveryPhase = nil
+        verificationsCompleted = nil
+        filePhases.removeAll()
         fileQueue.restoreProcessingRowsAfterCancel()
     }
 }

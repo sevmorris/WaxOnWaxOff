@@ -171,14 +171,6 @@ struct WaxOffMainView: View {
                         FileInfoStatsView(file: file, applyFloorWarnings: false)
                     }
                     .padding()
-                } else if let phase = viewModel.deliveryPhase {
-                    VStack(spacing: 10) {
-                        ProgressView().scaleEffect(1.2)
-                        Text(phase)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack {
                         Image(systemName: "waveform")
