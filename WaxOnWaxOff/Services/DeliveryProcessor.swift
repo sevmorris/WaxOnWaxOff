@@ -52,6 +52,7 @@ actor DeliveryProcessor {
         onFileCompleted: (@Sendable (DeliveryJobResult) -> Void)? = nil,
         onFileFailed: (@Sendable (DeliveryJobFailure) -> Void)? = nil,
         onPhase: (@Sendable (UUID, String) -> Void)? = nil,
+        onVerificationProgress: (@Sendable (Int) -> Void)? = nil,
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
     ) async throws -> DeliveryBatchRunResult {
         guard !inputs.isEmpty else {
@@ -125,7 +126,8 @@ actor DeliveryProcessor {
             group.addTask {
                 try await Self.drainVerifications(
                     verificationStream,
-                    poolSize: ProcessingConfig.verificationConcurrency
+                    poolSize: ProcessingConfig.verificationConcurrency,
+                    onProgress: onVerificationProgress
                 )
                 return .drained
             }
@@ -155,16 +157,35 @@ actor DeliveryProcessor {
     /// Verifications never throw; the only throw path is cancellation, which
     /// stops un-started work at the checkCancellation gate while FFmpegRunner
     /// SIGTERMs any pass already in flight.
+    ///
+    /// `onProgress` reports the running count of completed passes — a count with
+    /// no denominator, deliberately. The batch's intended pass count is knowable
+    /// up front (`inputs.count` × 1 for .wav/.mp3, × 2 for .both), but the actual
+    /// count is not: an MP3 encode failure in .both mode queues the WAV pass and
+    /// not the MP3 one (see the partial-success return above), a file that throws
+    /// before either append queues none, and cancellation leaves un-started passes
+    /// unqueued. A denominator computed at entry would strand short of its total
+    /// on exactly those paths — reading as hung at the moment something has gone
+    /// wrong — so the readout counts up and stops.
+    ///
+    /// The counter is incremented only where completions are harvested, in the
+    /// group closure's sequential body, so it needs no lock. `waitForAll()` is
+    /// replaced by an explicit `next()` loop for the same reason: it is the only
+    /// way to observe each completion individually.
     private static func drainVerifications(
         _ stream: AsyncStream<DeferredVerification>,
-        poolSize: Int
+        poolSize: Int,
+        onProgress: (@Sendable (Int) -> Void)? = nil
     ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             var active = 0
+            var completed = 0
             for await verification in stream {
                 if active >= poolSize {
                     try await group.next()
                     active -= 1
+                    completed += 1
+                    onProgress?(completed)
                 }
                 group.addTask {
                     try Task.checkCancellation()
@@ -172,7 +193,10 @@ actor DeliveryProcessor {
                 }
                 active += 1
             }
-            try await group.waitForAll()
+            while try await group.next() != nil {
+                completed += 1
+                onProgress?(completed)
+            }
         }
     }
 
