@@ -87,6 +87,23 @@ struct WaxOffMainView: View {
 
             Spacer()
 
+            // Batch-level, and here rather than in the waveform pane on purpose.
+            // Verification runs after every row has already said Complete, so it
+            // belongs to the batch, not to a row; and the pane's fallback chain
+            // only renders when nothing is selected, so a readout placed there
+            // disappears the moment the user clicks a finished row. Sitting next
+            // to Cancel also puts it beside the control you would reach for if it
+            // looked stuck — which is the complaint that prompted #23.
+            if let completed = viewModel.verificationsCompleted {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Verifying delivered files… \(completed) done")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if viewModel.isProcessing {
                 Button {
                     viewModel.cancelProcessing()
@@ -219,7 +236,8 @@ private struct DeliveryFileListView: View {
                     file: file,
                     isProcessing: viewModel.isProcessing,
                     channelBadge: Self.upmixBadge(for: file),
-                    applyFloorWarnings: false
+                    applyFloorWarnings: false,
+                    phase: viewModel.filePhases[file.id]
                 )
                     .tag(file.id)
             }
