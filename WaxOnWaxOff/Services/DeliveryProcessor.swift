@@ -289,6 +289,26 @@ actor DeliveryProcessor {
         // pass-1 measurements; this is loudnorm reporting it after the fact.
         if let normalizationType {
             onLog?("  loudnorm: applied \(normalizationType) normalization", .verbose)
+
+            // Cross-check the prediction against the ground truth. Log only —
+            // never assert, and never fail on a mismatch.
+            //
+            // Agreement is expected for sources of 3 seconds or more. Below
+            // that, af_loudnorm.c:446-461 forces linear mode from the
+            // short-first-frame path, bypassing the init() predicate that
+            // predictsLinearMode models — so a sub-3s file disagreeing is
+            // correct behaviour on both sides, not a defect to be fixed.
+            if let m = measurements {
+                let predictedLinear = m.predictsLinearMode(
+                    targetLUFS: settings.targetLUFS,
+                    truePeakDB: settings.truePeak,
+                    lra: settings.lra
+                ) == nil
+                let actualLinear = normalizationType == "linear"
+                if predictedLinear != actualLinear {
+                    onLog?("  loudnorm: predicted \(predictedLinear ? "linear" : "dynamic"), applied \(normalizationType)", .verbose)
+                }
+            }
         }
 
         guard FileManager.default.fileExists(atPath: wavTempURL.path) else {
