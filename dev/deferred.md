@@ -26,21 +26,7 @@ actionable belongs in the issue tracker.
   `effectiveTimeoutSeconds` belt-and-suspenders is covered by the
   Session C tests.
 
-- **[perf-2026-07] Mixed-outcome batch with the verification pool** —
-  no integration test pins one file failing outright (e.g., unreadable
-  input) among successes in a WaxOff batch. Expected under the pool
-  design in `DeliveryProcessor.run`: the failed file contributes no
-  verifications, the successful files' "delivered" lines still all
-  arrive before `run()` returns, and the successes/failures split is
-  correct. Currently exercised only implicitly; the all-success and
-  cancellation paths are pinned by `DeliveryProcessorIntegrationTests`.
-
 ## Code hygiene
-
-- **`process(url:settings:onPhase:onLog:)` wrapper in
-  DeliveryProcessor** — only called by integration tests; silently
-  discards `mp3FailureMessage`. Candidate for retiring in favour of
-  `run()` in the tests once Both-mode partial-failure test is written.
 
 - **`import SwiftUI` in ContentViewModel and DeliveryViewModel** —
   pre-dates the 2.1.0 cycle; may be unused (verify with a compile
