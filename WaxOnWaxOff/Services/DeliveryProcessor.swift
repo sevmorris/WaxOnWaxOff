@@ -274,7 +274,7 @@ actor DeliveryProcessor {
         let wavTempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).wav")
         let wavFinalURL = outputDir.appendingPathComponent("\(outputStem).wav")
 
-        try await renderWAV(
+        let normalizationType = try await renderWAV(
             ffmpeg: ffmpeg,
             input: url,
             output: wavTempURL,
@@ -284,6 +284,12 @@ actor DeliveryProcessor {
             measurements: measurements,
             fileDuration: fileDuration
         )
+
+        // What pass 2 actually did. The warning above predicts this from the
+        // pass-1 measurements; this is loudnorm reporting it after the fact.
+        if let normalizationType {
+            onLog?("  loudnorm: applied \(normalizationType) normalization", .verbose)
+        }
 
         guard FileManager.default.fileExists(atPath: wavTempURL.path) else {
             throw DeliveryError.outputNotCreated
@@ -559,6 +565,13 @@ actor DeliveryProcessor {
         return m
     }
 
+    /// Renders the delivery WAV and returns loudnorm's own `normalization_type`
+    /// — `"linear"` or `"dynamic"`, verbatim from the pass-2 JSON block. Returns
+    /// nil when loudnorm did not run (silent input, so no measurements) or when
+    /// the block could not be parsed.
+    ///
+    /// This is what pass 2 actually did, as opposed to what
+    /// `predictsLinearMode` says it will do from the pass-1 measurements.
     private func renderWAV(
         ffmpeg: String,
         input: URL,
@@ -568,7 +581,7 @@ actor DeliveryProcessor {
         outputChannelCount: Int,
         measurements: LoudnormMeasurements?,
         fileDuration: TimeInterval?
-    ) async throws {
+    ) async throws -> String? {
         // A mono source delivered as stereo is upmixed to dual-mono first — matching the
         // analyzeAudio filter chain so measured_I / offset remain valid for the stereo
         // signal. (Skipped for true mono delivery; both passes then use the native channel.)
@@ -580,11 +593,19 @@ actor DeliveryProcessor {
         // resample in this filter chain. If you add one here, update analyzeAudio to apply the
         // same resample before its pass-1 analysis so measured_I / offset remain valid.
         if let m = measurements {
+            // print_format=json is appended here rather than inside
+            // linearPassFilter: that builder is shared with WaxOn, where it is
+            // fused into the loudnorm+limiter chain whose exact filter string
+            // AudioProcessorIntegrationTests asserts against. Keeping the option
+            // at this call site holds the change to WaxOff.
+            //
+            // loudnorm defaults print_format to NONE, so without this the pass-2
+            // block is never emitted at all — it is not merely discarded.
             filterChain += "," + m.linearPassFilter(
                 targetLUFS: settings.targetLUFS,
                 truePeakDB: settings.truePeak,
                 lra: settings.lra
-            )
+            ) + ":print_format=json"
         }
 
         // Brick-wall limiter as a safety backstop for inter-sample peaks that
@@ -612,7 +633,15 @@ actor DeliveryProcessor {
             output.path
         ]
 
-        try await FFmpegRunner.run(exe: ffmpeg, args: args, fileDuration: fileDuration)
+        // .capture rather than .run: both issue an identical launch with
+        // capture: .stderr — run simply drops the result on success. Nothing
+        // about the render itself changes.
+        let stderr = try await FFmpegRunner.capture(exe: ffmpeg, args: args, fileDuration: fileDuration)
+
+        // The JSON block reports lowercase "linear"/"dynamic" (af_loudnorm.c:877).
+        // Capitalised "Linear"/"Dynamic" belong to print_format=summary, which this
+        // call never requests and parseLoudnormJSON could not read anyway.
+        return FFmpegRunner.parseLoudnormJSON(from: stderr)?["normalization_type"]
     }
 
     /// `title` is the ID3 title to write. It must come from the delivered output's
