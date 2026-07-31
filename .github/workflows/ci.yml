@@ -13,7 +13,7 @@ jobs:
     # project requires — see the pin below for the real floor.
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
