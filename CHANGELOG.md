@@ -2,6 +2,18 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.5.1] — 2026-07-31
+
+Documentation and interface text only. No audio processing changed and no app behaviour changed — every edit in this release is text the app or the manual displays.
+
+**Documentation**
+- The manual (`docs/manual/index.html`) is rewritten in ASD-STE100 Simplified Technical English: short sentences, simple present, active voice, and one approved word for each meaning. Procedures, reference sections, and both processing pipelines are converted. Passages that explain *why* the app behaves as it does are deliberately kept as prose — Simplified Technical English states a mechanism well and carries an argument badly. The Theory of Operation (`docs/manual/theory.html`) is unchanged for the same reason
+- Long reference entries that would have crowded a settings table now sit in a short subsection below it, and the table cell points to it
+
+**Interface**
+- The in-app Help is rewritten in Simplified Technical English, matching the manual
+- Error messages and inline interface text are rewritten in Simplified Technical English. Two hedges are kept deliberately: the **Already Processed?** and **Already Delivered?** warnings still say a file *appears* to have been processed and that processing it again *may* degrade it, because that check reads filenames and can be wrong
+
 ## [2.5.0] — 2026-07-30
 
 **Diagnostics**
