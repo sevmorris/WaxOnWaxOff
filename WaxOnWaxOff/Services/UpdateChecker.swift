@@ -132,7 +132,7 @@ enum UpdateFetchError: LocalizedError {
         case .badResponse:
             return "Could not reach GitHub. Check your internet connection."
         case .rateLimited:
-            return "GitHub’s API rate limit was reached. Please try again in a little while."
+            return "WaxOn/WaxOff reached the GitHub API rate limit. Try again later."
         }
     }
 }
@@ -148,8 +148,8 @@ func checkForUpdates(silent: Bool = false) async {
     case .upToDate(let version):
         guard !silent else { return }
         let alert = NSAlert()
-        alert.messageText = "You're up to date"
-        alert.informativeText = "WaxOn/WaxOff \(version) is the latest version."
+        alert.messageText = "You have the latest version"
+        alert.informativeText = "WaxOn/WaxOff \(version) is installed."
         alert.addButton(withTitle: "OK")
         alert.runModal()
 

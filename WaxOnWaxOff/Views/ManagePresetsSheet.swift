@@ -70,7 +70,7 @@ private struct ManagePresetsShell: View {
                 .font(.headline)
 
             if presets.isEmpty {
-                Text("No custom presets yet. Use “Save Current Settings…” from the preset menu.")
+                Text("You have no custom presets. To save a preset, select “Save Current Settings…” from the Preset menu.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {

@@ -723,11 +723,11 @@ enum DeliveryError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .outputNotCreated:
-            return "Output file was not created."
+            return "WaxOff did not create the output file."
         case .processingFailed(let msg):
-            return "Processing failed: \(msg)"
+            return "The processing failed. \(msg)"
         case .encodingFailed(let msg):
-            return "MP3 encoding failed: \(msg)"
+            return "The MP3 encoding failed. \(msg)"
         }
     }
 }

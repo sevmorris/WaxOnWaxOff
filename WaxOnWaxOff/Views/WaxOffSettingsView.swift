@@ -43,7 +43,7 @@ struct WaxOffSettingsView: View {
                             Text("Both").tag(OutputMode.both)
                         }
                         .pickerStyle(.segmented)
-                        Text("Mono sources upmix to dual-mono stereo unless Mono delivery is selected")
+                        Text("WaxOff upmixes a mono source to dual-mono stereo. Mono delivery prevents the upmix.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

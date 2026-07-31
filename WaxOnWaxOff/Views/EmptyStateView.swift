@@ -10,7 +10,7 @@ struct EmptyStateView: View {
                 .foregroundStyle(Color.brandAccent.opacity(0.5))
 
             VStack(spacing: 8) {
-                Text("Drag and drop audio files here to get started.")
+                Text("Drag your audio files onto this window.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
