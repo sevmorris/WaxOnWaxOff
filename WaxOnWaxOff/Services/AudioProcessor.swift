@@ -302,6 +302,12 @@ actor AudioProcessor {
                 }
                 onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
                               measurements.targetOffset, measurements.inputI, target), .info)
+                // Detection only — does not alter the filter built below. WaxOn's
+                // LRA=20 makes the range condition unlikely, but the true-peak
+                // condition can still force dynamic normalization.
+                if let warning = measurements.dynamicFallbackWarning(targetLUFS: target, truePeakDB: tp, lra: 20) {
+                    onLog?(warning, .info)
+                }
                 onLog?("  loudnorm: normalizing…", .verbose)
 
                 // Fused into the final limiter chain below instead of rendered separately.

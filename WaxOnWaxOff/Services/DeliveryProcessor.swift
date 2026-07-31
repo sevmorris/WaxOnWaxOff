@@ -272,6 +272,18 @@ actor DeliveryProcessor {
             }
             onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
                           m.targetOffset, m.inputI, settings.targetLUFS), .info)
+            // Detection only — changes nothing about the pass-2 filter built
+            // below. loudnorm treats linear=true as a request it may refuse; the
+            // pass-1 measurements are enough to predict the refusal, so say so
+            // rather than delivering a quietly range-compressed file with no
+            // explanation.
+            if let warning = m.dynamicFallbackWarning(
+                targetLUFS: settings.targetLUFS,
+                truePeakDB: settings.truePeak,
+                lra: settings.lra
+            ) {
+                onLog?(warning, .info)
+            }
         } else {
             onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
         }
