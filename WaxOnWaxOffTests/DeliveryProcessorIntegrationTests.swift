@@ -307,6 +307,69 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "the processing log should record the MP3 encoding failure")
     }
 
+    /// Pass 2 reports which normalization loudnorm actually applied, and that
+    /// reaches the Console at Verbose. Guards the whole chain: the filter has
+    /// to carry `print_format=json` (loudnorm defaults it to NONE, emitting
+    /// nothing), the render has to capture stderr rather than discard it, and
+    /// the block has to parse.
+    ///
+    /// The assertion is only that a type was reported and that it is one of
+    /// loudnorm's two JSON spellings. It deliberately does NOT assert which
+    /// one, and does not check the value against `predictsLinearMode` —
+    /// prediction and actual are allowed to diverge, and pinning either would
+    /// make this test a statement about the source material rather than about
+    /// the plumbing.
+    ///
+    /// The fixture is 5 seconds, clear of the 3-second boundary at
+    /// af_loudnorm.c:446 below which loudnorm forces linear mode from its
+    /// short-first-frame path. The comparison there is strict (`<`), so 3.0
+    /// would technically pass — but a test sitting on that edge would be
+    /// pinning an implementation detail of FFmpeg's frame sizing.
+    func testDeliveryLogsLoudnormNormalizationTypeAtVerbose() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "norm_type.wav",
+            durationSeconds: 5.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .wav
+        settings.outputDirectoryPath = workDir.path
+
+        let collector = LogCollector()
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings,
+            onLog: { message, level in collector.append(message, level) }
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+
+        let verbose = collector.verboseMessages
+        let line = try XCTUnwrap(
+            verbose.first(where: { $0.contains("applied") && $0.contains("normalization") }),
+            "expected a Verbose line reporting the applied normalization type; got: \(verbose)")
+
+        XCTAssertTrue(line.contains("linear") || line.contains("dynamic"),
+                      "the reported type must be one of loudnorm's JSON spellings, got: \(line)")
+        // The capitalised forms belong to print_format=summary. Seeing one here
+        // would mean the wrong print format reached the filter.
+        XCTAssertFalse(line.contains("Linear") || line.contains("Dynamic"),
+                       "summary-format spelling in a JSON-format line: \(line)")
+
+        // Verbose-only: it must not reach the default Console view. Matched on
+        // the exact line rather than on the word "normalization", which also
+        // appears in #11's .info fallback warnings ("loudnorm will apply
+        // dynamic normalization…") — a sine source trips those via the
+        // measured-LRA sentinel.
+        XCTAssertFalse(collector.infoMessages.contains(line),
+                       "the normalization-type line must not appear at .info")
+    }
+
     // MARK: - Deferred verification (A1b, verification pool)
 
     /// Batch path: a file's completion callback fires at file-written and
@@ -691,6 +754,14 @@ nonisolated private final class LogCollector: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return lines.compactMap { line in
             if case .info = line.level { return line.message }
+            return nil
+        }
+    }
+
+    var verboseMessages: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return lines.compactMap { line in
+            if case .verbose = line.level { return line.message }
             return nil
         }
     }
