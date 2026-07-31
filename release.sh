@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # release.sh — Build, verify, package, and publish a WaxOn/WaxOff release.
 #
-# Usage: ./release.sh <version> [--allow-red-ci]
+# Usage: ./release.sh <version> [--allow-red-ci] [--generated-notes]
 #   e.g. ./release.sh 1.2.0
 #
 # Requires: xcodebuild, hdiutil, gh (GitHub CLI), git
@@ -11,23 +11,27 @@ set -euo pipefail
 REPO="sevmorris/WaxOnWaxOff"
 
 # ── Args ──────────────────────────────────────────────────────────────────────
-# One positional argument (the version) plus an optional flag in either position.
-# Anything else — including no arguments, or a second positional that isn't the
-# flag — still fails with usage, as it did before the flag existed.
+# One positional argument (the version) plus optional flags in any position.
+# Anything else — including no arguments, or a second positional that isn't a
+# flag — still fails with usage, as it did before the flags existed.
 ALLOW_RED_CI=0
+ALLOW_GENERATED_NOTES=0
 ARGS=()
 for arg in "$@"; do
     case "$arg" in
-        --allow-red-ci) ALLOW_RED_CI=1 ;;
-        *)              ARGS+=("$arg") ;;
+        --allow-red-ci)    ALLOW_RED_CI=1 ;;
+        --generated-notes) ALLOW_GENERATED_NOTES=1 ;;
+        *)                 ARGS+=("$arg") ;;
     esac
 done
 
 if [[ ${#ARGS[@]} -ne 1 ]]; then
-    echo "Usage: $0 <version> [--allow-red-ci]"
+    echo "Usage: $0 <version> [--allow-red-ci] [--generated-notes]"
     echo "  e.g. $0 1.2.0"
     echo ""
-    echo "  --allow-red-ci  Release even when CI is not green for HEAD."
+    echo "  --allow-red-ci     Release even when CI is not green for HEAD."
+    echo "  --generated-notes  Release without a curated release-notes file,"
+    echo "                     generating notes from commit subjects instead."
     exit 1
 fi
 
@@ -44,6 +48,7 @@ DMG="/tmp/WaxOnWaxOff-${TAG}.dmg"
 MOUNT="/tmp/waxon_verify_${VERSION}"
 MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
 LANDING_IDX="$PROJECT_DIR/docs/index.html"
+NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step()  { echo "\n▶ $*"; }
@@ -78,6 +83,28 @@ if git tag | grep -q "^${TAG}$"; then
     fail "Tag $TAG already exists — has this version been released?"
 fi
 ok "Tag $TAG is available"
+
+# ── Release-notes gate ────────────────────────────────────────────────────────
+# The notes are read much later, at the GitHub-release step — by which point the
+# branch and the tag have both been pushed. Failing there would strand a pushed
+# tag with no release behind it, so the absence has to be caught here, while
+# nothing has been mutated and nothing has left the machine.
+#
+# Without this, a forgotten notes file is invisible: the curated path announces
+# itself, the generated path says nothing, and both end on the same "Release
+# published" line. Shipping auto-generated notes becomes a silent default rather
+# than a decision.
+if [[ -f "$NOTES_FILE" ]]; then
+    ok "Curated notes present: release-notes/${TAG}.md"
+elif (( ALLOW_GENERATED_NOTES )); then
+    echo "\n  ⚠ --generated-notes — publishing $TAG without curated notes" >&2
+    echo "      expected:  release-notes/${TAG}.md" >&2
+    echo "      notes will be generated from commit subjects since the last tag" >&2
+    ok "Generated notes accepted"
+else
+    echo "      expected:  release-notes/${TAG}.md" >&2
+    fail "No curated notes for $TAG — write that file, or re-run with --generated-notes"
+fi
 
 # ── CI gate ───────────────────────────────────────────────────────────────────
 # Refuse to cut a release from a commit CI has not proven green. This sits at the
@@ -332,7 +359,10 @@ step "Creating GitHub release"
 # commit list. Use it when the release needs prose the log can't produce —
 # licensing notes, a known-gap disclosure, an explanation of what changed and
 # what deliberately didn't. Without one, fall back to subjects since the last tag.
-NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
+#
+# NOTES_FILE is defined with the other paths and its absence is gated in
+# preflight, so reaching the generated branch here means --generated-notes was
+# passed deliberately.
 if [[ -f "$NOTES_FILE" ]]; then
     ok "Using curated notes: release-notes/${TAG}.md"
     gh release create "$TAG" "$DMG" \
