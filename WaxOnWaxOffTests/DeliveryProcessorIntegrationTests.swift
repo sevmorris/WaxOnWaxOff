@@ -106,6 +106,38 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                        "MP3 encode may drift slightly from WAV; allow wider tolerance")
     }
 
+    /// In MP3-only mode the encoder's input is the temp WAV, named
+    /// `{outputStem}.{8-hex}.wav`. Deriving the ID3 title from that filename left
+    /// the UUID fragment in the tag, which then ships to the podcast feed. The
+    /// title must track the delivered stem, identically in both output modes.
+    func testMP3OnlyTitleTagHasNoTempUUIDFragment() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "wax_off_title_in.wav",
+            durationSeconds: 4.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
+
+        let title = try await titleTag(ffprobe: tools.ffprobe, of: mp3)
+        let expected = mp3.deletingPathExtension().lastPathComponent
+
+        XCTAssertEqual(title, expected,
+                       "MP3-only title must equal the delivered stem, not the temp source's name")
+        XCTAssertFalse(title.contains("."),
+                       "A '.' in the title means a temp UUID fragment survived: \(title)")
+    }
+
     /// The post-render verification pass logs a "delivered … LUFS · … dBTP"
     /// info line for the WAV output (wav-only path).
     func testVerificationLogsDeliveredLineForWAV() async throws {
@@ -459,6 +491,15 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         let dict = try XCTUnwrap(FFmpegRunner.parseLoudnormJSON(from: stderr))
         let inputI = try XCTUnwrap(dict["input_i"])
         return try XCTUnwrap(Double(inputI))
+    }
+
+    /// ID3 title tag via ffprobe.
+    private func titleTag(ffprobe: String, of url: URL) async throws -> String {
+        let out = try await FFmpegRunner.captureStdout(exe: ffprobe, args: [
+            "-v", "error", "-show_entries", "format_tags=title",
+            "-of", "default=nw=1:nk=1", url.path
+        ])
+        return out.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Channel count of audio stream a:0 via ffprobe.
