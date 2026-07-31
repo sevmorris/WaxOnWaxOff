@@ -50,6 +50,11 @@ MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
 LANDING_IDX="$PROJECT_DIR/docs/index.html"
 NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
 
+# Set once project.pbxproj has been rewritten in place and cleared once that
+# rewrite is committed. While it is 1 the working tree carries an uncommitted
+# version bump, and the EXIT trap reverts it.
+BUMP_ACTIVE=0
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step()  { echo "\n▶ $*"; }
 ok()    { echo "  ✓ $*"; }
@@ -57,7 +62,18 @@ fail()  { echo "\n  ✗ $*" >&2; exit 1; }
 
 cleanup() {
     # Uses ${VAR:-} so the trap fires cleanly even if the script exits before
-    # the path variables are defined (e.g. early exit on argument-error).
+    # the path variables are defined (e.g. early exit on argument-error). A bare
+    # (( BUMP_ACTIVE )) would trip `set -u` on those early exits, hence the :-0.
+    #
+    # The version bump is written to project.pbxproj long before it is committed,
+    # so any failure in that window would otherwise leave the bump stranded in the
+    # working tree — and the dirty-tree preflight then blocks the next run until
+    # someone reverts it by hand. Reverting the whole file is safe precisely
+    # because preflight proved the tree clean at entry: the script's own two seds
+    # are the only changes present, so there is nothing else here to discard.
+    if (( ${BUMP_ACTIVE:-0} )); then
+        git -C "${PROJECT_DIR:-.}" checkout -- "${PROJECT:-}/project.pbxproj" 2>/dev/null || true
+    fi
     [[ -d "${STAGING:-}" ]]      && rm -rf -- "$STAGING"      || true
     [[ -d "${MOUNT:-}" ]]        && rm -rf -- "$MOUNT"        || true
     [[ -d "${DERIVED_DATA:-}" ]] && rm -rf -- "$DERIVED_DATA" || true
@@ -204,6 +220,11 @@ sed -i '' "s/CURRENT_PROJECT_VERSION = ${BUILD_NUM};/CURRENT_PROJECT_VERSION = $
     "$PROJECT/project.pbxproj"
 ok "Build number ${BUILD_NUM} → ${NEXT_BUILD} (commit deferred until after notarization)"
 
+# Both seds have now run, so project.pbxproj is dirty. Arm the trap: from here
+# until the commit below, any exit — a fail, a set -e abort, an interrupt —
+# restores the file.
+BUMP_ACTIVE=1
+
 step "Fetching FFmpeg binaries"
 chmod +x "$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
 "$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
@@ -270,10 +291,9 @@ ok "Created $(du -sh $DMG | cut -f1) DMG"
 step "Notarizing DMG"
 # Assumes a profile named 'WoWoNotary' exists.
 # Setup: xcrun notarytool store-credentials WoWoNotary --apple-id <email> --team-id T9RLNAXPWU
-# If notarization fails, revert the version-number changes so the working tree
-# is clean and no stranded "Bump version" commit is left on the branch.
+# The version-number changes are reverted by the EXIT trap, which owns that job
+# for every failure in the window, not just this one.
 if ! xcrun notarytool submit "$DMG" --wait --keychain-profile "WoWoNotary"; then
-    git checkout -- "$PROJECT/project.pbxproj"
     fail "Notarization failed — version changes in project.pbxproj have been reverted"
 fi
 xcrun stapler staple "$DMG"
@@ -301,6 +321,12 @@ if [[ -n "$(git status --short -- "$PROJECT/project.pbxproj")" ]]; then
 else
     ok "project.pbxproj unchanged — nothing to commit"
 fi
+# Disarm: the bump is committed (or there was nothing to commit), so the working
+# tree no longer carries it and the trap must not revert on a successful exit.
+# Placed after the `fi` so a failing `git add`/`git commit` still leaves the trap
+# armed — those exit with the bump uncommitted, which is exactly the case it
+# exists for.
+BUMP_ACTIVE=0
 
 # ── Update docs (README + manual) to point at the new version ────────────────
 # Per project convention: rewrite unconditionally and let `git status --porcelain`
