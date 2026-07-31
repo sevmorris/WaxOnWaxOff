@@ -620,7 +620,7 @@
         <tr>
           <td>Channels</td>
           <td>Mono · Stereo</td>
-          <td>Stereo passes a stereo source's two channels through unchanged; sources with more or fewer channels are converted to two by FFmpeg's default matrix. Mono extracts a single channel from a stereo source.</td>
+          <td>Stereo passes a stereo source's two channels through unchanged; sources with more or fewer channels are converted to two by FFmpeg's default matrix. A warning is logged. Mono extracts a single channel from a stereo source.</td>
         </tr>
         <tr>
           <td>Channel</td>
@@ -881,6 +881,9 @@
 
     <h3>Channels</h3>
     <p>WaxOff outputs stereo (2-channel) by default. Mono input is accepted — by default it is upmixed to dual-mono stereo before processing, but the <strong>Channels</strong> control in WaxOff Settings can instead deliver a mono source as a true single channel. Stereo sources always remain stereo; the control has no effect on them.</p>
+
+    <h3>Metadata</h3>
+    <p>WaxOff copies the metadata from the source file to the output files. WaxOff replaces the title tag with the name of the delivered file. The source title tag is frequently an old working name.</p>
 
     <h3>Location</h3>
     <p>Output files are written alongside the source by default. If a custom output directory is configured, all files go there. If neither location is writable, WaxOff falls back to <code>~/Music/WaxOnWaxOff/</code> — and if that folder can't be created or written, to the Desktop as a last resort (with a confirmation if more than one file in the batch would land there). Existing files with the same name are overwritten.</p>

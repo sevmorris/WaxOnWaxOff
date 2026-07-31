@@ -272,6 +272,18 @@ actor DeliveryProcessor {
             }
             onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
                           m.targetOffset, m.inputI, settings.targetLUFS), .info)
+            // Detection only — changes nothing about the pass-2 filter built
+            // below. loudnorm treats linear=true as a request it may refuse; the
+            // pass-1 measurements are enough to predict the refusal, so say so
+            // rather than delivering a quietly range-compressed file with no
+            // explanation.
+            if let warning = m.dynamicFallbackWarning(
+                targetLUFS: settings.targetLUFS,
+                truePeakDB: settings.truePeak,
+                lra: settings.lra
+            ) {
+                onLog?(warning, .info)
+            }
         } else {
             onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
         }
@@ -339,6 +351,7 @@ actor DeliveryProcessor {
                     ffmpeg: ffmpeg,
                     input: sourceForMP3,
                     output: mp3TempURL,
+                    title: outputStem,
                     settings: settings,
                     outputChannelCount: outputChannelCount,
                     fileDuration: fileDuration
@@ -624,10 +637,15 @@ actor DeliveryProcessor {
         try await FFmpegRunner.run(exe: ffmpeg, args: args, fileDuration: fileDuration)
     }
 
+    /// `title` is the ID3 title to write. It must come from the delivered output's
+    /// stem, not from `input`: in MP3-only mode `input` is the temp WAV, named
+    /// `{outputStem}.{8-hex}.wav`, and `deletingPathExtension()` strips only the
+    /// `.wav` — leaving the UUID fragment in the tag that ships to the podcast feed.
     private func encodeMP3(
         ffmpeg: String,
         input: URL,
         output: URL,
+        title: String,
         settings: WaxOffSettings,
         outputChannelCount: Int,
         fileDuration: TimeInterval?
@@ -647,7 +665,6 @@ actor DeliveryProcessor {
             FFmpegFilters.aresample(to: mp3SampleRate)
         ].joined(separator: ",")
 
-        let title = input.deletingPathExtension().lastPathComponent
         let args = [
             "-hide_banner", "-nostats", "-y",
             "-i", input.path,
