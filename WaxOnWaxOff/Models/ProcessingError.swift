@@ -40,11 +40,11 @@ enum ProcessingError: LocalizedError {
         case .ffmpegNotFound:
             return "FFmpeg executable not found"
         case .ffmpegFailed(let code, let message):
-            return "FFmpeg failed (\(code)): \(message)"
+            return "FFmpeg failed with code \(code). \(message)"
         case .outputMissing:
-            return "Processing produced no output"
+            return "Processing produced no output file."
         case .analysisError(let message):
-            return "Audio analysis failed: \(message)"
+            return "The audio analysis failed. \(message)"
         }
     }
 }
