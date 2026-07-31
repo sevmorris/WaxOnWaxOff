@@ -1,7 +1,7 @@
 import XCTest
 @testable import WaxOnWaxOff
 
-/// End-to-end WaxOff tests — drive `DeliveryProcessor.process` against a
+/// End-to-end WaxOff tests — drive `DeliveryProcessor.run` against a
 /// generated input, then re-measure the rendered output with loudnorm to
 /// verify the configured target was actually reached. Requires the bundled
 /// FFmpeg binaries (see `scripts/fetch-ffmpeg.sh`).
@@ -42,7 +42,14 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         settings.outputMode = .wav
         settings.outputDirectoryPath = workDir.path
 
-        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertNil(job.mp3FailureMessage, "no MP3 sub-failure expected here")
+        let outputs = job.outputURLs
         let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
 
         let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: wav)
@@ -71,7 +78,14 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         settings.mp3Bitrate = 160
         settings.outputDirectoryPath = workDir.path
 
-        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertNil(job.mp3FailureMessage, "no MP3 sub-failure expected here")
+        let outputs = job.outputURLs
         XCTAssertEqual(outputs.count, 2)
         XCTAssertTrue(outputs.contains(where: { $0.pathExtension == "wav" }))
         XCTAssertTrue(outputs.contains(where: { $0.pathExtension == "mp3" }))
@@ -98,7 +112,14 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         settings.mp3Bitrate = 160
         settings.outputDirectoryPath = workDir.path
 
-        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertNil(job.mp3FailureMessage, "no MP3 sub-failure expected here")
+        let outputs = job.outputURLs
         let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
 
         let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: mp3)
@@ -126,7 +147,14 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         settings.outputMode = .mp3
         settings.outputDirectoryPath = workDir.path
 
-        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertNil(job.mp3FailureMessage, "no MP3 sub-failure expected here")
+        let outputs = job.outputURLs
         let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
 
         let title = try await titleTag(ffprobe: tools.ffprobe, of: mp3)
@@ -401,7 +429,14 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         settings.monoDelivery = true
         settings.outputDirectoryPath = workDir.path
 
-        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertNil(job.mp3FailureMessage, "no MP3 sub-failure expected here")
+        let outputs = job.outputURLs
         let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
         let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
 
@@ -431,7 +466,14 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         settings.monoDelivery = false   // default
         settings.outputDirectoryPath = workDir.path
 
-        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertNil(job.mp3FailureMessage, "no MP3 sub-failure expected here")
+        let outputs = job.outputURLs
         let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
 
         let wavChannels = try await channelCount(ffprobe: tools.ffprobe, of: wav)
@@ -457,7 +499,14 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         settings.monoDelivery = true    // on, but must be ignored for a stereo source
         settings.outputDirectoryPath = workDir.path
 
-        let outputs = try await DeliveryProcessor().process(url: input, settings: settings)
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertNil(job.mp3FailureMessage, "no MP3 sub-failure expected here")
+        let outputs = job.outputURLs
         let wav = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "wav" }))
 
         let wavChannels = try await channelCount(ffprobe: tools.ffprobe, of: wav)
@@ -466,16 +515,18 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
 
     // MARK: -
 
-    /// Drives `DeliveryProcessor.process` while capturing the processing-log
+    /// Drives `DeliveryProcessor.run` while capturing the processing-log
     /// stream, returning the produced outputs and the info-level log messages.
     private func runCapturingLog(input: URL, settings: WaxOffSettings) async throws -> (outputs: [URL], info: [String]) {
         let collector = LogCollector()
-        let outputs = try await DeliveryProcessor().process(
-            url: input,
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
             settings: settings,
             onLog: { message, level in collector.append(message, level) }
         )
-        return (outputs, collector.infoMessages)
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail")
+        let job = try XCTUnwrap(result.successes.first)
+        return (job.outputURLs, collector.infoMessages)
     }
 
     /// Re-runs loudnorm pass-1 analysis on the given file and returns the

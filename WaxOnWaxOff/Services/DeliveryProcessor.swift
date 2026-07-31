@@ -200,28 +200,6 @@ actor DeliveryProcessor {
         }
     }
 
-    func process(
-        url: URL,
-        settings: WaxOffSettings,
-        onPhase: (@Sendable (String) -> Void)? = nil,
-        onLog: (@Sendable (String, LogLevel) -> Void)? = nil
-    ) async throws -> [URL] {
-        let tools = try await FFmpegManager.shared.ensureTools()
-        let lufsTag = formatNumber(settings.targetLUFS)
-        let allocator = OutputAllocator { [lufsTag] input in
-            "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
-        }
-        let (outputs, _, verifications) = try await process(url: url, settings: settings, tools: tools, allocator: allocator, onPhase: onPhase, onLog: onLog)
-        // Single-file entry point: run the deferred verifications before
-        // returning so callers (and tests) still observe the "delivered" log
-        // lines within the call, matching the batch path's guarantee that
-        // verification completes before the run is reported finished.
-        for verification in verifications {
-            await verification()
-        }
-        return outputs
-    }
-
     private func process(
         url: URL,
         settings: WaxOffSettings,
