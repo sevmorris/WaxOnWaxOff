@@ -19,14 +19,15 @@ struct HelpView: View {
 
                 section("Overview") {
                     text("""
-                    WaxOn/WaxOff is a two-mode podcast audio tool for macOS on Apple Silicon \
-                    (M-series) Macs. Both modes share the same drag-and-drop file workflow, \
-                    waveform viewer, and stats panel — they differ in what they do to your audio.
+                    WaxOn/WaxOff is a podcast audio tool for macOS. It has two modes. It \
+                    operates on Apple Silicon (M-series) Macs. Both modes use the same file \
+                    workflow, waveform viewer, and stats panel. The two modes are different in \
+                    what they do to your audio.
                     """)
                     text("""
-                    Switch modes at any time using the WaxOn | WaxOff buttons in the top \
-                    left of the window. Each mode keeps its own independent file list, so \
-                    switching doesn't disturb your work in the other mode.
+                    You can change the mode at any time. Use the WaxOn and WaxOff buttons \
+                    in the top left of the window. Each mode keeps its own file list. A change \
+                    of mode does not disturb your work in the other mode.
                     """)
                 }
 
@@ -34,19 +35,19 @@ struct HelpView: View {
 
                 section("WaxOn — Raw Recording Prep") {
                     text("""
-                    Use WaxOn on raw recordings before editing. It conditions the signal — \
-                    removing low-frequency rumble, controlling peak level, and optionally \
-                    normalizing loudness — and outputs a clean 24-bit WAV ready to drop \
-                    into Logic Pro or any other editor. It does not denoise the exported \
-                    file; RNNoise is used only inside the loudness analysis path when \
-                    Loudness Norm is on (see the online Theory of Operation).
+                    Use WaxOn on your raw recordings before you edit them. WaxOn removes \
+                    low-frequency rumble. WaxOn controls the peak level. WaxOn can also \
+                    normalize the loudness. The output is a 24-bit WAV file for Logic Pro or a \
+                    different editor. WaxOn does not remove noise from the output file. When \
+                    Loudness Norm is on, WaxOn uses RNNoise only in the loudness analysis. For \
+                    more data, refer to the online Theory of Operation.
                     """)
                 }
                 section("WaxOn — Quick Start") {
                     steps([
-                        "Set sample rate and output channels in Settings; toggles and knobs are in the control bar.",
-                        "Drag audio files onto the window (or the file list).",
-                        "Click Process. Output files appear alongside the originals."
+                        "Set the sample rate and the output channels in Settings. The toggles and the knobs are in the control bar.",
+                        "Drag your audio files onto the window or onto the file list.",
+                        "Click Process. WaxOn writes the output files to the folder of the source files."
                     ])
                 }
                 section("WaxOn — Output Naming") {
@@ -55,42 +56,43 @@ struct HelpView: View {
                 }
                 section("WaxOn — Processing Pipeline") {
                     numberedList([
-                        "High-pass filter — On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.",
-                        "Channel handling — mono extracts left/right (or downmixes multichannel sources); stereo passes a stereo source's two channels through (other channel counts are converted to two via FFmpeg's default matrix). The app writes a warning to the console.",
-                        "Optional phase rotation — 200 Hz allpass (default on).",
-                        "Resampling to the target sample rate.",
-                        "Dynamic leveling (if enabled) — dynaudnorm for panel recordings and multi-voice sources. Not recommended for solo voice.",
-                        "Loudness normalization (if enabled) — two-pass EBU R128 analysis, then linear gain (loudnorm can revert to dynamic normalization if true-peak headroom doesn't allow a constant gain). Pass 1 may use internal RNNoise for measurement accuracy only.",
-                        "True-peak control — always on: 2× oversampled limiting at a fixed −1.0 dBTP when Loudness Norm is on, downward-only linear peak normalization when off."
+                        "High-pass filter. On uses 80 Hz. Off uses a 20 Hz DC floor. WaxOn always removes the DC offset.",
+                        "Channel handling. Mono extracts the left channel or the right channel. Mono downmixes a multichannel source. Stereo sends the two channels of a stereo source through with no change. For a different channel count, FFmpeg converts the source to two channels with its default matrix. The app writes a warning to the console.",
+                        "Phase rotation is optional. It is a 200 Hz allpass filter. The default is on.",
+                        "WaxOn resamples the audio to the target sample rate.",
+                        "Dynamic Leveling is optional. It uses dynaudnorm. Use it for panel recordings and multi-voice sources. Do not use it for a solo voice.",
+                        "Loudness normalization is optional. WaxOn does an EBU R128 analysis in two passes. WaxOn then applies a linear gain. If the true-peak headroom does not permit a constant gain, loudnorm applies dynamic normalization instead. Pass 1 can use internal RNNoise. RNNoise improves the accuracy of the measurement only.",
+                        "True-peak control is always on. When Loudness Norm is on, WaxOn applies 2× oversampled limiting at a fixed −1.0 dBTP. When Loudness Norm is off, WaxOn applies downward-only linear peak normalization."
                     ])
                     text("Output: 24-bit WAV.")
                 }
                 section("WaxOn — Settings") {
-                    definition("Sample Rate", "44.1 kHz or 48 kHz. Match your DAW project setting.")
-                    definition("Channels", "Mono or Stereo. Mono extracts a single channel; Stereo passes a stereo source's two channels through unchanged (other channel counts are converted to two via FFmpeg's default matrix). The app writes a warning to the console.")
-                    definition("Channel", "Left or Right — which channel to extract in Mono mode.")
-                    definition("High Pass", "On (80 Hz) removes rumble and proximity-effect bass; Off uses a 20 Hz DC floor only. DC offset is always removed.")
-                    definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. On by default.")
-                    definition("Dynamic Leveling", "Enables dynaudnorm. Lifts quiet voices and tames loud ones. Best for panel recordings, live Q&As, or multi-guest interviews — not for regular solo voice use. Strength controls how quickly and strongly the leveling responds.")
-                    definition("Loudness Norm", "Enables EBU R128 loudness normalization. When off, only filtering and downward-only peak normalization are applied.")
-                    definition("Target", "Integrated loudness target when Loudness Norm is on. Default −30 LUFS, range −35 to −16 LUFS. Lower values leave more headroom for editing.")
-                    definition("Output Dir", "Where processed files are saved. Defaults to the same folder as the source.")
+                    definition("Sample Rate", "Select 44.1 kHz or 48 kHz. Use the same value as your DAW project.")
+                    definition("Channels", "Select Mono or Stereo. Mono extracts one channel. Stereo sends the two channels of a stereo source through with no change. For a different channel count, FFmpeg converts the source to two channels with its default matrix. The app writes a warning to the console.")
+                    definition("Channel", "Select Left or Right. This is the channel that WaxOn extracts in Mono mode.")
+                    definition("High Pass", "On uses 80 Hz. It removes rumble and proximity-effect bass. Off uses a 20 Hz DC floor only. WaxOn always removes the DC offset.")
+                    definition("Phase Rotation", "WaxOn applies a 200 Hz allpass filter before normalization. The filter reduces the crest factor on asymmetric voice recordings. This gives 1–4 dB more headroom before the limiter. You cannot hear an effect on the audio character. The default is on.")
+                    definition("Dynamic Leveling", "This setting turns on dynaudnorm. It increases the level of quiet voices. It decreases the level of loud voices. Use it for panel recordings, live Q&As, or multi-guest interviews. Do not use it for a solo voice. Strength controls the speed and the quantity of the adjustment.")
+                    definition("Loudness Norm", "This setting turns on EBU R128 loudness normalization. When it is off, WaxOn applies only the filters and downward-only peak normalization.")
+                    definition("Target", "This is the integrated loudness target when Loudness Norm is on. The default is −30 LUFS. The range is −35 to −16 LUFS. A lower value gives more headroom for editing.")
+                    definition("Output Dir", "This is the folder for the output files. The default is the folder of the source file.")
                 }
 
                 dividerRow
 
                 section("WaxOff — Delivery & Mastering") {
                     text("""
-                    Use WaxOff on your finished, edited mix. It applies broadcast-standard \
-                    EBU R128 loudness normalization and delivers the result as 24-bit WAV, \
-                    MP3, or both — ready to upload to your podcast host.
+                    Use WaxOff on your finished mix. WaxOff applies broadcast-standard EBU \
+                    R128 loudness normalization. WaxOff delivers the result as a 24-bit WAV \
+                    file, an MP3 file, or both. You can then upload the files to your podcast \
+                    host.
                     """)
                 }
                 section("WaxOff — Quick Start") {
                     steps([
-                        "Select a preset from the menu in the header, or dial in your own settings.",
+                        "Select a preset from the menu in the header. As an alternative, set your own values.",
                         "Drag your finished mix file onto the window.",
-                        "Click Process. Output files appear alongside the original."
+                        "Click Process. WaxOff writes the output files to the folder of the source file."
                     ])
                 }
                 section("WaxOff — Output Naming") {
@@ -99,35 +101,35 @@ struct HelpView: View {
                 }
                 section("WaxOff — Processing Pipeline") {
                     numberedList([
-                        "Analysis pass — the audio runs through a 200 Hz allpass (phase rotation) and then FFmpeg's loudnorm filter, which measures integrated loudness, true peak, and loudness range. A mono source is upmixed to dual-mono stereo at the head of this chain, ahead of the allpass, unless Mono delivery is selected.",
-                        "Normalization pass — the same chain runs again with the measured values and a single linear gain. The 200 Hz allpass runs here too, so the render matches what was measured. In this linear mode there is no dynamic processing and the stereo image and transients are unchanged. If the mix's loudness range exceeds 9 LU (a fixed internal value), or linear gain would breach the true-peak ceiling, loudnorm instead reverts to dynamic normalization for that file — which lands slightly under target and reduces the loudness range.",
-                        "Brick-wall limiter — a 2× oversampled true-peak limiter at your True Peak ceiling, as a safety backstop for inter-sample peaks loudnorm's linear mode missed. On a well-mixed source it doesn't engage.",
-                        "MP3 encoding (if Output is MP3 or Both) — the normalized WAV is encoded with libmp3lame at the chosen bitrate, through a separate pre-encode limiter set 1 dB below your True Peak to absorb lossy-decode overshoot. Always 44.1 kHz."
+                        "Analysis pass. The audio goes through a 200 Hz allpass filter for phase rotation. The audio then goes through the FFmpeg loudnorm filter. The loudnorm filter measures the integrated loudness, the true peak, and the loudness range. If you do not select Mono delivery, WaxOff upmixes a mono source to dual-mono stereo. The upmix occurs at the start of the chain, before the allpass filter.",
+                        "Normalization pass. The same chain runs again with the measured values and one linear gain. The 200 Hz allpass filter runs here also. Thus the output agrees with the measurement. In linear mode there is no dynamic processing. The stereo image and the transients do not change. WaxOff uses a fixed internal loudness range of 9 LU. If the loudness range of the mix is more than 9 LU, loudnorm applies dynamic normalization instead. If a linear gain would go past the true-peak ceiling, loudnorm also applies dynamic normalization instead. The result is below the target and has a smaller loudness range.",
+                        "Brick-wall limiter. This is a 2× oversampled true-peak limiter at your True Peak ceiling. It catches the inter-sample peaks that the loudnorm linear mode did not find. On a well-mixed source the limiter does not operate.",
+                        "MP3 encoding occurs when Output is MP3 or Both. WaxOff encodes the normalized WAV file with libmp3lame at the selected bitrate. A separate limiter operates before the encoder. This limiter is 1 dB below your True Peak. It absorbs the overshoot from the lossy decode. The MP3 sample rate is always 44.1 kHz."
                     ])
-                    text("Output: 24-bit WAV at the chosen sample rate, and/or MP3 — stereo by default, or a single channel when Mono delivery is selected for a mono source.")
+                    text("Output: a 24-bit WAV file at the selected sample rate, an MP3 file, or both. The default is stereo. If you select Mono delivery for a mono source, the output has one channel.")
                 }
                 section("WaxOff — Settings") {
-                    definition("Preset", "Applies a saved group of settings in one click. Three built-in presets are included; you can save your own via the Preset menu.")
-                    definition("Sample Rate", "44.1 kHz or 48 kHz for the output WAV. MP3 is always encoded at 44.1 kHz regardless of this setting, so the control is grayed out when Output is MP3 only.")
-                    definition("Output", "WAV only, MP3 only, or both. WAV is always 24-bit PCM.")
-                    definition("Channels", "Mono or Stereo delivery for mono sources. Stereo (default) upmixes a mono source to dual-mono; Mono delivers a true single channel instead. Available only when every loaded source is mono; never downmixes a stereo source.")
-                    definition("MP3 Bitrate", "CBR bitrate for MP3 output: 128, 160, or 192 kbps. Grayed out when Output is WAV only.")
-                    definition("True Peak", "Maximum true peak ceiling: −3.0 to −0.5 dBTP. −1.0 dBTP is the standard for podcast streaming platforms.")
-                    definition("Target LUFS", "Integrated loudness target: −24 to −14 LUFS. −18 LUFS is the podcast standard; −16 LUFS gives a louder result.")
-                    definition("Output Dir", "Where output files are saved. Defaults to the same folder as the source.")
+                    definition("Preset", "A preset applies a saved group of settings with one click. The app includes three built-in presets. You can save your own presets from the Preset menu.")
+                    definition("Sample Rate", "Select 44.1 kHz or 48 kHz for the output WAV file. WaxOff always encodes MP3 at 44.1 kHz. This setting has no effect on the MP3 file. The control is not available when Output is MP3 only.")
+                    definition("Output", "Select WAV only, MP3 only, or both. The WAV file is always 24-bit PCM.")
+                    definition("Channels", "Select Mono or Stereo delivery for mono sources. Stereo is the default. Stereo upmixes a mono source to dual-mono stereo. Mono delivers one channel. The control is available only when all the loaded sources are mono. WaxOff does not downmix a stereo source.")
+                    definition("MP3 Bitrate", "Select the CBR bitrate for the MP3 output: 128, 160, or 192 kbps. The control is not available when Output is WAV only.")
+                    definition("True Peak", "This is the maximum true-peak ceiling. The range is −3.0 to −0.5 dBTP. Podcast streaming platforms use −1.0 dBTP as the standard.")
+                    definition("Target LUFS", "This is the integrated loudness target. The range is −24 to −14 LUFS. The podcast standard is −18 LUFS. A value of −16 LUFS gives a louder result.")
+                    definition("Output Dir", "This is the folder for the output files. The default is the folder of the source file.")
                 }
                 section("WaxOff — Built-in Presets") {
-                    definition("Podcast Standard", "−18 LUFS, −1.0 dBTP, Both WAV + MP3 at 160 kbps, 44.1 kHz. Correct for most podcast hosts.")
-                    definition("Podcast Loud", "−16 LUFS, −1.0 dBTP, Both WAV + MP3 at 160 kbps, 44.1 kHz. Louder perceived volume, still within platform limits.")
-                    definition("WAV Only (Mastering)", "−18 LUFS, −1.0 dBTP, WAV only at 48 kHz. For delivery to a mastering engineer or video platform.")
-                    text("Save your own presets via the Preset menu › Save Current Settings…. Custom presets persist across relaunches and can be deleted via Manage Presets… in the same menu.")
+                    definition("Podcast Standard", "−18 LUFS, −1.0 dBTP, WAV and MP3 at 160 kbps, 44.1 kHz. Use this preset for most podcast hosts.")
+                    definition("Podcast Loud", "−16 LUFS, −1.0 dBTP, WAV and MP3 at 160 kbps, 44.1 kHz. The perceived volume is louder. The result stays in the platform limits.")
+                    definition("WAV Only (Mastering)", "−18 LUFS, −1.0 dBTP, WAV only at 48 kHz. Use this preset to deliver to a mastering engineer or a video platform.")
+                    text("To save your own preset, use the Preset menu › Save Current Settings…. Custom presets stay available after you restart the app. To delete a custom preset, use Manage Presets… in the same menu.")
                 }
 
                 dividerRow
 
                 section("Supported Formats") {
                     text("WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, CAF, AAC, MP4, MOV.")
-                    text("All processing uses FFmpeg, bundled inside the app — no separate installation required.")
+                    text("All processing uses FFmpeg. FFmpeg is included in the app. You do not install it separately.")
                 }
 
                 dividerRow
