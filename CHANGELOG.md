@@ -2,6 +2,38 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.5.0] — 2026-07-30
+
+**Diagnostics**
+- WaxOff and WaxOn now warn when `loudnorm` falls back to dynamic normalization. `linear=true` is a request FFmpeg may refuse; when it refuses, the file lands under its target with its loudness range compressed — which is exactly what linear mode exists to prevent. 2.4.0 documented that this can happen but gave no way to tell whether it happened to your file. The pass-1 measurements are now checked against FFmpeg's own condition before pass 2 runs, and the console names which one failed: loudness range above the target, or insufficient true-peak headroom. Detection only — no audio is changed
+- WaxOn warns and badges when a source with more than two channels is downmixed to stereo. A 5.1 or 7.1 source under Channels = Stereo is folded to two channels by FFmpeg's default matrix; the mono path already announced the equivalent conversion, and the stereo path was silent. The file list now shows a `MULTI→STEREO` badge alongside the existing `MULTI→MONO` and `STEREO→MONO` badges
+
+**Correctness**
+- WaxOff MP3-only deliveries get a clean ID3 title. In MP3-only mode the encoder read the title from an internal temp filename, leaving a fragment like `episode-lev-18LUFS.1a2b3c4d` in the tag — which then travelled into the podcast feed and every player. The title now comes from the delivered filename in both output modes. Both mode was never affected
+
+**Interface**
+- WaxOff shows each file's processing stage on its own row. Delivery runs several files at once, and a single shared readout displayed whichever file reported last, attributed to none of them. Each row now reads its own stage — "Analyzing loudness…", "Normalizing…", "Encoding MP3…" — and clears when that file finishes
+- WaxOff shows verification progress in the toolbar. Output verification runs after files are written, so rows read Complete while work continues; on hour-long files that gap is over a minute. The toolbar now reads "Verifying delivered files… N done" next to Cancel, and no longer leaves a stale "Encoding MP3…" on screen after the encode has finished
+
+**Robustness**
+- Corrected the WaxOn disk-space reservation. The pre-flight check reserved temp space for five intermediate files per concurrent job; only four have existed since 2.2.0 removed one. On a nearly-full disk it could block a batch that would have fit
+
+**Documentation**
+- The manual documents WaxOff metadata handling: source metadata is carried through, and the title tag is replaced with the delivered filename
+- The build floor is stated in the README and `Vendor/README.md` — Xcode 26 or later (Swift 6.2+). A fresh clone opened with an older Xcode fails to compile, and nothing said so
+- Corrected the bug-tracking and version-mapping claims, resolved a stats-timing claim that could not be supported from the source, and removed an unreferenced image and anchor
+
+**Developer**
+- CI runs green again. It had been red since 2026-07-09 and through two releases: the Xcode pin was 16.4, which ships Swift 6.1, while the code requires Swift 6.2 for `nonisolated deinit`. Pinned to Xcode 26.3 — the toolchain `release.sh` builds from — so CI now compiles against the same SDK that ships
+- `release.sh` refuses to release from a commit CI has not proven green, with `--allow-red-ci` to override
+- The build is warning-free, 188 → 0 across both targets. The test target did not set `SWIFT_DEFAULT_ACTOR_ISOLATION`, so every cross-target access reported an isolation warning that Swift 6 language mode would make an error
+- `actions/checkout` bumped to v5, off the deprecated Node 20 runtime
+
+**Structural**
+- Restored twelve missing `v*` tags for 2.0.0 through 2.2.0, and added the `[2.1.0]` entry this file never carried
+- Internal working files moved out of the published Pages root; `docs/` now holds only user-facing material
+- Removed dead code: unreachable error cases, unused computed properties, unused imports, and an inert `sed` rule in `release.sh`
+
 ## [2.4.0] — 2026-07-23
 
 **Bundled FFmpeg**
