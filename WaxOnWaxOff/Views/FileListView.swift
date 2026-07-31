@@ -70,6 +70,10 @@ struct FileRowView: View {
     /// When false (WaxOff), the noise-floor warning triangle is suppressed — the
     /// high-noise-floor heuristic targets raw speech, not finished delivery mixes.
     var applyFloorWarnings: Bool = true
+    /// Live processing phase for this row, when the caller tracks one (WaxOff).
+    /// Declared last and defaulted to nil so this is purely additive: WaxOn's
+    /// call site is unchanged and its rows render exactly as before.
+    var phase: String? = nil
 
     /// The warning triangle uses the same mode-aware FLOOR classifier as the stats
     /// panel: it fires only at a flagged severity, and never in WaxOff (where a mix may
@@ -153,7 +157,10 @@ struct FileRowView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .processing:
-            Text("Processing...")
+            // The phase, when the caller supplies one, says which stage this
+            // file is actually in; "Processing..." is the fallback for a row
+            // that has not emitted a phase yet, and for WaxOn.
+            Text(phase ?? "Processing...")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .ready(let stats):
