@@ -56,7 +56,7 @@ struct HelpView: View {
                 section("WaxOn — Processing Pipeline") {
                     numberedList([
                         "High-pass filter — On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.",
-                        "Channel handling — mono extracts left/right (or downmixes multichannel sources); stereo passes a stereo source's two channels through (other channel counts are converted to two via FFmpeg's default matrix).",
+                        "Channel handling — mono extracts left/right (or downmixes multichannel sources); stereo passes a stereo source's two channels through (other channel counts are converted to two via FFmpeg's default matrix). The app writes a warning to the console.",
                         "Optional phase rotation — 200 Hz allpass (default on).",
                         "Resampling to the target sample rate.",
                         "Dynamic leveling (if enabled) — dynaudnorm for panel recordings and multi-voice sources. Not recommended for solo voice.",
@@ -67,7 +67,7 @@ struct HelpView: View {
                 }
                 section("WaxOn — Settings") {
                     definition("Sample Rate", "44.1 kHz or 48 kHz. Match your DAW project setting.")
-                    definition("Channels", "Mono or Stereo. Mono extracts a single channel; Stereo passes a stereo source's two channels through unchanged (other channel counts are converted to two via FFmpeg's default matrix).")
+                    definition("Channels", "Mono or Stereo. Mono extracts a single channel; Stereo passes a stereo source's two channels through unchanged (other channel counts are converted to two via FFmpeg's default matrix). The app writes a warning to the console.")
                     definition("Channel", "Left or Right — which channel to extract in Mono mode.")
                     definition("High Pass", "On (80 Hz) removes rumble and proximity-effect bass; Off uses a 20 Hz DC floor only. DC offset is always removed.")
                     definition("Phase Rotation", "Applies a 200 Hz all-pass filter before normalization. Reduces crest factor on asymmetric voice recordings, recovering 1–4 dB of headroom before the limiter. Effect on audio character is inaudible. On by default.")

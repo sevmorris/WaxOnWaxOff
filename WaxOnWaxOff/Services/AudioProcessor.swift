@@ -130,6 +130,13 @@ actor AudioProcessor {
 
         let step1Af: String
         if isStereo {
+            // `-ac 2` below folds a >2-channel source down via FFmpeg's default
+            // matrix. Warn for parity with the mono path, which already warns on
+            // the equivalent conversion — a channel-destructive change should not
+            // be silent in one output mode and announced in the other.
+            if inputChannelCount > 2 {
+                onLog?("⚠ \(inputChannelCount)-channel input — downmixing to stereo via FFmpeg's default matrix.", .info)
+            }
             step1Af = "highpass=f=\(hpFreq),\(phaseFilter)\(FFmpegFilters.aresample(to: sr))"
         } else {
             // For >2 channel sources (5.1, 7.1, ambisonic), the user's Left/Right

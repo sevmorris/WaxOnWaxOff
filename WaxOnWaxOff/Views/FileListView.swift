@@ -38,14 +38,26 @@ struct FileListView: View {
         )
     }
 
-    /// In WaxOn we surface the inverse of WaxOff's MONO→STEREO badge: when the
-    /// source has more than one channel and the user has Mono output selected,
-    /// some channels are about to be discarded. The badge is a heads-up so a
-    /// stereo room recording isn't silently turned into a single-channel grab.
+    /// In WaxOn we surface the inverse of WaxOff's MONO→STEREO badge: whenever
+    /// channels are about to be discarded or folded together, the badge is a
+    /// heads-up so a stereo room recording isn't silently turned into a
+    /// single-channel grab, and a surround stem isn't silently folded to two.
+    /// Both output modes are covered — a channel-destructive conversion should
+    /// not be announced in one and silent in the other.
     private func channelBadge(for file: FileItem) -> ChannelBadge? {
-        guard viewModel.settings.outputChannels == .mono,
-              let info = file.fileInfo,
-              info.channelCount > 1 else { return nil }
+        guard let info = file.fileInfo else { return nil }
+
+        guard viewModel.settings.outputChannels == .mono else {
+            // Stereo output: only a >2-channel source loses anything. A mono
+            // source is duplicated into both channels, which discards nothing.
+            guard info.channelCount > 2 else { return nil }
+            return ChannelBadge(
+                label: "MULTI→STEREO",
+                help: "\(info.channelCount)-channel source — will be downmixed to stereo via FFmpeg's default matrix (center and surrounds folded in)."
+            )
+        }
+
+        guard info.channelCount > 1 else { return nil }
 
         if info.channelCount == 2 {
             let isLeft = viewModel.settings.channel == .left

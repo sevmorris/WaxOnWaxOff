@@ -261,7 +261,55 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         XCTAssertEqual(outRMS, inRMS, accuracy: 0.3, "within-ceiling source should not be attenuated")
     }
 
+    /// A >2-channel source under Stereo output is folded to two channels by
+    /// FFmpeg's default matrix. That is channel-destructive and must be
+    /// announced, exactly as the mono path already announces its equivalent.
+    func testMultichannelSourceUnderStereoOutputLogsWarning() async throws {
+        let tools = try XCTUnwrap(tools)
+
+        let input = workDir.appendingPathComponent("wax_on_5p1.wav")
+        try IntegrationFFmpeg.run(ffmpeg: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+            "-af", "pan=5.1|c0=c0|c1=c0|c2=c0|c3=c0|c4=c0|c5=c0",
+            "-ar", "44100", "-c:a", "pcm_s16le",
+            input.path
+        ])
+        let inputChannels = try await channelCount(ffprobe: tools.ffprobe, of: input)
+        XCTAssertEqual(inputChannels, 6,
+                       "fixture must actually be 6-channel for this test to mean anything")
+
+        var settings = WaxOnSettings()
+        settings.sampleRate = .s44100
+        settings.outputChannels = .stereo
+        settings.loudnormEnabled = false
+        settings.dynamicLevelingEnabled = false
+        settings.outputDirectoryPath = workDir.path
+
+        let collector = LogCollector()
+        let processor = AudioProcessor(settings: settings, onLog: { collector.append($0, $1) })
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
+
+        XCTAssertTrue(collector.infoMessages.contains { $0.contains("6-channel input") && $0.contains("downmixing to stereo") },
+                      "expected a downmix warning for a 6-channel source under Stereo output; got: \(collector.infoMessages)")
+
+        let output = try XCTUnwrap(batch.successes.first?.output)
+        let outputChannels = try await channelCount(ffprobe: tools.ffprobe, of: output)
+        XCTAssertEqual(outputChannels, 2,
+                       "stereo output should be 2-channel")
+    }
+
     // MARK: -
+
+    /// Channel count of audio stream a:0 via ffprobe.
+    private func channelCount(ffprobe: String, of url: URL) async throws -> Int {
+        let out = try await FFmpegRunner.captureStdout(exe: ffprobe, args: [
+            "-v", "error", "-select_streams", "a:0",
+            "-show_entries", "stream=channels", "-of", "default=nw=1:nk=1", url.path
+        ])
+        return try XCTUnwrap(Int(out.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
 
     private func measureIntegratedLoudness(ffmpeg: String, of url: URL) async throws -> Double {
         let stderr = try await FFmpegRunner.capture(exe: ffmpeg, args: [
