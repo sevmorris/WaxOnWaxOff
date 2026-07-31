@@ -699,7 +699,7 @@
     </ol>
 
     <h3>Output Format</h3>
-    <p>All WaxOn outputs are <strong>24-bit WAV</strong>, regardless of input format. Lossless, uncompressed, and compatible with every DAW.</p>
+    <p>All WaxOn output files are <strong>24-bit WAV</strong>. The input format has no effect on this. The format is lossless and uncompressed. It is compatible with every DAW.</p>
   </section>
 
   <section id="waxon-output">
@@ -796,40 +796,43 @@
         <tr>
           <td>Sample Rate</td>
           <td>44.1 kHz · 48 kHz</td>
-          <td>Output sample rate for the WAV. 44.1 kHz for podcast delivery; 48 kHz for video or mastering handoff. MP3 output is always encoded at 44.1 kHz regardless of this setting. Grayed out when Output is MP3 only.</td>
+          <td>This is the output sample rate for the WAV file. Use 44.1 kHz for podcast delivery and 48 kHz for video or a mastering handoff. WaxOff always encodes MP3 at 44.1 kHz. The control is not available when Output is MP3 only.</td>
         </tr>
         <tr>
           <td>Output</td>
           <td>WAV · MP3 · Both · default Both</td>
-          <td>WAV is always 24-bit PCM. MP3 is CBR at the chosen bitrate. Both produces two output files.</td>
+          <td>The WAV file is always 24-bit PCM. The MP3 file is CBR at the selected bitrate. Both writes two output files.</td>
         </tr>
         <tr>
           <td>Channels</td>
           <td>Mono · Stereo · default Stereo</td>
-          <td>Mirrors WaxOn's channel toggle. Stereo (default) keeps the existing behavior — a stereo source passes through and a mono source is upmixed to dual-mono stereo. Mono delivers a mono source as a true single channel instead, skipping the upmix. Enabled only when every loaded source is mono — the control is batch-wide, not per-file — and grayed out otherwise. It never downmixes a stereo source; stereo content is unaffected regardless of this setting.</td>
+          <td>Mono or Stereo delivery for a mono source. Stereo is the default. Refer to <strong>Channels</strong> in WaxOff Output Files below.</td>
         </tr>
         <tr>
           <td>MP3 Bitrate</td>
           <td>128 · 160 · 192 kbps</td>
-          <td>CBR bitrate for MP3 output. 160 kbps is a good default for podcast delivery. Grayed out when Output is WAV only.</td>
+          <td>This is the CBR bitrate for the MP3 output. 160 kbps is a good default for podcast delivery. The control is not available when Output is WAV only.</td>
         </tr>
         <tr>
           <td>True Peak</td>
           <td>−3.0 to −0.5 dBTP · 0.5 dBTP steps · default −1.0</td>
-          <td>Maximum true peak ceiling. −1.0 dBTP is the standard for podcast streaming platforms and prevents inter-sample clipping on compressed streams.</td>
+          <td>This is the maximum true-peak ceiling. Podcast streaming platforms use −1.0 dBTP as the standard. This value prevents inter-sample clipping on compressed streams.</td>
         </tr>
         <tr>
           <td>Target LUFS</td>
           <td>−24 to −14 LUFS · 1 LUFS steps · default −18</td>
-          <td>Integrated loudness target. −18 LUFS is a safe, conservative target that sits below the major platform levels (Spotify −14, Apple Podcasts −16), so both boost rather than attenuate it. −16 LUFS gives a louder result.</td>
+          <td>This is the integrated loudness target. −18 LUFS is the safe default. Refer to <strong>Target loudness</strong> below.</td>
         </tr>
         <tr>
           <td>Output Dir</td>
           <td>Path or empty</td>
-          <td>Where output files are saved. Empty = same folder as the source.</td>
+          <td>This is the folder for the output files. If it is empty, WaxOff uses the folder of the source file.</td>
         </tr>
       </tbody>
     </table>
+
+    <h3>Target loudness</h3>
+    <p>−18 LUFS is a safe, conservative target. It is below the levels of the major platforms: Spotify uses −14 LUFS and Apple Podcasts uses −16 LUFS. Thus these platforms increase the level of your file and do not decrease it. A value of −16 LUFS gives a louder result.</p>
   </section>
 
   <section id="waxoff-pipeline">
@@ -881,7 +884,7 @@
     <p>Files whose names already match this pattern trigger an <strong>Already Delivered?</strong> confirmation when added — running delivery again can over-limit or drift from the target loudness.</p>
 
     <h3>Channels</h3>
-    <p>WaxOff outputs stereo (2-channel) by default. Mono input is accepted — by default it is upmixed to dual-mono stereo before processing, but the <strong>Channels</strong> control in WaxOff Settings can instead deliver a mono source as a true single channel. Stereo sources always remain stereo; the control has no effect on them.</p>
+    <p>WaxOff outputs stereo (2 channels) by default. WaxOff accepts a mono input. By default, WaxOff upmixes a mono source to dual-mono stereo before it processes the audio. The <strong>Channels</strong> control in WaxOff Settings can instead deliver a mono source as one channel. The control is available only when all the loaded sources are mono. The control applies to the full batch, not to one file. A stereo source always stays stereo. The control has no effect on a stereo source.</p>
 
     <h3>Metadata</h3>
     <p>WaxOff copies the metadata from the source file to the output files. WaxOff replaces the title tag with the name of the delivered file. The source title tag is frequently an old working name.</p>
