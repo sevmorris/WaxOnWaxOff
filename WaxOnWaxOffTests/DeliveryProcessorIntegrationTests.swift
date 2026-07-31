@@ -410,6 +410,85 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "no deferred verification may run after cancellation")
     }
 
+    /// Mixed-outcome batch: one input that fails outright, sat between two good
+    /// ones. Pins three things the all-success and cancellation tests above do
+    /// not reach. The failure aggregates into `failures` without tearing down
+    /// its siblings — the delivery loop returns `.failure` rather than throwing,
+    /// so only `CancellationError` propagates. Both successes still get their
+    /// "delivered" line, all in before `run()` returns. And the failed file
+    /// contributes none, because verifications are yielded to the pool on the
+    /// success path only.
+    ///
+    /// The bad input is a `.wav` holding non-audio bytes, written with
+    /// Foundation alone. Unreadable, not absent: it exists with a valid
+    /// extension, so nothing short-circuits ahead of ffmpeg and the failure
+    /// lands in the first ffmpeg stage. Same intent as the negative-bitrate
+    /// fixture above — drive a real ffmpeg-layer failure, never a Swift-side
+    /// pre-flight. (The disk-space and extension gates live in DeliveryViewModel
+    /// and FileQueueCoordinator, upstream of the processor, so neither is on
+    /// this path.)
+    func testMixedOutcomeBatchSplitsResultsAndVerifiesOnlySuccesses() async throws {
+        let tools = try XCTUnwrap(tools)
+
+        var good: [DeliveryJobInput] = []
+        for i in 0..<2 {
+            let url = try IntegrationFFmpeg.makeSineWAV(
+                ffmpeg: tools.ffmpeg, directory: workDir, name: "mixed_good_\(i).wav",
+                durationSeconds: 3.0, sampleRate: 44100
+            )
+            good.append(DeliveryJobInput(id: UUID(), url: url))
+        }
+
+        let badURL = workDir.appendingPathComponent("mixed_bad.wav")
+        try Data("not audio — a .wav extension over plain text".utf8).write(to: badURL)
+        let bad = DeliveryJobInput(id: UUID(), url: badURL)
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .wav
+        settings.outputDirectoryPath = workDir.path
+
+        let collector = LogCollector()
+        let result = try await DeliveryProcessor().run(
+            inputs: [good[0], bad, good[1]],
+            settings: settings,
+            onLog: { message, level in collector.append(message, level) }
+        )
+
+        // The split is correct and correctly attributed.
+        XCTAssertEqual(result.failures.count, 1, "the unreadable input must land in failures")
+        XCTAssertEqual(result.successes.count, 2, "a sibling failure must not take down the good files")
+        XCTAssertEqual(try XCTUnwrap(result.failures.first).id, bad.id,
+                       "the failure must be attributed to the unreadable input")
+        XCTAssertEqual(Set(result.successes.map(\.id)), Set(good.map(\.id)),
+                       "both good files must be reported as successes")
+
+        // One "delivered" line per success, all of them in by the time run()
+        // returns — the drain is a sibling task-group child, so the group
+        // cannot finish while a verification is outstanding.
+        let info = collector.infoMessages
+        let delivered = info.filter { $0.contains("delivered ") }
+        XCTAssertEqual(delivered.count, 2,
+                       "expected exactly one delivered line per success before run() returned, got: \(delivered)")
+        for job in result.successes {
+            let wav = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "wav" }))
+            XCTAssertTrue(delivered.contains { $0.contains("delivered \(wav.lastPathComponent)") },
+                          "missing delivered line for \(wav.lastPathComponent)")
+        }
+
+        // The failed file contributes nothing to the verification pool, and no
+        // output of its own is written.
+        let badStem = badURL.deletingPathExtension().lastPathComponent
+        XCTAssertFalse(delivered.contains { $0.contains(badStem) },
+                       "a failed file must yield no verification")
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: workDir.appendingPathComponent("\(badStem)-lev-18LUFS.wav").path),
+                       "no output should be written for the failed input")
+        XCTAssertTrue(info.contains { $0.contains("✗ \(badURL.lastPathComponent)") },
+                      "the processing log should record the failure")
+    }
+
     // MARK: - Mono delivery (mono sources)
 
     /// (a) Mono source + mono delivery ON → a true single-channel WAV and MP3 that still
