@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 enum OutputNaming {
     /// WaxOn prep outputs: `{name}-{44k|48k}waxon.wav`
@@ -67,6 +68,30 @@ enum OutputDirectory {
             }
         }
         return nil
+    }
+
+    /// If the fallback chain would send more than one output to ~/Desktop,
+    /// confirm before proceeding — a silent batch of files on the Desktop is
+    /// surprising. Single-file jobs fall back silently (existing behaviour).
+    ///
+    /// Returns true when the caller should proceed: either fewer than two
+    /// outputs land on the Desktop, or the user chose Continue Anyway.
+    ///
+    /// `@MainActor` because `NSAlert.runModal()` requires it. The rest of this
+    /// enum is `nonisolated`; this member is the exception because it presents
+    /// UI rather than computing a path.
+    @MainActor static func confirmDesktopFallback(outputDirectories: [URL]) -> Bool {
+        let desktopPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Desktop").path
+        let desktopCount = outputDirectories.filter { $0.path == desktopPath }.count
+        guard desktopCount > 1 else { return true }
+
+        let alert = NSAlert()
+        alert.messageText = "Output will land on your Desktop"
+        alert.informativeText = "The app found no other writable directory. The app writes \(desktopCount) output files to ~/Desktop. To prevent this, set a custom output directory in Settings."
+        alert.addButton(withTitle: "Continue Anyway")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     nonisolated private static func resolve(
