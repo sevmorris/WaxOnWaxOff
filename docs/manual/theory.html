@@ -941,48 +941,54 @@
     <p>Because WaxOff always requests <code>linear=true</code> for pass 2, this LRA target is not <em>intended</em> to apply macro-dynamic compression at delivery. When the request is granted, pass 2 is a single linear gain offset and the mix's loud/quiet spread is preserved. Pass 1 still measures and reports <code>input_lra</code>, which appears in the processing log — useful for checking whether a finished mix sits in a typical podcast range (roughly 6–10 LU for well-balanced speech content). If dynamic loudnorm normalization were ever needed, it would require <code>linear=false</code>; WaxOff deliberately never selects that mode — though FFmpeg can fall back to it, see <em>A limitation of <code>linear=true</code></em>.</p>
 
     <h3>Delivery Targets</h3>
-    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px;">Platform targets below are approximate as of early 2026 — verify against current host and platform documentation before optimizing for a single service.</p>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px;">Every figure below is cited to the platform's own documentation or to the governing specification. Where a platform publishes nothing, the table says so rather than repeating a number from secondary sources — which is the case for YouTube.</p>
     <table class="compare-table">
       <thead>
         <tr>
           <th>Platform</th>
           <th>Target LUFS</th>
           <th>Max True Peak</th>
+          <th>Source</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td>Apple Podcasts</td>
-          <td>−16 LUFS (normalized)</td>
-          <td>−1.0 dBTP</td>
+          <td>−16 LKFS ±1 dB — authoring recommendation</td>
+          <td>−1.0 dBFS</td>
+          <td><a href="https://podcasters.apple.com/support/893-audio-requirements">Audio requirements</a></td>
         </tr>
         <tr>
-          <td>Spotify</td>
-          <td>−14 LUFS (normalized)</td>
-          <td>−1.0 dBTP</td>
+          <td>Spotify (music)</td>
+          <td>−14 LUFS — music normalization; no podcast figure published</td>
+          <td>−1.0 dBTP (−2.0 for masters above −14)</td>
+          <td><a href="https://support.spotify.com/us/artists/article/loudness-normalization/">Loudness normalization</a></td>
         </tr>
         <tr>
           <td>Buzzsprout</td>
-          <td>−16 LUFS</td>
-          <td>−1.0 dBTP</td>
+          <td>−19 LUFS mono · −16 LUFS stereo</td>
+          <td>−1.0 dBFS</td>
+          <td><a href="https://www.buzzsprout.com/help/224-magic-mastering-faqs">Magic Mastering FAQs</a></td>
         </tr>
         <tr>
           <td>YouTube</td>
-          <td>−14 LUFS (normalized)</td>
-          <td>−1.0 dBTP</td>
+          <td>None published</td>
+          <td>None published</td>
+          <td><a href="https://support.google.com/youtube/answer/1722171">Upload settings</a></td>
         </tr>
         <tr>
           <td>EBU R128 (broadcast)</td>
-          <td>−23 LUFS</td>
+          <td>−23.0 LUFS ±1.0 LU</td>
           <td>−1.0 dBTP</td>
+          <td><a href="https://tech.ebu.ch/docs/r/r128.pdf">EBU R 128</a></td>
         </tr>
       </tbody>
     </table>
-    <p>Most streaming platforms normalize incoming audio to their own target on playback, so delivering at −18 LUFS versus −16 LUFS won't make your episode sound quieter or louder to listeners (the platform adjusts). What matters most is staying below the true peak ceiling to avoid clipping during that normalization step.</p>
+    <p>Streaming platforms generally level playback toward a house target, so the difference between delivering at −18 LUFS and −16 LUFS is unlikely to be what your listeners hear. Exactly how much levelling each one applies, and under what conditions, is documented less thoroughly than the round numbers suggest — see below. What matters in either case is staying below the true peak ceiling, so that whatever gain a platform does apply cannot push the signal into clipping.</p>
 
-    <p>One platform asymmetry is worth knowing: <strong>YouTube only normalizes downward</strong>. It will not boost content that is quieter than −14 LUFS. Spotify normalizes in both directions. Apple Podcasts normalizes both ways as well. This means a mix delivered at −23 LUFS will sound quieter than expected on YouTube even though it is compliant, while on Spotify it will be boosted to match −14 LUFS. For podcast delivery, this is rarely a real-world issue since vocal content at −18 LUFS will be boosted on both, but it matters if you are optimizing for a single platform.</p>
+    <p>What each platform actually does to an incoming file is worth separating from what is commonly said about it. Spotify documents normalization in both directions — negative gain for masters louder than −14 LUFS, positive gain for quieter ones — but that page addresses music, and Spotify publishes no equivalent statement for podcasts, so applying the same expectation to spoken-word uploads is an inference rather than a documented behaviour. Apple ties playback levelling to Sound Check: content carrying loudness or Sound Check metadata plays back at −16 dB, which is a narrower claim than Apple normalizing every file it is handed. YouTube publishes no loudness target at all — its upload specification covers codec, channels, sample rate and bitrate, and stops there. The −14 LUFS figure widely attributed to YouTube does not appear in YouTube's own documentation, and neither does the frequently repeated claim that it normalizes downward only; both are worth treating as unconfirmed. YouTube's Stable Volume is a listener-side playback control that evens out loud and quiet passages, not an integrated-loudness target to master against.</p>
 
-    <p>The Audio Engineering Society recommends −16 to −20 LUFS as the appropriate range for talk-based podcast content, with −18 LUFS as the practical center. The reasoning is threefold: mobile playback amplification is limited (content at −23 LUFS is difficult to hear in noisy environments like commuting), podcast consumption typically happens in ambient noise where higher average loudness aids intelligibility, and −18 LUFS sits safely between all the major platform targets. It will be boosted modestly by Apple and Spotify rather than aggressively attenuated by either. Delivering at −14 LUFS, for example, would be attenuated by Apple Podcasts and is right at Spotify's ceiling, leaving no safety margin. The conservative −18 LUFS leaves room for platforms to boost cleanly without any risk of triggering codec clipping.</p>
+    <p>The current Audio Engineering Society recommendation for this material is <a href="https://aes2.org/wp-content/uploads/2024/01/20210924_TD1008_v3.13.pdf">AES TD1008</a> (2021), covering internet audio streaming and on-demand distribution. It places podcast content at −18 LUFS with a +1 LU upper tolerance and a true peak not exceeding −1 dBTP, and its format table gives News/Talk the same −18 LUFS. The −16 to −20 LUFS window still widely quoted for podcasts comes from the earlier <a href="https://aes2.org/wp-content/uploads/2024/01/AESTD1004_1_15_10.pdf">TD1004</a> (2015), which TD1008 supersedes; the −20 LUFS floor survives in the newer document, the −16 upper bound does not. The reasoning behind a target this much louder than broadcast is threefold: mobile playback amplification is limited, and content at −23 LUFS is hard to hear while commuting; podcast listening usually happens in ambient noise, where a higher average level aids intelligibility; and −18 LUFS sits below every platform figure that is actually published, so it is far more likely to be raised than pulled down hard. Delivering at −14 LUFS sits at the top of that range with no margin left. The conservative −18 LUFS leaves room for a platform to raise the level cleanly without any risk of triggering codec clipping.</p>
     <p>WaxOff's default of −18 LUFS with −1.0 dBTP is a safe, widely accepted podcast delivery target.</p>
   </section>
 
