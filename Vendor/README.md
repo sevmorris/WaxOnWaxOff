@@ -90,7 +90,15 @@ The app bundles a binary copy of the weights file, not the training codebase.
 
 ## Historical builds
 
-App releases up to and including **v2.3.0** bundled a third-party static FFmpeg 8.0 built **with** `--enable-gpl`, linking x264, x265 and libvidstab. Those artifacts remain published, and the GPL Corresponding Source directions for them are on the `ffmpeg-deps-8.0-arm64` and `v2.3.0` release pages. They are superseded, not withdrawn.
+App releases up to and including **v2.3.0** bundled a third-party static FFmpeg 8.0 built **with** `--enable-gpl`, linking x264, x265 and libvidstab.
+
+Those artifacts have been **withdrawn from distribution**. The exact Corresponding Source for that third-party build could not be obtained, so the GPL obligations attached to distributing it could not be met. Rather than continue distributing a binary we cannot accompany with its source, the affected release assets — the `ffmpeg-deps-8.0-arm64` binaries and the app DMGs for v2.2.1 through v2.3.0 — have been removed.
+
+Withdrawal does not retroactively affect copies already distributed; anyone who obtained those builds keeps the rights the GPL granted them at the time. It ends further distribution, which is what this project is able to control.
+
+Current builds are unaffected. They use the audio-only LGPL FFmpeg described above, built from `scripts/build-ffmpeg.sh` in this repository, with its source obligation satisfied as set out in *One live source obligation, satisfied*.
+
+The git tags for those versions remain in place; only the published release assets are gone. Building those tags from a clean clone will fail, because `scripts/fetch-ffmpeg.sh` can no longer resolve the binaries they pin.
 
 ---
 
