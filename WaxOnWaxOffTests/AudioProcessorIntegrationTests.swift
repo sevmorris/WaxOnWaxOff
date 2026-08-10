@@ -175,6 +175,66 @@ final class AudioProcessorIntegrationTests: XCTestCase {
     /// With Loudness Norm off, a source hotter than −1.0 dBTP is brought to the
     /// ceiling by a single uniform linear gain (not the limiter): the peak and the
     /// RMS drop by the same amount.
+    /// WaxOn reports which normalization loudnorm actually applied, at Verbose
+    /// (#33 — the WaxOn half of #9, which shipped WaxOff-only).
+    ///
+    /// Guards the whole chain this needed: the fused pass-2 filter has to carry
+    /// `print_format=json` (loudnorm defaults print_format to NONE), the
+    /// invocation has to run at `-loglevel info` (the JSON prints at
+    /// AV_LOG_INFO, which `error` suppresses), and its stderr has to be
+    /// captured rather than discarded. WaxOff needed only the first and third
+    /// of those; the loglevel is specific to WaxOn's fused loudnorm+limiter
+    /// invocation.
+    ///
+    /// Asserts that a type was reported and that it is one of loudnorm's two
+    /// JSON spellings — deliberately not which one, and not that it agrees with
+    /// `predictsLinearMode`. WaxOn's LRA=20 makes linear overwhelmingly likely,
+    /// but pinning that would make this a statement about the fixture's audio
+    /// rather than about the plumbing.
+    ///
+    /// Fixture is 5 seconds, clear of the 3-second boundary at
+    /// af_loudnorm.c:446 below which loudnorm forces linear mode from its
+    /// short-first-frame path.
+    func testWaxOnLogsLoudnormNormalizationTypeAtVerbose() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "waxon_norm_type.wav",
+            durationSeconds: 5.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOnSettings()
+        settings.sampleRate = .s44100
+        settings.loudnormEnabled = true
+        settings.loudnormTarget = -23.0
+        settings.outputDirectoryPath = workDir.path
+
+        let collector = LogCollector()
+        let processor = AudioProcessor(settings: settings, onLog: { collector.append($0, $1) })
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
+
+        let verbose = collector.verboseMessages
+        let line = try XCTUnwrap(
+            verbose.first(where: { $0.contains("applied") && $0.contains("normalization") }),
+            "expected a Verbose line reporting the applied normalization type; got: \(verbose)")
+
+        XCTAssertTrue(line.contains("linear") || line.contains("dynamic"),
+                      "the reported type must be one of loudnorm's JSON spellings, got: \(line)")
+        // The capitalised forms belong to print_format=summary. Seeing one here
+        // would mean the wrong print format reached the filter.
+        XCTAssertFalse(line.contains("Linear") || line.contains("Dynamic"),
+                       "summary-format spelling in a JSON-format line: \(line)")
+
+        // Verbose-only: it must not reach the default Console view. Matched on
+        // the exact line rather than on the word "normalization", which also
+        // appears in the .info dynamic-fallback warning.
+        XCTAssertFalse(collector.infoMessages.contains(line),
+                       "the normalization-type line must not appear at .info")
+    }
+
     func testLoudnormOffHotSourceLinearlyNormalizedToCeiling() async throws {
         let tools = try XCTUnwrap(tools)
         // 440 Hz sine pushed to ~0 dBFS (lavfi `sine` is ~−18 dBFS on its own) so
@@ -376,6 +436,14 @@ nonisolated private final class LogCollector: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return lines.compactMap { line in
             if case .info = line.level { return line.message }
+            return nil
+        }
+    }
+
+    var verboseMessages: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return lines.compactMap { line in
+            if case .verbose = line.level { return line.message }
             return nil
         }
     }

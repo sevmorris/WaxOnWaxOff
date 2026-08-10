@@ -225,6 +225,10 @@ actor AudioProcessor {
         // rendered to its own file and re-read. Pass 1 (the analysis above) is unaffected.
         let limiterInput = postDynLevelURL
         let loudnormFilter: String?
+        // Hoisted so the fused render below can compare loudnorm's reported
+        // normalization_type against what predictsLinearMode expected. nil when
+        // Loudness Norm is off or the input was too quiet to measure.
+        var pass2Measurements: LoudnormMeasurements?
         if settings.loudnormEnabled {
             let target = settings.loudnormTarget
             let tp = -1.0
@@ -311,7 +315,15 @@ actor AudioProcessor {
                 onLog?("  loudnorm: normalizing…", .verbose)
 
                 // Fused into the final limiter chain below instead of rendered separately.
+                //
+                // print_format=json is appended here rather than inside
+                // linearPassFilter: that builder is shared with WaxOff, and its
+                // output there already carries the option from its own call
+                // site. loudnorm defaults print_format to NONE, so without this
+                // the pass-2 block is never emitted at all.
                 loudnormFilter = measurements.linearPassFilter(targetLUFS: target, truePeakDB: tp, lra: 20)
+                    + ":print_format=json"
+                pass2Measurements = measurements
             }
         } else {
             loudnormFilter = nil
@@ -338,12 +350,50 @@ actor AudioProcessor {
 
             try? fm.removeItem(at: tmpURL)
 
-            try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            // -loglevel info because loudnorm prints its JSON block at
+            // AV_LOG_INFO, which `error` suppresses. -nostats suppresses the
+            // periodic progress updates, which otherwise grow with render
+            // length — the single final summary line still prints either way.
+            // Both options are output-only: renders at `error` and at `info`
+            // are byte-identical, verified against this exact argument list.
+            // .capture rather than .run for the same reason #9 needed it on
+            // WaxOff: both issue an identical launch with capture: .stderr, and
+            // run simply drops the result.
+            let renderStderr = try await FFmpegRunner.capture(exe: tools.ffmpeg, args: [
+                "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-y",
                 "-i", limiterInput.path, "-af", step2Af,
                 "-map_metadata", "0",
                 "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
             ], fileDuration: fileDuration)
+
+            // What pass 2 actually did, as loudnorm reports it. The warning
+            // above predicts this from the pass-1 measurements; this is the
+            // confirmation. Lowercase "linear"/"dynamic" per af_loudnorm.c:877 —
+            // the capitalised forms belong to print_format=summary, which this
+            // call never requests.
+            if let normalizationType = FFmpegRunner.parseLoudnormJSON(from: renderStderr)?["normalization_type"] {
+                onLog?("  loudnorm: applied \(normalizationType) normalization", .verbose)
+
+                // Cross-check the prediction against the ground truth. Log only —
+                // never assert, and never fail on a mismatch.
+                //
+                // Agreement is expected for sources of 3 seconds or more. Below
+                // that, af_loudnorm.c:446-461 forces linear mode from the
+                // short-first-frame path, bypassing the init() predicate that
+                // predictsLinearMode models — so a sub-3s file disagreeing is
+                // correct behaviour on both sides, not a defect to be fixed.
+                if let m = pass2Measurements {
+                    let predictedLinear = m.predictsLinearMode(
+                        targetLUFS: settings.loudnormTarget,
+                        truePeakDB: -1.0,
+                        lra: 20
+                    ) == nil
+                    let actualLinear = normalizationType == "linear"
+                    if predictedLinear != actualLinear {
+                        onLog?("  loudnorm: predicted \(predictedLinear ? "linear" : "dynamic"), applied \(normalizationType)", .verbose)
+                    }
+                }
+            }
         } else {
             // Loudness Norm OFF: downward-only linear true-peak normalization instead of
             // the limiter. Measure the post-filter/post-dynleveling true peak, then apply
