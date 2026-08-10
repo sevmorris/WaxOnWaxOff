@@ -116,12 +116,29 @@ struct WaxOffMainView: View {
             // something real — and what it cancels costs nothing on disk, since
             // every file is already delivered. The label says so.
             if viewModel.isProcessing && viewModel.isVerifying {
+                // Both controls, because both are meaningful here. Stop
+                // verifying ends the advisory pass; Process starts the next
+                // batch, cancelling that pass on its way. Process stays
+                // disabled while newly dropped files analyse, which is what
+                // makes "drop during the tail, then start" work without any
+                // queueing machinery — the button simply lights up when the
+                // new files are ready.
                 Button {
                     viewModel.cancelProcessing()
                 } label: {
                     Label("Stop verifying", systemImage: "stop.fill")
                 }
                 .help("Files are delivered. This stops the remaining verification passes only.")
+
+                Button {
+                    viewModel.process()
+                } label: {
+                    Label("Process", systemImage: "play.fill")
+                }
+                .disabled(viewModel.files.isEmpty || viewModel.isAnyFileAnalyzing)
+                .help(viewModel.isAnyFileAnalyzing
+                      ? "Waiting for analysis to complete…"
+                      : "Starts the next batch and stops the remaining verification passes.")
             } else if viewModel.isProcessing {
                 Button {
                     viewModel.cancelProcessing()

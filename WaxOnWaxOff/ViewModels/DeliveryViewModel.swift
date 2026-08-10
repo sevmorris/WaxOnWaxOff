@@ -51,6 +51,15 @@ final class DeliveryViewModel {
     }
     var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
+    /// Whether `process()` will start a batch rather than return.
+    ///
+    /// Idle starts, obviously. The verification tail also starts: delivery is
+    /// finished, every file is written, and the only outstanding work is the
+    /// advisory re-measurement, which cancelling costs nothing on disk.
+    /// Active delivery does not — a restart there would abandon renders in
+    /// progress, and that is a different bargain entirely.
+    var canStartNewBatch: Bool { !isProcessing || isVerifying }
+
     /// True when every loaded file with known channel info is single-channel. The mono
     /// delivery control only applies to mono sources; for stereo, mixed, or an empty
     /// queue it stays inert. (The pipeline independently ignores the setting for any
@@ -121,6 +130,30 @@ final class DeliveryViewModel {
 
     func process() {
         guard !files.isEmpty else { return }
+
+        // Re-entry. Until now nothing here blocked a second call — the toolbar
+        // hiding Process was the only thing preventing it, which left a UI
+        // detail standing in for a state invariant.
+        //
+        // During the tail the outstanding task is cancelled first, then awaited
+        // before restarting. Awaiting matters: a cancelled task still unwinds
+        // through the cleanup at the end of this method's Task, which clears
+        // isProcessing / isVerifying / verificationsCompleted. Start the new
+        // batch without waiting and that cleanup lands on the new batch's
+        // state, leaving it running with the UI believing nothing is.
+        //
+        // Already-delivered rows are .processed, and the ready-file filter
+        // below only takes .ready — so a restart cannot reprocess the previous
+        // batch. That is by construction, not by clearing the list.
+        if isProcessing {
+            guard canStartNewBatch, let outstanding = processingTask else { return }
+            cancelProcessing()
+            Task { @MainActor [weak self] in
+                _ = await outstanding.value
+                self?.process()
+            }
+            return
+        }
 
         if let customPath = settings.outputDirectoryPath,
            !FileManager.default.isWritableFile(atPath: customPath) {
