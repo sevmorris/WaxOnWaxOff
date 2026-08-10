@@ -100,6 +100,17 @@ final class DeliveryViewModelRestartWindowTests: XCTestCase {
         XCTAssertTrue(vm.isRestarting, "a press during the tail must schedule a restart")
         XCTAssertFalse(vm.isProcessing, "cancelProcessing() clears this synchronously — the window")
 
+        // The only place `.restarting` can be posed: `isRestarting` is
+        // `private(set)`, so ToolbarStateTests cannot reach this state and
+        // covers the other three. `canStartNewBatch` must read false here even
+        // though `isProcessing` is false, or the toolbar would offer a Process
+        // that `process()` refuses.
+        XCTAssertEqual(vm.toolbarState, .restarting)
+        XCTAssertFalse(vm.canStartNewBatch,
+                       "a scheduled restart is not a state a new batch can start from")
+        XCTAssertFalse(vm.canEditFileList,
+                       "the restart is about to run on these rows")
+
         // Press two, same turn, nothing awaited in between. This is the race.
         vm.process()
         XCTAssertFalse(vm.isProcessing,
