@@ -501,7 +501,7 @@
     <p>Both modes share the same window layout, divided into four areas.</p>
 
     <h3>Toolbar</h3>
-    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left. The Preset picker is next to it. The action buttons (Process, Remove, Clear) are after the Preset picker. When a batch runs, the Process button becomes Cancel. The settings-sidebar toggle is at the far right of the toolbar.</p>
+    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left. The Preset picker is next to it. The action buttons (Process, Remove, Clear) are after the Preset picker. When a batch runs, the Process button becomes Cancel. In WaxOff, the buttons change again when the delivery is complete and the verification continues. Refer to <a href="#waxoff-verification">Verification</a>. The settings-sidebar toggle is at the far right of the toolbar.</p>
 
     <h3>File List</h3>
     <p>The left panel shows all the loaded files. Each row shows the filename and a status label. Drag a row to change its position. Drag the vertical divider to change the size of the panel. You can also drag a folder onto the list. The app scans the folder and its subfolders for supported audio files.</p>
@@ -873,6 +873,12 @@
 
     <h3>Why Two Passes?</h3>
     <p>EBU R128 loudness measurement requires the entire file to compute integrated loudness (gated measurement over the full duration). You can't know the correct gain until you've read every sample, so two passes are unavoidable for accurate normalization. WaxOff makes this transparent: drop the file, click Process, and both passes happen automatically.</p>
+
+    <h3 id="waxoff-verification">Verification</h3>
+    <p>After WaxOff writes a delivered file, WaxOff measures that file again. This is a check of the result. It is not a second processing stage. The audio on disk is complete before the verification starts. WaxOff does not change a delivered file after this point.</p>
+    <p>The toolbar shows <strong>Verifying delivered files… <em>N</em> done</strong> while this runs. Each row shows <strong>Complete</strong> during the verification, because each file is already written. On a batch of long files the verification can continue for more than one minute.</p>
+    <p>The <strong>Stop verifying</strong> button stops the remaining verification passes. It does not remove or change a delivered file.</p>
+    <p>You do not have to wait for the verification. Add the new files and click <strong>Process</strong>. WaxOff stops the outstanding verification and starts the new batch. WaxOff does not process the files of the previous batch again. The <strong>Process</strong> button is not available while a batch is still in delivery. A new batch there would discard the files that are not complete.</p>
   </section>
 
   <section id="waxoff-output">
