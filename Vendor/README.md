@@ -13,7 +13,9 @@ WaxOnWaxOff bundles a **static, audio-only FFmpeg 8.0** for macOS **arm64 (Apple
 
 Xcode runs `scripts/fetch-ffmpeg.sh` before each build; `release.sh` runs it before packaging.
 
-**Do not delete** the `ffmpeg-deps-*` GitHub releases — CI and fresh clones fetch binaries from them, and older tags remain the corresponding artifact for previously released app versions.
+**Do not delete** the release named by `FFMPEG_DEPS_TAG` in `Vendor/ffmpeg-manifest.env` — currently `ffmpeg-deps-8.0-audio-arm64`. CI and fresh clones fetch the binaries from it, and `scripts/fetch-ffmpeg.sh` has no other source.
+
+That is a rule about the *current* deps release, not a blanket rule over everything matching `ffmpeg-deps-*`. The superseded `ffmpeg-deps-8.0-arm64` assets were removed deliberately and **must not be restored** — restoring them resumes distributing a GPL binary whose Corresponding Source this project cannot supply. See *Historical builds* below. Its git tag is kept; only the published assets are gone.
 
 ### The build
 
