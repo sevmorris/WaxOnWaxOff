@@ -112,7 +112,7 @@ struct WaxOffMainView: View {
             // remains.
             //
             // Cancel stays available during the tail rather than being hidden.
-            // drainVerifications honours cancellation, so the button still does
+            // drainVerifications honors cancellation, so the button still does
             // something real — and what it cancels costs nothing on disk, since
             // every file is already delivered. The label says so.
             // First, because it is the one state where neither of the two below
