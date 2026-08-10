@@ -8,16 +8,14 @@ Items from the 2026-07 perf cycle (`perf/waxoff-2026-07`) are tagged
 
 ## Bugs
 
-Tracked as GitHub issues, not here. Open as of 2026-07-25:
-[#2](https://github.com/sevmorris/WaxOnWaxOff/issues/2) (>2-channel downmix
-unwarned under Stereo), [#3](https://github.com/sevmorris/WaxOnWaxOff/issues/3)
-(DiskSpaceChecker over-reserves), [#4](https://github.com/sevmorris/WaxOnWaxOff/issues/4)
-(MP3-only temp UUID in the ID3 title),
-[#11](https://github.com/sevmorris/WaxOnWaxOff/issues/11) (loudnorm's silent
-linear→dynamic fallback is undetectable).
+Tracked as GitHub issues, not here. This file is for work deliberately
+deferred, not for defects. Anything actionable belongs in the issue tracker.
 
-This file is for work deliberately deferred, not for defects. Anything
-actionable belongs in the issue tracker.
+No snapshot of which issues are open, deliberately. The one that used to sit
+here listed #2, #3, #4 and #11 as open "as of 2026-07-25"; all four were closed
+on 2026-07-31 and the list went on asserting otherwise until an audit caught
+it. A copy of the tracker in a file that nobody updates is worse than no copy.
+Read the tracker.
 
 ## Test gaps
 
@@ -25,12 +23,6 @@ actionable belongs in the issue tracker.
   correct but untested; requires a crafted corrupt container. The
   `effectiveTimeoutSeconds` belt-and-suspenders is covered by the
   Session C tests.
-
-## Code hygiene
-
-- **`import SwiftUI` in ContentViewModel and DeliveryViewModel** —
-  pre-dates the 2.1.0 cycle; may be unused (verify with a compile
-  check before removing).
 
 ## Technical debt
 
