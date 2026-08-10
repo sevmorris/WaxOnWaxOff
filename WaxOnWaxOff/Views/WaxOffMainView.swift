@@ -104,7 +104,25 @@ struct WaxOffMainView: View {
                 }
             }
 
-            if viewModel.isProcessing {
+            // Three states, not two. `isProcessing` stays true until run()
+            // returns, which is after the verification pool drains — so keying
+            // Cancel/Process off it alone left the toolbar claiming a delivery
+            // was still running for the whole tail (#24). `isVerifying` splits
+            // that window: files are written, only the advisory re-measurement
+            // remains.
+            //
+            // Cancel stays available during the tail rather than being hidden.
+            // drainVerifications honours cancellation, so the button still does
+            // something real — and what it cancels costs nothing on disk, since
+            // every file is already delivered. The label says so.
+            if viewModel.isProcessing && viewModel.isVerifying {
+                Button {
+                    viewModel.cancelProcessing()
+                } label: {
+                    Label("Stop verifying", systemImage: "stop.fill")
+                }
+                .help("Files are delivered. This stops the remaining verification passes only.")
+            } else if viewModel.isProcessing {
                 Button {
                     viewModel.cancelProcessing()
                 } label: {

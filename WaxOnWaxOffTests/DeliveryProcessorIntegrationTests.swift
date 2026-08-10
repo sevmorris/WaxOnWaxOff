@@ -552,6 +552,80 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "the processing log should record the failure")
     }
 
+    /// `onDeliveryComplete` fires exactly once, at the delivering-to-verifying
+    /// boundary: after every input reaches a terminal outcome, while the
+    /// verification pool is still draining. This is what the toolbar's
+    /// Verifying state keys off (#24).
+    ///
+    /// What this pins is the boundary's contract — fires once, strictly after
+    /// every delivery outcome, strictly before the tail ends. It deliberately
+    /// does NOT assert that verifications overlap delivery. That overlap is
+    /// real and is why `onVerificationProgress` cannot serve as this signal
+    /// (see the pool comment in DeliveryProcessor.run), but whether it happens
+    /// on a given run is a race: on short fixtures all deliveries can finish
+    /// before the first verification does, which is exactly what this test
+    /// observed while being written. Asserting it would be asserting a timing
+    /// outcome, so the reason for the separate callback lives in the comments
+    /// rather than in an assertion that passes by luck.
+    func testDeliveryCompleteFiresOnceAtTheVerificationBoundary() async throws {
+        let tools = try XCTUnwrap(tools)
+        var jobs: [DeliveryJobInput] = []
+        for i in 0..<3 {
+            let url = try IntegrationFFmpeg.makeSineWAV(
+                ffmpeg: tools.ffmpeg, directory: workDir, name: "boundary_\(i).wav",
+                durationSeconds: 3.0, sampleRate: 44100
+            )
+            jobs.append(DeliveryJobInput(id: UUID(), url: url))
+        }
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.truePeak = -1.0
+        settings.outputMode = .both
+        settings.mp3Bitrate = 160
+        settings.outputDirectoryPath = workDir.path
+
+        let events = EventCollector()
+        let result = try await DeliveryProcessor().run(
+            inputs: jobs,
+            settings: settings,
+            onFileCompleted: { _ in events.append("delivered") },
+            onFileFailed: { _ in events.append("failed") },
+            onPhase: { _, _ in },
+            onDeliveryComplete: { events.append("deliveryComplete") },
+            onVerificationProgress: { _ in events.append("verified") }
+        )
+
+        XCTAssertTrue(result.failures.isEmpty)
+        XCTAssertEqual(result.successes.count, 3)
+
+        let ordered = events.snapshot()
+        XCTAssertEqual(ordered.filter { $0 == "deliveryComplete" }.count, 1,
+                       "onDeliveryComplete must fire exactly once, got: \(ordered)")
+
+        let boundary = try XCTUnwrap(ordered.firstIndex(of: "deliveryComplete"))
+
+        // Every file's terminal callback precedes the boundary — that is what
+        // makes it safe for the toolbar to treat it as "all files written".
+        let terminal = ordered.enumerated().filter { $0.element == "delivered" || $0.element == "failed" }
+        XCTAssertEqual(terminal.count, 3)
+        for (idx, _) in terminal {
+            XCTAssertLessThan(idx, boundary,
+                              "every delivery outcome must precede the boundary, got: \(ordered)")
+        }
+
+        // A real tail remains after the boundary. Each verification is an
+        // ffmpeg invocation of hundreds of ms, while the gap between the last
+        // file's yield and the boundary is microseconds — the same timing
+        // argument testCancelAfterCompletionSkipsDeferredVerifications relies on.
+        let verifiedAfter = ordered.suffix(from: boundary).filter { $0 == "verified" }.count
+        XCTAssertGreaterThan(verifiedAfter, 0,
+                             "verification work must remain after the boundary, got: \(ordered)")
+
+        // 3 files x (WAV + MP3) = 6 verification passes, all accounted for.
+        XCTAssertEqual(ordered.filter { $0 == "verified" }.count, 6)
+    }
+
     // MARK: - Mono delivery (mono sources)
 
     /// (a) Mono source + mono delivery ON → a true single-channel WAV and MP3 that still

@@ -24,6 +24,14 @@ final class DeliveryViewModel {
     /// output is written, before its own verification runs, so verification
     /// cannot be attributed to a row. No denominator — see `drainVerifications`.
     var verificationsCompleted: Int? = nil
+    /// True only during the verification tail: every file is written and the
+    /// verification pool is still draining. Distinct from
+    /// `verificationsCompleted`, which goes non-nil as soon as the first
+    /// verification finishes — and verifications drain concurrently with
+    /// delivery, so on a multi-file batch that happens while files are still
+    /// being written. Driven by `onDeliveryComplete`, which fires once at the
+    /// delivering-to-verifying boundary.
+    var isVerifying = false
     var alertMessage: String?
     var showWaxoffWarning = false
     private var pendingWaxoffFiles: [URL] = []
@@ -165,6 +173,7 @@ final class DeliveryViewModel {
         }
 
         isProcessing = true
+        isVerifying = false
         processingCancelled = false
         log.clear()
         fileQueue.snapshotReadyStats()
@@ -221,6 +230,11 @@ final class DeliveryViewModel {
                             self.filePhases[id] = phase
                         }
                     },
+                    onDeliveryComplete: { [weak self] in
+                        Task { @MainActor [weak self] in
+                            self?.isVerifying = true
+                        }
+                    },
                     onVerificationProgress: { [weak self] completed in
                         Task { @MainActor [weak self] in
                             self?.verificationsCompleted = completed
@@ -257,6 +271,7 @@ final class DeliveryViewModel {
             }
 
             isProcessing = false
+            isVerifying = false
             verificationsCompleted = nil
             // Safety net only. Phases are cleared per file on completion or
             // failure above; this catches an entry orphaned by a path that
@@ -271,6 +286,7 @@ final class DeliveryViewModel {
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false
+        isVerifying = false
         verificationsCompleted = nil
         filePhases.removeAll()
         fileQueue.restoreProcessingRowsAfterCancel()
