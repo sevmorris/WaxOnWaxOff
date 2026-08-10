@@ -52,6 +52,13 @@ actor DeliveryProcessor {
         onFileCompleted: (@Sendable (DeliveryJobResult) -> Void)? = nil,
         onFileFailed: (@Sendable (DeliveryJobFailure) -> Void)? = nil,
         onPhase: (@Sendable (UUID, String) -> Void)? = nil,
+        /// Fires once, when every input has reached a terminal outcome and the
+        /// delivery child is finished — while the verification pool is still
+        /// draining. This is the delivering-to-verifying boundary, and it is
+        /// not derivable from `onVerificationProgress`: verifications drain
+        /// concurrently with delivery, so that callback fires during delivery
+        /// on any multi-file batch.
+        onDeliveryComplete: (@Sendable () -> Void)? = nil,
         onVerificationProgress: (@Sendable (Int) -> Void)? = nil,
         onLog: (@Sendable (String, LogLevel) -> Void)? = nil
     ) async throws -> DeliveryBatchRunResult {
@@ -121,6 +128,10 @@ actor DeliveryProcessor {
                         return .failure(failure)
                     }
                 }
+                // Every input has a terminal outcome; only the verification
+                // pool is still working. Fired before the sink is finished so
+                // the boundary is reported while the tail genuinely remains.
+                onDeliveryComplete?()
                 return .outcomes(outcomes)
             }
             group.addTask {
