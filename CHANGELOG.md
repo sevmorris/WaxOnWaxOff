@@ -2,6 +2,27 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.6.0] — 2026-08-10
+
+**Interface**
+- WaxOff shows a distinct state while it verifies delivered files. Verification runs after every row already reads Complete, and the toolbar used to keep showing a red Cancel for the whole of it — offering to abort work that was already written to disk. There is now a "Verifying delivered files… N done" readout with a Cancel scoped to what it actually stops: the remaining verification passes, not the delivery
+- You can start a new WaxOff batch while the previous one is still verifying. Verification is advisory re-measurement of files already on disk, so there is no reason to wait it out — on a batch of hour-long files that was over a minute of nothing to do. Process is now available during that window and starting a batch ends the outstanding verification. It stays unavailable while a batch is genuinely still delivering, where a restart would abandon renders in progress
+
+**Diagnostics**
+- WaxOn reports which normalization `loudnorm` applied — linear or dynamic — in the Console at Verbose, matching what WaxOff gained in 2.5.0. WaxOn's wider `LRA=20` makes the dynamic fallback far less likely, but "less likely" is not "never", and the console now says which one your file got. Both modes also log when that outcome disagrees with what the pass-1 measurements predicted
+
+**Licensing**
+- The FFmpeg binaries bundled through v2.3.0 have been withdrawn from distribution. They came from a third-party static build made with `--enable-gpl`, and the exact Corresponding Source for it could not be obtained, so the GPL obligations attached to distributing it could not be met. The `ffmpeg-deps-8.0-arm64` binaries and the app DMGs for v2.2.1 through v2.3.0 have been removed. Copies already distributed keep the rights the GPL granted at the time; this ends further distribution, which is the part this project controls. Current builds are unaffected — they use the audio-only LGPL FFmpeg introduced in 2.4.0. See `Vendor/README.md`
+
+**Documentation**
+- The platform loudness targets in the Theory of Operation are corrected and sourced. Every figure now cites the platform's own documentation or the governing specification, and the undated "approximate as of early 2026" hedge is gone. Buzzsprout's target was listed as a single figure when it is two (−19 LUFS mono, −16 LUFS stereo); Apple's −16 LKFS is an authoring recommendation rather than playback normalization; Spotify's −14 LUFS is its music figure and it publishes none for podcasts; and YouTube publishes no loudness target at all, so the widely-quoted −14 LUFS is marked as unconfirmed rather than repeated. The AES citation now points at TD1008 (2021) instead of the superseded TD1004
+
+**Developer**
+- `release.sh` reverts the version bump on any failure, not only on a failed notarization. A dozen other exits — a build error, an expired certificate, a stapling failure one line below the branch that did revert — left the bump stranded in the working tree, which then blocked the next run on the dirty-tree preflight
+- `release.sh` reverts the README, manual and landing-page rewrites the same way. They were rewritten in place twenty lines before being committed, and nothing restored them if anything in between failed
+- Pruning old releases no longer deletes their git tags. It removed the release page, its assets and the tag, so a pruned version became unbuildable from a clean clone and unreachable from its own changelog entry — while `CHANGELOG.md` said older versions stay reachable by tag. The tag now survives; only the release page is pruned
+- The duplicated desktop-fallback alert is factored into one definition shared by both modes
+
 ## [2.5.1] — 2026-07-31
 
 Documentation and interface text only. No audio processing changed and no app behaviour changed — every edit in this release is text the app or the manual displays.
