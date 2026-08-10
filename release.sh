@@ -55,6 +55,13 @@ NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
 # version bump, and the EXIT trap reverts it.
 BUMP_ACTIVE=0
 
+# Same contract for the docs rewrite: set once the README, manual and landing
+# page are being rewritten in place and cleared once that rewrite is committed.
+# A separate flag because the two windows are disjoint — the version bump is
+# already committed before the first docs sed runs — and because they revert
+# different files.
+DOCS_ACTIVE=0
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step()  { echo "\n▶ $*"; }
 ok()    { echo "  ✓ $*"; }
@@ -73,6 +80,13 @@ cleanup() {
     # are the only changes present, so there is nothing else here to discard.
     if (( ${BUMP_ACTIVE:-0} )); then
         git -C "${PROJECT_DIR:-.}" checkout -- "${PROJECT:-}/project.pbxproj" 2>/dev/null || true
+    fi
+    # Same reasoning for the docs rewrite, one window later. These three paths
+    # are exactly the ones the `git add` below stages, so a failure between the
+    # first sed and that commit restores the same set it would have committed.
+    if (( ${DOCS_ACTIVE:-0} )); then
+        git -C "${PROJECT_DIR:-.}" checkout -- \
+            "${MANUAL_IDX:-}" "${LANDING_IDX:-}" "${PROJECT_DIR:-.}/README.md" 2>/dev/null || true
     fi
     [[ -d "${STAGING:-}" ]]      && rm -rf -- "$STAGING"      || true
     [[ -d "${MOUNT:-}" ]]        && rm -rf -- "$MOUNT"        || true
@@ -202,12 +216,20 @@ ok "MARKETING_VERSION agrees across all $(grep -c 'MARKETING_VERSION' "$PROJECT/
 
 CURRENT=$(grep MARKETING_VERSION "$PROJECT/project.pbxproj" | head -1 | grep -o '[0-9][0-9.]*')
 if [[ "$CURRENT" == "$VERSION" ]]; then
+    # No MARKETING_VERSION rewrite needed, but the build-number sed below still
+    # mutates project.pbxproj, so the window opens here too.
+    BUMP_ACTIVE=1
     ok "Already at $VERSION"
 else
     # Escape dots (and other regex metacharacters) so pre-release versions like
     # "1.7.0-rc.1" don't cause sed pattern mismatches.
     ESC_CURRENT=$(printf '%s' "$CURRENT" | sed 's/[.[\*^$]/\\&/g')
     ESC_VERSION=$(printf '%s'  "$VERSION" | sed 's/[.[\*^$]/\\&/g')
+    # Arm before the first mutation, not after the last. Between the two seds
+    # sits a grep pipeline that reads the build number; under `set -o pipefail`
+    # it can abort with this sed's edit already on disk, so arming afterwards
+    # would leave exactly the stranded bump this flag exists to prevent.
+    BUMP_ACTIVE=1
     sed -i '' "s/MARKETING_VERSION = ${ESC_CURRENT};/MARKETING_VERSION = ${ESC_VERSION};/g" \
         "$PROJECT/project.pbxproj"
     ok "Bumped $CURRENT → $VERSION (commit deferred until after notarization)"
@@ -219,11 +241,6 @@ NEXT_BUILD=$((BUILD_NUM + 1))
 sed -i '' "s/CURRENT_PROJECT_VERSION = ${BUILD_NUM};/CURRENT_PROJECT_VERSION = ${NEXT_BUILD};/g" \
     "$PROJECT/project.pbxproj"
 ok "Build number ${BUILD_NUM} → ${NEXT_BUILD} (commit deferred until after notarization)"
-
-# Both seds have now run, so project.pbxproj is dirty. Arm the trap: from here
-# until the commit below, any exit — a fail, a set -e abort, an interrupt —
-# restores the file.
-BUMP_ACTIVE=1
 
 step "Fetching FFmpeg binaries"
 chmod +x "$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
@@ -333,6 +350,11 @@ BUMP_ACTIVE=0
 # decide whether anything actually changed before committing.
 step "Updating docs to ${TAG}"
 
+# Armed before the first of the eight seds below. Arming after any one of them
+# would strand the edits the earlier ones already made; arming here is a no-op
+# if the script exits before anything is written.
+DOCS_ACTIVE=1
+
 # Manual: download button + sidebar version badge.
 sed -i '' "s|WaxOnWaxOff-v[0-9][0-9.]*\.dmg|WaxOnWaxOff-${TAG}.dmg|g" "$MANUAL_IDX"
 sed -i '' "s|>Download v[0-9][0-9.]*<|>Download ${TAG}<|g" "$MANUAL_IDX"
@@ -360,6 +382,11 @@ if [[ -n "$(git status --porcelain)" ]]; then
 else
     ok "Docs already up to date"
 fi
+# Disarm: the rewrite is committed (or there was nothing to commit). Placed
+# after the `fi` so a failing `git add`/`git commit` still leaves the trap
+# armed — those exit with the rewrite uncommitted, which is the case it exists
+# for.
+DOCS_ACTIVE=0
 
 # ── Tag and push ──────────────────────────────────────────────────────────────
 step "Tagging and pushing"
