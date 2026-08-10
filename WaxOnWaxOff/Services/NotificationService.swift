@@ -2,18 +2,34 @@ import Foundation
 import UserNotifications
 
 enum NotificationService {
-    static func showCompletionNotification(mode: AppMode, fileCount: Int) async {
+    /// Post a completion notification. Returns immediately; the notification is
+    /// delivered on its own task.
+    ///
+    /// Deliberately **not** `async`, and the permission prompt is why. On a Mac
+    /// that has not yet answered it, `authorizationStatus` is `.notDetermined`
+    /// and `requestAuthorization` does not return until the user responds. Every
+    /// caller awaited this immediately before clearing `isProcessing`, so on a
+    /// first run the toolbar went on showing a running batch — Cancel and all —
+    /// until the prompt was dismissed, and the prompt is easy not to connect to
+    /// the app you thought had just finished. Nothing downstream depends on the
+    /// notification having been posted, so nothing should wait for it.
+    ///
+    /// Making the signature synchronous is the point: a future call site cannot
+    /// reintroduce the block by forgetting to detach it.
+    static func showCompletionNotification(mode: AppMode, fileCount: Int) {
         guard fileCount > 0 else { return }
 
         // Unit tests are hosted inside the app bundle, so this would otherwise
-        // reach the real notification centre. On a machine that has never
-        // answered the prompt — every fresh CI runner — `authorizationStatus`
-        // is `.notDetermined`, `requestAuthorization` puts up a system dialog,
-        // and with nobody to answer it the `await` below never returns. That
-        // hangs the caller, not just the notification: `DeliveryViewModel`
-        // awaits this before clearing `isProcessing`.
+        // reach the real notification center. Since the call no longer blocks
+        // its caller, this no longer prevents a hang — it stops a test run from
+        // posting real notifications and from leaving an unanswerable prompt
+        // behind on whatever machine ran it.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
 
+        Task { await deliver(mode: mode, fileCount: fileCount) }
+    }
+
+    private static func deliver(mode: AppMode, fileCount: Int) async {
         let center = UNUserNotificationCenter.current()
 
         do {

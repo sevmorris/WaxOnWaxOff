@@ -180,12 +180,12 @@ final class ContentViewModel {
                 fileQueue.restoreProcessingRows()
 
                 if batch.failures.isEmpty {
-                    await NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
+                    NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
                 } else if batch.successes.isEmpty {
                     alertMessage = "Processing failed. Open the Console tab for details."
                 } else {
                     alertMessage = "\(batch.successes.count) file\(batch.successes.count == 1 ? "" : "s") processed, \(batch.failures.count) failed. See Console for details."
-                    await NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
+                    NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
                 }
             } catch is CancellationError {
                 // User cancelled — cancelProcessing() already restored row state
