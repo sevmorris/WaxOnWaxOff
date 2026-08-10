@@ -418,36 +418,44 @@ ${CHANGES}"
 fi
 ok "Release published"
 
-# ── Remove old app releases (keep the ${KEEP_RELEASES} most recent v* tags) ───
-# Never delete ffmpeg-deps-* — CI and fresh clones download binaries from that
-# release (see scripts/fetch-ffmpeg.sh). Pruning all releases by date removed
-# ffmpeg-deps-8.0-arm64 during the v2.0.6 cut.
+# ── Remove old app release PAGES (keep the ${KEEP_RELEASES} most recent) ─────
+# This prunes the GitHub release page and its DMG asset. It does NOT touch the
+# git tag, locally or on the remote — deliberately. The tag is the only durable
+# pointer to what shipped: without it a version is both unbuildable from a clean
+# clone and unreachable from its own CHANGELOG entry, and restoring one after
+# the fact means recovering the commit SHA from somewhere else. A release page
+# is a convenience; a tag is the record. This is what CHANGELOG.md already
+# describes — "older versions are reachable by tag but their release pages have
+# been pruned" — which until now the `--cleanup-tag` on the delete below made
+# false.
 #
-# Raised 5 → 10 for the 2.4.0 cut. Every release through v2.3.0 bundles the
-# third-party GPL FFmpeg build, so those pages carry GPL Corresponding Source
-# obligations. Deleting a page does not end the obligation — it attaches to
-# distributions already made, and everyone who downloaded keeps their
-# entitlement — it only removes our means of satisfying it. At 5 this step
-# would have deleted v2.2.1 in the same run that adds source directions to the
-# others. Retention of GPL-bearing releases is a licensing decision (#12), not
-# something a tail -n +N should make mid-publish.
+# Ten is chosen to cover roughly a year of releases at the current cadence, so
+# the download links in recent CHANGELOG entries and in any circulating issue
+# thread keep resolving. It is not a licensing constraint: the GPL-bearing
+# artifacts that once made retention a compliance question have been withdrawn
+# from distribution entirely (see Vendor/README.md, "Historical builds").
 KEEP_RELEASES=10
-step "Removing old app releases (keeping ${KEEP_RELEASES} most recent v* tags)"
+step "Removing old app release pages (keeping ${KEEP_RELEASES} most recent v* releases)"
 OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
     --jq '.[].tagName' | grep -E '^v[0-9]' | tail -n +$((KEEP_RELEASES + 1)) || true)
 if [[ -z "$OLD_TAGS" ]]; then
-    ok "No old app releases to remove"
+    ok "No old app release pages to remove"
 else
     while IFS= read -r old_tag; do
+        # What actually keeps ffmpeg-deps-* out of this loop is the
+        # `grep -E '^v[0-9]'` filter above: the deps tag begins with "f", so it
+        # never reaches here. This case is a backstop only, kept in case that
+        # filter is ever loosened. CI and fresh clones download binaries from
+        # that release (see scripts/fetch-ffmpeg.sh), and pruning by date alone
+        # removed ffmpeg-deps-8.0-arm64 during the v2.0.6 cut.
         case "$old_tag" in
             ffmpeg-deps-*)
                 ok "Skipped protected deps release $old_tag"
                 continue
                 ;;
         esac
-        gh release delete "$old_tag" --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
-        git tag -d "$old_tag" 2>/dev/null || true
-        ok "Removed $old_tag"
+        gh release delete "$old_tag" --repo "$REPO" --yes 2>/dev/null || true
+        ok "Pruned release page for $old_tag (tag kept)"
     done <<< "$OLD_TAGS"
 fi
 
