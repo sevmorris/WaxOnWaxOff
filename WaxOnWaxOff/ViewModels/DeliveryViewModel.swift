@@ -310,7 +310,7 @@ final class DeliveryViewModel {
                     if !partials.isEmpty {
                         alertMessage = "\(partials.count) file\(partials.count == 1 ? "" : "s") had MP3 encoding failure (WAV complete). See Console for details."
                     }
-                    await NotificationService.showCompletionNotification(
+                    NotificationService.showCompletionNotification(
                         mode: .waxOff,
                         fileCount: batch.successes.count
                     )
