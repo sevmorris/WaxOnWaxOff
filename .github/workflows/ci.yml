@@ -3,10 +3,35 @@ name: CI
 on:
   push:
     branches: [main]
+  # No base-branch filter. With `branches: [main]` a pull request based on
+  # anything else ran no workflow at all, so a stacked PR sat there looking
+  # reviewable while never having been built — #50 reached ready-for-review
+  # with zero runs against its head SHA.
   pull_request:
-    branches: [main]
 
 jobs:
+  lint-shell:
+    # Ubuntu rather than macOS: shellcheck ships on the runner image, and this
+    # job needs no Xcode, so it finishes long before the build does.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+
+      - name: shellcheck the bash scripts
+        run: shellcheck scripts/*.sh
+
+      - name: Syntax-check release.sh
+        # release.sh is zsh and stays zsh — it uses glob qualifiers such as
+        # `Xcode*(N)`, which bash cannot parse, so converting it is a rewrite of
+        # the script that publishes releases rather than a shebang change.
+        # shellcheck refuses the file outright (SC1071: sh/bash/dash/ksh only),
+        # which left the highest-consequence script in the repo with no static
+        # analysis at all. zsh's own parser is the check that does apply.
+        run: zsh -n release.sh
+
   build-and-test:
     # macos-15 carries Xcode 26.x. macos-14 tops out at Xcode 15.4, which can
     # neither open this pbxproj (objectVersion 77) nor supply the Swift 6.2 the

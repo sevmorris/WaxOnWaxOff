@@ -68,8 +68,16 @@ gate_loud() {  # label oldfile newfile
     if [ -z "$oI" ] || [ -z "$nI" ]; then state INCOMPLETE "$1 LUFS/TP unmeasurable"; return; fi
     dI="$(awk -v a="$oI" -v b="$nI" 'BEGIN{printf "%.4f", a-b}')"
     dT="$(awk -v a="$oT" -v b="$nT" 'BEGIN{printf "%.4f", a-b}')"
-    abs_le "$dI" "$LUFS_TOL" && state PASS "$1 LUFS Δ=${dI} (old ${oI} new ${nI})" || state FAIL "$1 LUFS Δ=${dI} > ${LUFS_TOL}"
-    abs_le "$dT" "$TP_TOL"   && state PASS "$1 TP   Δ=${dT} (old ${oT} new ${nT})" || state FAIL "$1 TP Δ=${dT} > ${TP_TOL}"
+    if abs_le "$dI" "$LUFS_TOL"; then
+        state PASS "$1 LUFS Δ=${dI} (old ${oI} new ${nI})"
+    else
+        state FAIL "$1 LUFS Δ=${dI} > ${LUFS_TOL}"
+    fi
+    if abs_le "$dT" "$TP_TOL"; then
+        state PASS "$1 TP   Δ=${dT} (old ${oT} new ${nT})"
+    else
+        state FAIL "$1 TP Δ=${dT} > ${TP_TOL}"
+    fi
 }
 gate_null() {  # label oldfile newfile
     nd="$(null_db "$2" "$3")"
