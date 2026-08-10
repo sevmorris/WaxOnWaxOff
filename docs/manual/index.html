@@ -872,7 +872,7 @@
     <p>While processing with no file selected, the waveform panel shows live phase labels: <em>Analyzing loudness… → Normalizing… → Encoding MP3…</em> Selecting a file shows its waveform and stats instead.</p>
 
     <h3>Why Two Passes?</h3>
-    <p>EBU R128 loudness measurement requires the entire file to compute integrated loudness (gated measurement over the full duration). You can't know the correct gain until you've read every sample, so two passes are unavoidable for accurate normalization. WaxOff makes this transparent: drop the file, click Process, and both passes happen automatically.</p>
+    <p>EBU R128 computes integrated loudness from the full duration of the file. The measurement is gated. Thus WaxOff cannot know the correct gain until it reads every sample. Two passes are necessary for accurate normalization. WaxOff does both passes automatically. Drop the file and click Process.</p>
 
     <h3 id="waxoff-verification">Verification</h3>
     <p>After WaxOff writes a delivered file, WaxOff measures that file again. This is a check of the result. It is not a second processing stage. The audio on disk is complete before the verification starts. WaxOff does not change a delivered file after this point.</p>
