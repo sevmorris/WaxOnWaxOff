@@ -115,9 +115,12 @@ done
 PROBE="${WOW_OLD_FFPROBE:-$(dirname "$OLD")/ffprobe}"
 for ext in mp4 mov; do
     hasv="$("$PROBE" -v error -show_entries stream=codec_type -of csv=p=0 "$CORPUS/speech-in.$ext" 2>/dev/null | grep -c video)"
-    [ "${hasv:-0}" -ge 1 ] \
-        && echo "   speech-in.$ext: video stream present ✓" \
-        || { echo "INCOMPLETE: speech-in.$ext has no video stream — the -map 0:a:0 path would not be exercised" >&2; exit 3; }
+    if [ "${hasv:-0}" -ge 1 ]; then
+        echo "   speech-in.$ext: video stream present ✓"
+    else
+        echo "INCOMPLETE: speech-in.$ext has no video stream — the -map 0:a:0 path would not be exercised" >&2
+        exit 3
+    fi
 done
 
 echo "▶ 5.1 fixture (distinct content per channel where possible)"
