@@ -4,6 +4,16 @@ import UserNotifications
 enum NotificationService {
     static func showCompletionNotification(mode: AppMode, fileCount: Int) async {
         guard fileCount > 0 else { return }
+
+        // Unit tests are hosted inside the app bundle, so this would otherwise
+        // reach the real notification centre. On a machine that has never
+        // answered the prompt — every fresh CI runner — `authorizationStatus`
+        // is `.notDetermined`, `requestAuthorization` puts up a system dialog,
+        // and with nobody to answer it the `await` below never returns. That
+        // hangs the caller, not just the notification: `DeliveryViewModel`
+        // awaits this before clearing `isProcessing`.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+
         let center = UNUserNotificationCenter.current()
 
         do {

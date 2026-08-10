@@ -51,6 +51,16 @@ final class DeliveryViewModel {
     }
     var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
+    /// True from the moment a restart is scheduled until the new batch starts.
+    ///
+    /// `cancelProcessing()` clears `isProcessing` synchronously, but the restart
+    /// cannot begin until the outstanding task finishes unwinding — which means
+    /// SIGTERM to every live ffmpeg/ffprobe and the task group waiting on each
+    /// one. Without this flag that gap reads as idle: the toolbar falls through
+    /// to an enabled Process button, and a second press takes the start path,
+    /// producing a batch that the *outstanding* task's cleanup then clobbers.
+    private(set) var isRestarting = false
+
     /// Whether `process()` will start a batch rather than return.
     ///
     /// Idle starts, obviously. The verification tail also starts: delivery is
@@ -129,7 +139,16 @@ final class DeliveryViewModel {
     }
 
     func process() {
-        guard !files.isEmpty else { return }
+        // `isRestarting` closes the window the re-entry branch below opens.
+        // Awaiting the outstanding task was never enough on its own: it orders
+        // the *restart* correctly, but the user is a second caller. Between
+        // `cancelProcessing()` and the restart firing, `isProcessing` is already
+        // false, so a second press fell straight through to the start path — and
+        // the outstanding task's cleanup then landed on that new batch, leaving
+        // it rendering with `isProcessing` false and `processingTask` nil: no
+        // Cancel, no readout, and a third press able to start yet another batch
+        // over the same output paths.
+        guard !files.isEmpty, !isRestarting else { return }
 
         // Re-entry. Until now nothing here blocked a second call — the toolbar
         // hiding Process was the only thing preventing it, which left a UI
@@ -147,9 +166,13 @@ final class DeliveryViewModel {
         // batch. That is by construction, not by clearing the list.
         if isProcessing {
             guard canStartNewBatch, let outstanding = processingTask else { return }
+            isRestarting = true
             cancelProcessing()
             Task { @MainActor [weak self] in
                 _ = await outstanding.value
+                // Cleared immediately before re-entering, so the guard above
+                // holds for the whole unwind and not a moment longer.
+                self?.isRestarting = false
                 self?.process()
             }
             return

@@ -115,7 +115,22 @@ struct WaxOffMainView: View {
             // drainVerifications honours cancellation, so the button still does
             // something real — and what it cancels costs nothing on disk, since
             // every file is already delivered. The label says so.
-            if viewModel.isProcessing && viewModel.isVerifying {
+            // First, because it is the one state where neither of the two below
+            // describes the app. The previous batch is cancelled and unwinding;
+            // the next has not started. `isProcessing` is already false here, so
+            // without this branch the toolbar would show an idle Process button
+            // and invite the second press that the guard in `process()` now
+            // refuses. No control: the wait is subprocess teardown, it is short,
+            // and there is nothing here worth cancelling.
+            if viewModel.isRestarting {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Starting next batch…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if viewModel.isProcessing && viewModel.isVerifying {
                 // Both controls, because both are meaningful here. Stop
                 // verifying ends the advisory pass; Process starts the next
                 // batch, cancelling that pass on its way. Process stays
