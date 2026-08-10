@@ -34,6 +34,15 @@ final class ContentViewModel {
     }
     var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
+    /// Whether the file list can be edited.
+    ///
+    /// A batch works from a snapshot taken at Process, so removing rows mid-run
+    /// stops nothing — the completion callbacks simply stop finding their rows,
+    /// and files keep landing on disk with no UI left showing them. WaxOn has
+    /// no verification tail, so unlike WaxOff's version of this there is no
+    /// window where a batch is outstanding but editing is harmless.
+    var canEditFileList: Bool { !isProcessing }
+
     // nonisolated: with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
     // deinit would be MainActor-isolated, and macOS 15's isolated-deinit runtime
     // (swift_task_deinitOnExecutor, reached via the back-deploy shim) malloc-aborts

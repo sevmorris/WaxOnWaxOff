@@ -104,25 +104,25 @@ struct WaxOffMainView: View {
                 }
             }
 
-            // Three states, not two. `isProcessing` stays true until run()
-            // returns, which is after the verification pool drains — so keying
-            // Cancel/Process off it alone left the toolbar claiming a delivery
-            // was still running for the whole tail (#24). `isVerifying` splits
-            // that window: files are written, only the advisory re-measurement
-            // remains.
+            // Four states, and the view no longer works out which one it is in.
+            // It used to walk isRestarting / isProcessing / isVerifying itself,
+            // which meant the rule "Process is offered exactly when the model
+            // would start a batch" lived in two places and was pinned in
+            // neither. `toolbarState` decides; the tests assert the
+            // correspondence.
             //
-            // Cancel stays available during the tail rather than being hidden.
-            // drainVerifications honors cancellation, so the button still does
-            // something real — and what it cancels costs nothing on disk, since
-            // every file is already delivered. The label says so.
-            // First, because it is the one state where neither of the two below
-            // describes the app. The previous batch is cancelled and unwinding;
-            // the next has not started. `isProcessing` is already false here, so
-            // without this branch the toolbar would show an idle Process button
-            // and invite the second press that the guard in `process()` now
-            // refuses. No control: the wait is subprocess teardown, it is short,
-            // and there is nothing here worth cancelling.
-            if viewModel.isRestarting {
+            // The reasons each state exists, since the enum cases cannot carry
+            // them: isProcessing stays true until run() returns, which is after
+            // the verification pool drains — keying Cancel/Process off it alone
+            // left the toolbar claiming a delivery was still running for the
+            // whole tail (#24). And a restart has isProcessing already false
+            // while the previous batch is still unwinding, so without its own
+            // state the toolbar showed an idle Process button and invited the
+            // second press that `process()` now refuses.
+            switch viewModel.toolbarState {
+            case .restarting:
+                // No control. The wait is subprocess teardown, it is short, and
+                // there is nothing here worth cancelling.
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.small)
@@ -130,14 +130,20 @@ struct WaxOffMainView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            } else if viewModel.isProcessing && viewModel.isVerifying {
+
+            case .verifying:
                 // Both controls, because both are meaningful here. Stop
                 // verifying ends the advisory pass; Process starts the next
-                // batch, cancelling that pass on its way. Process stays
-                // disabled while newly dropped files analyse, which is what
-                // makes "drop during the tail, then start" work without any
-                // queueing machinery — the button simply lights up when the
-                // new files are ready.
+                // batch, cancelling that pass on its way. Cancel stays
+                // available rather than hidden: drainVerifications honors
+                // cancellation, so the button does something real — and what it
+                // cancels costs nothing on disk, since every file is already
+                // delivered. The label says so.
+                //
+                // Process stays disabled while newly dropped files analyze,
+                // which is what makes "drop during the tail, then start" work
+                // without any queueing machinery — the button simply lights up
+                // when the new files are ready.
                 Button {
                     viewModel.cancelProcessing()
                 } label: {
@@ -154,14 +160,16 @@ struct WaxOffMainView: View {
                 .help(viewModel.isAnyFileAnalyzing
                       ? "Waiting for analysis to complete…"
                       : "Starts the next batch and stops the remaining verification passes.")
-            } else if viewModel.isProcessing {
+
+            case .delivering:
                 Button {
                     viewModel.cancelProcessing()
                 } label: {
                     Label("Cancel", systemImage: "stop.fill")
                 }
                 .tint(.red)
-            } else {
+
+            case .idle:
                 Button {
                     viewModel.process()
                 } label: {
@@ -171,18 +179,25 @@ struct WaxOffMainView: View {
                 .help(viewModel.isAnyFileAnalyzing ? "Waiting for analysis to complete…" : "")
             }
 
+            // Editing the list is refused while renders are in flight. The
+            // batch works from a snapshot taken at Process, so removing rows
+            // does not stop anything — the completion callbacks just stop
+            // finding their rows, and files keep landing on disk with nothing
+            // in the UI to show for them. Still allowed during the tail, where
+            // the files are already written.
             Button {
                 viewModel.removeSelected()
             } label: {
                 Label("Remove", systemImage: "minus.circle")
             }
-            .disabled(viewModel.selectedFileIDs.isEmpty)
+            .disabled(viewModel.selectedFileIDs.isEmpty || !viewModel.canEditFileList)
 
             Button {
                 viewModel.clearAll()
             } label: {
                 Label("Clear", systemImage: "trash")
             }
+            .disabled(viewModel.files.isEmpty || !viewModel.canEditFileList)
             .keyboardShortcut(.delete, modifiers: [.command, .option])
 
             Divider()

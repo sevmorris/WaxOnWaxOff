@@ -68,7 +68,60 @@ final class DeliveryViewModel {
     /// advisory re-measurement, which cancelling costs nothing on disk.
     /// Active delivery does not — a restart there would abandon renders in
     /// progress, and that is a different bargain entirely.
-    var canStartNewBatch: Bool { !isProcessing || isVerifying }
+    ///
+    /// `!isRestarting` is part of the answer, not a detail. During a restart
+    /// `isProcessing` is already false, so the rest of this expression says
+    /// true while `process()` in fact returns at its guard — the property
+    /// promised something it had stopped delivering the moment that guard was
+    /// added. Behaviour never depended on the difference (the re-entry branch
+    /// below is only reached when `isRestarting` is already false), but the
+    /// toolbar reads this to decide whether to offer Process, and it has to be
+    /// asking a question the model actually answers.
+    var canStartNewBatch: Bool { !isRestarting && (!isProcessing || isVerifying) }
+
+    /// Which set of action controls the toolbar shows.
+    ///
+    /// One place decides. The toolbar previously walked the same three flags in
+    /// its own if/else chain, so the rule "Process is offered exactly when
+    /// `canStartNewBatch` is true" held only by the two happening to agree —
+    /// nothing named it and nothing tested it. `toolbarStateOffersProcess`
+    /// pins it now.
+    ///
+    /// Order is the meaning: a restart is in flight even though `isProcessing`
+    /// is already false, and the tail is a kind of processing, so both have to
+    /// be asked about before the plain `isProcessing` case.
+    enum ToolbarState {
+        /// Idle. Process starts a batch.
+        case idle
+        /// Renders in progress. Cancel only — a restart here abandons them.
+        case delivering
+        /// Files written, verification draining. Stop verifying, and Process.
+        case verifying
+        /// Previous batch cancelled and unwinding, next one not yet started.
+        case restarting
+    }
+
+    var toolbarState: ToolbarState {
+        if isRestarting { return .restarting }
+        if isProcessing && isVerifying { return .verifying }
+        if isProcessing { return .delivering }
+        return .idle
+    }
+
+    /// Whether the file list can be edited.
+    ///
+    /// Delivery is writing renders for the rows it holds and the restart is
+    /// about to, so removing them there orphans the batch's UI state without
+    /// stopping any of the work — the callbacks simply stop finding their rows.
+    /// The verification tail is editable on purpose: those files are already on
+    /// disk, and refusing edits there would contradict the whole point of
+    /// letting a new batch start during the window.
+    var canEditFileList: Bool {
+        switch toolbarState {
+        case .idle, .verifying: return true
+        case .delivering, .restarting: return false
+        }
+    }
 
     /// True when every loaded file with known channel info is single-channel. The mono
     /// delivery control only applies to mono sources; for stereo, mixed, or an empty

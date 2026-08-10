@@ -108,18 +108,25 @@ struct ContentView: View {
                 .help(viewModel.isAnyFileAnalyzing ? "Waiting for analysis to complete…" : "")
             }
 
+            // Editing the list is refused while a batch runs. The batch works
+            // from a snapshot taken at Process, so removing rows does not stop
+            // anything — the completion callbacks just stop finding their rows,
+            // and files keep landing on disk with nothing in the UI to show for
+            // them. WaxOff has the same guard, with a tail exemption it needs
+            // and WaxOn does not have.
             Button {
                 viewModel.removeSelected()
             } label: {
                 Label("Remove", systemImage: "minus.circle")
             }
-            .disabled(viewModel.selectedFileIDs.isEmpty)
+            .disabled(viewModel.selectedFileIDs.isEmpty || !viewModel.canEditFileList)
 
             Button {
                 viewModel.clearAll()
             } label: {
                 Label("Clear", systemImage: "trash")
             }
+            .disabled(viewModel.files.isEmpty || !viewModel.canEditFileList)
             .keyboardShortcut(.delete, modifiers: [.command, .option])
 
             Divider()
