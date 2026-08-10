@@ -2,6 +2,26 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.6.1] — 2026-08-10
+
+Fixes and documentation. No audio processing changed — nothing in the signal chain, the filter graphs, or the delivered files is different from 2.6.0.
+
+**Fixed**
+- WaxOff no longer starts a second delivery if you press Process twice while it switches batches. Starting a batch during the verification tail cancels the outstanding one and restarts once it has unwound, and in between the app looked idle: Process was enabled and nothing said otherwise. A second press there began a batch that the outstanding one's cleanup then orphaned — it kept rendering to disk with no progress shown, no working Cancel, and a further press able to start yet another batch over the same output paths. The toolbar now reads "Starting next batch…" during that gap and refuses the second press
+- The toolbar no longer looks stuck after the first batch you ever process. Both modes waited for the completion notification before clearing their running state, and on a Mac that has not yet answered the notification permission prompt that wait does not end until you answer it. A finished delivery sat behind a system prompt that is easy not to connect to the app. Nothing waits for the notification now
+- Clear and Remove are unavailable while a batch is delivering. Both stayed live mid-run, and a batch works from the file list as it stood when you pressed Process — so clearing it stopped nothing. Files kept landing on disk while the rows tracking them disappeared. Both stay available during verification, where the files are already written
+
+**Documentation**
+- The manual and in-app Help document the verification pass: what it is, why every row reads Complete while it runs, what Stop verifying stops, and that the next batch can start during it. 2.6.0 shipped the behaviour with nothing describing it
+- `Vendor/README.md` no longer contradicts itself about the withdrawn FFmpeg binaries. A rule near the top said not to delete the `ffmpeg-deps-*` releases, on the grounds that older ones remain the corresponding artifact for older app versions — while a later section records that one was deliberately removed for the opposite reason. The rule now names the release it protects, and the withdrawn tag is marked as not to be restored
+- "Why Two Passes?" is converted to Simplified Technical English. It was the one paragraph the 2.5.1 conversion missed
+
+**Developer**
+- The WaxOff toolbar no longer works out its own state. It walked the same flags the view model already tracked, so "Process appears exactly when a batch can start" held only because two pieces of code happened to agree — and it had already drifted, with `canStartNewBatch` reading true during a restart while `process()` refused. A named state decides now, and tests pin the correspondence
+- CI lints the shell scripts. `shellcheck` runs over `scripts/*.sh` at full strictness, and `release.sh` gets `zsh -n` — `shellcheck` cannot parse it at all, so the script that publishes releases, deletes GitHub resources and rewrites docs was the one file nothing checked
+- CI runs on pull requests whatever their base branch. A PR based on anything but `main` triggered no workflow, so a stacked PR could reach ready-for-review having never been built
+- `dev/deferred.md` no longer lists four issues as open that had all been closed
+
 ## [2.6.0] — 2026-08-10
 
 **Interface**
