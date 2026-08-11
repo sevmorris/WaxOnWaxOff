@@ -682,6 +682,100 @@ actor DeliveryProcessor {
         return FFmpegRunner.parseLoudnormJSON(from: stderr)?["normalization_type"]
     }
 
+    /// Builds the full FFmpeg argument list for the MP3 encode. Pure — no I/O,
+    /// no process launch — because the input indices shift with which optional
+    /// inputs are present, and an index error here is silent at runtime.
+    ///
+    /// Input order: audio is 0; chapters, when present, is 1; artwork is 2 with
+    /// chapters and 1 without.
+    ///
+    /// `metadata.chapters` is deliberately NOT read here. Chapters must already
+    /// be rendered to an ffmetadata file by the caller and passed as
+    /// `chaptersFile` — this function is pure and does no file I/O. Passing
+    /// metadata with populated chapters but no `chaptersFile` produces
+    /// chapterless output with no error, so callers must render first.
+    nonisolated static func mp3Arguments(
+        input: URL,
+        output: URL,
+        title: String,
+        metadata: EpisodeMetadata,
+        chaptersFile: URL?,
+        settings: WaxOffSettings,
+        outputChannelCount: Int
+    ) -> [String] {
+        // 2× oversample → brick-wall limit → resample back. Lossy codecs add
+        // ~0.5–1.5 dB of inter-sample overshoot on decode, so the limiter sits
+        // 1 dB below the user's true-peak target as margin.
+        let mp3TP = settings.truePeak - 1.0
+        let limitAmp = FFmpegFilters.limiterCeilingAmplitude(dBFS: mp3TP)
+        let mp3SampleRate = 44100
+        let oversampleSr = mp3SampleRate * 2
+        let preEncodeFilter = [
+            FFmpegFilters.aresample(to: oversampleSr),
+            "alimiter=limit=\(limitAmp):attack=1:release=20:level=disabled",
+            FFmpegFilters.aresample(to: mp3SampleRate)
+        ].joined(separator: ",")
+
+        var args = ["-hide_banner", "-nostats", "-y", "-i", input.path]
+
+        var nextInputIndex = 1
+        var chaptersIndex: Int?
+        if let chaptersFile {
+            args += ["-i", chaptersFile.path]
+            chaptersIndex = nextInputIndex
+            nextInputIndex += 1
+        }
+        var artworkIndex: Int?
+        if let artworkURL = metadata.artworkURL {
+            args += ["-i", artworkURL.path]
+            artworkIndex = nextInputIndex
+            nextInputIndex += 1
+        }
+
+        // Explicit mapping is mandatory once a second input exists: FFmpeg's
+        // default stream selection would otherwise start choosing for us.
+        args += ["-map", "0:a:0"]
+        if let artworkIndex {
+            args += ["-map", "\(artworkIndex):v:0"]
+        }
+
+        args += [
+            "-af", preEncodeFilter,
+            "-c:a", "libmp3lame",
+            "-b:a", "\(settings.mp3Bitrate)k",
+            "-ar", String(mp3SampleRate),
+            "-ac", String(outputChannelCount)
+        ]
+
+        if artworkIndex != nil {
+            args += [
+                "-c:v", "copy",
+                "-disposition:v", "attached_pic",
+                "-metadata:s:v", "title=Album cover",
+                "-metadata:s:v", "comment=Cover (front)"
+            ]
+        }
+
+        // Carry the source's tags, then override with ours.
+        args += ["-map_metadata", "0"]
+        if let chaptersIndex {
+            args += ["-map_chapters", "\(chaptersIndex)"]
+        }
+
+        // Trimmed, not just checked for empty: a title of only spaces would
+        // otherwise be written to the delivered file in place of the stem.
+        let trimmedTitle = metadata.episodeTitle.trimmingCharacters(in: .whitespaces)
+        let episodeTitle = trimmedTitle.isEmpty ? title : trimmedTitle
+        args += ["-metadata", "title=\(FFmpegFilters.metadataValue(episodeTitle))"]
+        let trimmedPodcast = metadata.podcastName.trimmingCharacters(in: .whitespaces)
+        if !trimmedPodcast.isEmpty {
+            args += ["-metadata", "album=\(FFmpegFilters.metadataValue(trimmedPodcast))"]
+        }
+
+        args += ["-id3v2_version", "3", "-f", "mp3", output.path]
+        return args
+    }
+
     /// `title` is the ID3 title to write. It must come from the delivered output's
     /// stem, not from `input`: in MP3-only mode `input` is the temp WAV, named
     /// `{outputStem}.{8-hex}.wav`, and `deletingPathExtension()` strips only the
