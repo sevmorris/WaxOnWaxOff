@@ -8,6 +8,15 @@ nonisolated private let deliveryProcessorLogger = Logger(subsystem: "io.github.s
 struct DeliveryJobInput: Sendable {
     let id: UUID
     let url: URL
+    /// Per-episode ID3 metadata. Empty for a file the user never tagged, which
+    /// reproduces the delivery WaxOff produced before this feature existed.
+    let metadata: EpisodeMetadata
+
+    init(id: UUID, url: URL, metadata: EpisodeMetadata = EpisodeMetadata()) {
+        self.id = id
+        self.url = url
+        self.metadata = metadata
+    }
 }
 
 nonisolated struct DeliveryJobResult: Sendable {
@@ -104,6 +113,7 @@ actor DeliveryProcessor {
                         onFileStarted?(input.id)
                         let (outputs, mp3Fail, verifications) = try await self.process(
                             url: input.url,
+                            metadata: input.metadata,
                             settings: settings,
                             tools: tools,
                             allocator: allocator,
@@ -213,6 +223,7 @@ actor DeliveryProcessor {
 
     private func process(
         url: URL,
+        metadata: EpisodeMetadata,
         settings: WaxOffSettings,
         tools: FFmpegManager.Paths,
         allocator: OutputAllocator,
@@ -374,9 +385,11 @@ actor DeliveryProcessor {
                     input: sourceForMP3,
                     output: mp3TempURL,
                     title: outputStem,
+                    metadata: metadata,
                     settings: settings,
                     outputChannelCount: outputChannelCount,
-                    fileDuration: fileDuration
+                    fileDuration: fileDuration,
+                    onLog: onLog
                 )
 
                 guard FileManager.default.fileExists(atPath: mp3TempURL.path) else {
@@ -776,50 +789,101 @@ actor DeliveryProcessor {
         return args
     }
 
-    /// `title` is the ID3 title to write. It must come from the delivered output's
-    /// stem, not from `input`: in MP3-only mode `input` is the temp WAV, named
-    /// `{outputStem}.{8-hex}.wav`, and `deletingPathExtension()` strips only the
-    /// `.wav` — leaving the UUID fragment in the tag that ships to the podcast feed.
+    /// Chapters that still fall inside the audio, given the duration measured
+    /// at delivery time. The parser already bounded them when the text was
+    /// pasted, but the file on disk may have been replaced since — and a
+    /// chapter starting past the end makes FFmpeg write one whose END precedes
+    /// its START. Order is preserved, which `ChapterMetadataFile` requires.
+    nonisolated static func chaptersWithinDuration(
+        _ chapters: [Chapter],
+        duration: TimeInterval
+    ) -> [Chapter] {
+        chapters.filter { $0.start < duration }
+    }
+
+    /// `title` is the ID3 title fallback. It must come from the delivered
+    /// output's stem, not from `input`: in MP3-only mode `input` is the temp
+    /// WAV named `{outputStem}.{8-hex}.wav`, and `deletingPathExtension()`
+    /// strips only the `.wav` — leaving the UUID fragment in the tag that ships
+    /// to the podcast feed. `metadata.episodeTitle` overrides it when set.
     private func encodeMP3(
         ffmpeg: String,
         input: URL,
         output: URL,
         title: String,
+        metadata: EpisodeMetadata,
         settings: WaxOffSettings,
         outputChannelCount: Int,
-        fileDuration: TimeInterval?
+        fileDuration: TimeInterval?,
+        onLog: (@Sendable (String, LogLevel) -> Void)?
     ) async throws {
-        // 2× oversample → brick-wall limit → resample back
-        // Lossy codecs introduce ~0.5–1.5 dB of inter-sample peak overshoot during decode;
-        // limiter sits 1 dB below the user's true-peak target as a margin so the decoded
-        // MP3 stays under the same effective ceiling as the WAV output.
-        // MP3 always targets 44.1 kHz regardless of the WAV sample rate setting.
-        let mp3TP = settings.truePeak - 1.0
-        let limitAmp = FFmpegFilters.limiterCeilingAmplitude(dBFS: mp3TP)
-        let mp3SampleRate = 44100
-        let oversampleSr = mp3SampleRate * 2
-        let preEncodeFilter = [
-            FFmpegFilters.aresample(to: oversampleSr),
-            "alimiter=limit=\(limitAmp):attack=1:release=20:level=disabled",
-            FFmpegFilters.aresample(to: mp3SampleRate)
-        ].joined(separator: ",")
+        // Artwork that vanished between tagging and delivery is a warning, not
+        // a failure: losing a whole delivery over cover art is the wrong trade.
+        var effectiveMetadata = metadata
+        // `isReadableFile` returns true for a readable directory, so it alone
+        // is not enough: a directory reaching ffmpeg as `-i` fails the encode,
+        // and in MP3-only mode that is a total delivery failure — precisely
+        // what dropping the artwork is meant to avoid.
+        var artworkIsDirectory: ObjCBool = false
+        if let artworkURL = metadata.artworkURL {
+            let exists = FileManager.default.fileExists(atPath: artworkURL.path, isDirectory: &artworkIsDirectory)
+            if !exists || artworkIsDirectory.boolValue || !FileManager.default.isReadableFile(atPath: artworkURL.path) {
+                onLog?("⚠ Artwork is missing, unreadable, or not a file — encoding without cover art: \(artworkURL.lastPathComponent)", .info)
+                effectiveMetadata.artworkURL = nil
+            }
+        }
 
-        let args = [
-            "-hide_banner", "-nostats", "-y",
-            "-i", input.path,
-            "-af", preEncodeFilter,
-            "-c:a", "libmp3lame",
-            "-b:a", "\(settings.mp3Bitrate)k",
-            "-ar", String(mp3SampleRate),
-            "-ac", String(outputChannelCount),
-            // Pull artist/album/etc through from the source, then override the
-            // title so it tracks the filename the user is delivering (the
-            // source's "title" tag is often a stale working name).
-            "-map_metadata", "0",
-            "-metadata", "title=\(FFmpegFilters.metadataValue(title))",
-            "-f", "mp3",
-            output.path
-        ]
+        // Chapters need a duration to close the final chapter. Without one we
+        // cannot write a valid last END, so chapters are skipped rather than
+        // written wrong.
+        var chaptersFile: URL?
+        if !effectiveMetadata.chapters.isEmpty {
+            if let duration = fileDuration {
+                let inRange = Self.chaptersWithinDuration(effectiveMetadata.chapters, duration: duration)
+                if inRange.count != effectiveMetadata.chapters.count {
+                    let dropped = effectiveMetadata.chapters.count - inRange.count
+                    onLog?("⚠ \(title): \(dropped) chapter(s) start past the end of the audio — dropped.", .info)
+                    effectiveMetadata.chapters = inRange
+                }
+
+                if !effectiveMetadata.chapters.isEmpty {
+                    chaptersFile = try? ChapterMetadataFile.write(
+                        chapters: effectiveMetadata.chapters,
+                        duration: duration,
+                        directory: FileManager.waxonTempDirectory
+                    )
+                    if chaptersFile == nil {
+                        onLog?("⚠ \(title): could not write the chapter file — encoding without chapters.", .info)
+                    }
+                }
+            } else {
+                onLog?("⚠ \(title): could not determine file duration — encoding without chapters.", .info)
+            }
+        }
+        defer { if let chaptersFile { try? FileManager.default.removeItem(at: chaptersFile) } }
+
+        // Trimmed to match mp3Arguments, which discards whitespace-only values.
+        // Reporting "title" for a tag that never gets written would make this
+        // line lie about what shipped — the one thing it exists to answer.
+        let summary = [
+            effectiveMetadata.chapters.isEmpty ? nil : "\(effectiveMetadata.chapters.count) chapters",
+            effectiveMetadata.artworkURL == nil ? nil : "artwork",
+            effectiveMetadata.podcastName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : "album",
+            effectiveMetadata.episodeTitle.trimmingCharacters(in: .whitespaces).isEmpty ? nil : "title"
+        ].compactMap { $0 }
+        if !summary.isEmpty {
+            onLog?("  id3: \(summary.joined(separator: "  |  "))", .verbose)
+        }
+
+        let args = Self.mp3Arguments(
+            input: input,
+            output: output,
+            title: title,
+            metadata: effectiveMetadata,
+            chaptersFile: chaptersFile,
+            settings: settings,
+            outputChannelCount: outputChannelCount
+        )
 
         try await FFmpegRunner.run(exe: ffmpeg, args: args, fileDuration: fileDuration)
     }

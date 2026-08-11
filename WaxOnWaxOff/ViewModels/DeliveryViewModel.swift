@@ -182,6 +182,15 @@ final class DeliveryViewModel {
         showWaxoffWarning = false
     }
 
+    /// Replaces the metadata on one file. Editing is refused mid-batch for the
+    /// same reason removal is: the run works from a snapshot taken at Process,
+    /// so a change made now would not reach the file being delivered.
+    func updateMetadata(_ metadata: EpisodeMetadata, for id: UUID) {
+        guard canEditFileList else { return }
+        guard let index = fileQueue.files.firstIndex(where: { $0.id == id }) else { return }
+        fileQueue.files[index].metadata = metadata
+    }
+
     // Guarded here rather than at each call site. Disabling the toolbar's
     // Remove and Clear covered one route into these and left the list's own
     // two — swipe-to-delete and the Delete key — wide open, so the rule held
@@ -310,7 +319,7 @@ final class DeliveryViewModel {
         fileQueue.snapshotReadyStats()
 
         let currentSettings = settings
-        let inputs = readyFiles.map { DeliveryJobInput(id: $0.id, url: $0.url) }
+        let inputs = readyFiles.map { DeliveryJobInput(id: $0.id, url: $0.url, metadata: $0.metadata) }
 
         processingTask = Task {
             do {
