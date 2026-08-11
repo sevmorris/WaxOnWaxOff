@@ -157,7 +157,7 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         let outputs = job.outputURLs
         let mp3 = try XCTUnwrap(outputs.first(where: { $0.pathExtension == "mp3" }))
 
-        let title = try await titleTag(ffprobe: tools.ffprobe, of: mp3)
+        let title = try await formatTag("title", ffprobe: tools.ffprobe, of: mp3)
         let expected = mp3.deletingPathExtension().lastPathComponent
 
         XCTAssertEqual(title, expected,
@@ -802,10 +802,10 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         return try XCTUnwrap(Double(inputI))
     }
 
-    /// ID3 title tag via ffprobe.
-    private func titleTag(ffprobe: String, of url: URL) async throws -> String {
+    /// A single format-level ID3 tag's exact value via ffprobe (e.g. "title", "album").
+    private func formatTag(_ key: String, ffprobe: String, of url: URL) async throws -> String {
         let out = try await FFmpegRunner.captureStdout(exe: ffprobe, args: [
-            "-v", "error", "-show_entries", "format_tags=title",
+            "-v", "error", "-show_entries", "format_tags=\(key)",
             "-of", "default=nw=1:nk=1", url.path
         ])
         return out.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -818,6 +818,328 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
             "-show_entries", "stream=channels", "-of", "default=nw=1:nk=1", url.path
         ])
         return try XCTUnwrap(Int(out.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+
+    // MARK: - Podcast metadata
+
+    /// Encodes a fully tagged MP3 and probes it back. This is the only test
+    /// that proves the ID3 frames actually land — the argument tests prove we
+    /// build the right command, not that FFmpeg honours it.
+    func testDeliveredMP3CarriesChaptersArtworkAndTags() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "id3_in.wav",
+            durationSeconds: 9.0,
+            sampleRate: 44100
+        )
+
+        // Artwork is embedded with -c:v copy (never decoded or resized), so
+        // its exact size is irrelevant to the code path under test — Apple's
+        // 1400px minimum is a UI-level warning added in a later task, not
+        // something production reads here. Kept small to keep this test fast.
+        let artwork = workDir.appendingPathComponent("cover.png")
+        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "color=c=darkblue:s=400x400",
+            "-frames:v", "1", artwork.path
+        ], fileDuration: nil)
+
+        var metadata = EpisodeMetadata()
+        metadata.podcastName = "Test Podcast"
+        metadata.episodeTitle = "Episode 42"
+        metadata.artworkURL = artwork
+        metadata.chapters = [
+            Chapter(start: 0, title: "Cold Open"),
+            Chapter(start: 3, title: "Main Interview"),
+            Chapter(start: 6, title: "Outro")
+        ]
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input, metadata: metadata)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail: \(result.failures)")
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+
+        let chapterJSON = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_chapters", "-of", "json", mp3.path
+        ])
+        XCTAssertTrue(chapterJSON.contains("Cold Open"), "missing chapter 1 in:\n\(chapterJSON)")
+        XCTAssertTrue(chapterJSON.contains("Main Interview"), "missing chapter 2")
+        XCTAssertTrue(chapterJSON.contains("Outro"), "missing chapter 3")
+
+        let streamJSON = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_streams", "-of", "json", mp3.path
+        ])
+        XCTAssertTrue(streamJSON.contains("\"attached_pic\": 1"), "no attached cover art in:\n\(streamJSON)")
+
+        let title = try await formatTag("title", ffprobe: tools.ffprobe, of: mp3)
+        XCTAssertEqual(title, "Episode 42", "title tag mismatch")
+        let album = try await formatTag("album", ffprobe: tools.ffprobe, of: mp3)
+        XCTAssertEqual(album, "Test Podcast", "album tag mismatch")
+
+        // Guards mp3Arguments' index arithmetic (audio=0, chapters=1,
+        // artwork=2): a mis-mapped stream could pass the tag assertions above
+        // while delivering the wrong — or truncated/absent — audio.
+        let durationStr = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=nw=1:nk=1", mp3.path
+        ])
+        let duration = try XCTUnwrap(Double(durationStr.trimmingCharacters(in: .whitespacesAndNewlines)))
+        XCTAssertEqual(duration, 9.0, accuracy: 0.5, "delivered MP3 duration should match the 9s fixture")
+    }
+
+    /// An untagged file must deliver exactly as it did before this feature.
+    func testUntaggedDeliveryWritesNoChaptersOrArtwork() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "no_id3_in.wav",
+            durationSeconds: 5.0,
+            sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty)
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+
+        let chapterJSON = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_chapters", "-of", "json", mp3.path
+        ])
+        XCTAssertFalse(chapterJSON.contains("\"id\""), "untagged delivery must have no chapters:\n\(chapterJSON)")
+
+        let streamJSON = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_streams", "-of", "json", mp3.path
+        ])
+        XCTAssertFalse(streamJSON.contains("\"attached_pic\": 1"), "untagged delivery must have no cover art")
+    }
+
+    // MARK: - Metadata degradation
+
+    /// Artwork that vanished between tagging and delivery must cost the cover,
+    /// not the delivery. In MP3-only mode a thrown error is a total failure.
+    func testMissingArtworkStillDelivers() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir,
+            name: "missing_art.wav", durationSeconds: 4.0, sampleRate: 44100
+        )
+
+        var metadata = EpisodeMetadata()
+        metadata.episodeTitle = "Still Delivers"
+        metadata.artworkURL = workDir.appendingPathComponent("does-not-exist.png")
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input, metadata: metadata)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty, "missing artwork must not fail the delivery: \(result.failures)")
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+        let streamJSON = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_streams", "-of", "json", mp3.path
+        ])
+        XCTAssertFalse(streamJSON.contains("\"attached_pic\": 1"), "expected no cover art")
+    }
+
+    /// A directory passed as artwork passes `isReadableFile`, so it needs its
+    /// own check — otherwise it reaches ffmpeg as `-i <dir>` and fails the
+    /// whole MP3-only delivery.
+    func testDirectoryAsArtworkStillDelivers() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir,
+            name: "dir_art.wav", durationSeconds: 4.0, sampleRate: 44100
+        )
+
+        let dir = workDir.appendingPathComponent("not-an-image", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        var metadata = EpisodeMetadata()
+        metadata.artworkURL = dir
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input, metadata: metadata)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty, "a directory as artwork must not fail the delivery: \(result.failures)")
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+        let streamJSON = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_streams", "-of", "json", mp3.path
+        ])
+        XCTAssertFalse(streamJSON.contains("\"attached_pic\": 1"), "a directory must not be embedded as cover art")
+    }
+
+    /// Chapters past the end of the audio are dropped, not written with an END
+    /// preceding their START.
+    func testChaptersPastEndOfAudioAreDropped() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir,
+            name: "past_end.wav", durationSeconds: 6.0, sampleRate: 44100
+        )
+
+        var metadata = EpisodeMetadata()
+        metadata.chapters = [
+            Chapter(start: 0, title: "Kept"),
+            Chapter(start: 600, title: "Dropped")
+        ]
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input, metadata: metadata)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail: \(result.failures)")
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+        let chapterJSON = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_chapters", "-of", "json", mp3.path
+        ])
+        XCTAssertTrue(chapterJSON.contains("Kept"), "in-range chapter missing:\n\(chapterJSON)")
+        XCTAssertFalse(chapterJSON.contains("Dropped"), "out-of-range chapter must be dropped:\n\(chapterJSON)")
+    }
+
+    /// Titles that are not Latin-1 representable must survive: ID3v2.3 has no
+    /// UTF-8, so FFmpeg falls back to UTF-16 rather than mangling them.
+    func testNonASCIITagsRoundTrip() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir,
+            name: "unicode.wav", durationSeconds: 4.0, sampleRate: 44100
+        )
+
+        var metadata = EpisodeMetadata()
+        metadata.episodeTitle = "Episode 12 — What’s Next? café 日本語"
+        metadata.podcastName = "Señor Show"
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input, metadata: metadata)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty)
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+
+        let title = try await formatTag("title", ffprobe: tools.ffprobe, of: mp3)
+        XCTAssertEqual(title, "Episode 12 — What’s Next? café 日本語", "unicode title mangled")
+        let album = try await formatTag("album", ffprobe: tools.ffprobe, of: mp3)
+        XCTAssertEqual(album, "Señor Show", "unicode album mangled")
+    }
+
+    /// In `.both` mode only the MP3 is tagged — the WAV is moved into place
+    /// without going through `encodeMP3` at all. Currently true by
+    /// construction; this pins it so a future refactor cannot quietly change it.
+    func testBothModeTagsOnlyTheMP3() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir,
+            name: "both_mode.wav", durationSeconds: 6.0, sampleRate: 44100
+        )
+
+        var metadata = EpisodeMetadata()
+        metadata.podcastName = "Both Mode Show"
+        metadata.chapters = [Chapter(start: 0, title: "One"), Chapter(start: 3, title: "Two")]
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .both
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input, metadata: metadata)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail: \(result.failures)")
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+        let wav = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "wav" }))
+
+        let mp3Chapters = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_chapters", "-of", "json", mp3.path
+        ])
+        XCTAssertTrue(mp3Chapters.contains("One"), "MP3 should carry chapters:\n\(mp3Chapters)")
+
+        let wavChapters = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_chapters", "-of", "json", wav.path
+        ])
+        XCTAssertFalse(wavChapters.contains("One"), "WAV must not carry chapters:\n\(wavChapters)")
+    }
+
+    /// Chapter titles containing ffmetadata's special characters must survive
+    /// a real mux. The unit tests assert the escaped string we generate; only
+    /// this proves FFmpeg parses it back to the original.
+    func testChapterTitlesWithSpecialCharactersSurvive() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir,
+            name: "escaping.wav", durationSeconds: 9.0, sampleRate: 44100
+        )
+
+        var metadata = EpisodeMetadata()
+        metadata.chapters = [
+            Chapter(start: 0, title: "Intro = Part 1"),
+            Chapter(start: 3, title: "Notes; see #2"),
+            Chapter(start: 6, title: #"Back\slash"#)
+        ]
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .mp3
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(
+            inputs: [DeliveryJobInput(id: UUID(), url: input, metadata: metadata)],
+            settings: settings
+        )
+
+        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail: \(result.failures)")
+        let job = try XCTUnwrap(result.successes.first)
+        let mp3 = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "mp3" }))
+        let json = try await FFmpegRunner.captureStdout(exe: tools.ffprobe, args: [
+            "-v", "error", "-show_chapters", "-of", "json", mp3.path
+        ])
+        XCTAssertTrue(json.contains("Intro = Part 1"), "equals mangled:\n\(json)")
+        XCTAssertTrue(json.contains("Notes; see #2"), "semicolon/hash mangled:\n\(json)")
+        // ffprobe's JSON escapes a literal backslash as \\ — assert the encoded form.
+        XCTAssertTrue(json.contains(#"Back\\slash"#), "backslash mangled:\n\(json)")
     }
 }
 
