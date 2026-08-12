@@ -163,6 +163,79 @@ final class ChapterTableTests: XCTestCase {
         let chapters = [Chapter(start: 0, title: "One")]
         XCTAssertEqual(ChapterTableView.applying(start: 60, toChapterWith: UUID(), in: chapters), chapters)
         XCTAssertEqual(ChapterTableView.applying(title: "x", toChapterWith: UUID(), in: chapters), chapters)
+        XCTAssertEqual(ChapterTableView.setting(start: 60, toChapterWith: UUID(), in: chapters), chapters)
+    }
+
+    // MARK: - Committing a time without re-ordering the rows
+
+    /// What a keystroke does now. The value lands; the position does not move.
+    func testSettingAStartCommitsTheValueWithoutMovingTheRow() {
+        let moved = Chapter(start: 120, title: "Third")
+        let chapters = [Chapter(start: 0, title: "First"), Chapter(start: 60, title: "Second"), moved]
+
+        let result = ChapterTableView.setting(start: 30, toChapterWith: moved.id, in: chapters)
+
+        XCTAssertEqual(result.map(\.id), chapters.map(\.id), "no row changes position")
+        XCTAssertEqual(result.map(\.start), [0, 60, 30], "and the array is left out of order")
+        XCTAssertEqual(result[2].title, "Third")
+    }
+
+    /// The reported bug, as the table sees it: a time mid-edit reads `00:0`,
+    /// which is a perfectly valid zero, so it commits — and re-sorting on that
+    /// keystroke threw the row to the top of the list with the caret still in
+    /// it, leapfrogging the chapter at `00:01`.
+    func testAHalfTypedTimeDoesNotReorderTheRows() throws {
+        let half = try XCTUnwrap(ChapterTableView.seconds(fromStamp: "00:0", duration: 10_000))
+        XCTAssertEqual(half, 0, "the half-typed stamp really is valid, which is why it commits at all")
+
+        let edited = Chapter(start: 600, title: "Outro")
+        let chapters = [Chapter(start: 1, title: "Cold open"), Chapter(start: 60, title: "Intro"), edited]
+
+        let result = ChapterTableView.setting(start: half, toChapterWith: edited.id, in: chapters)
+        XCTAssertEqual(result.map(\.id), chapters.map(\.id), "the row the user is typing in stays put")
+        XCTAssertEqual(result[2].start, 0, "while the keystroke is still committed")
+
+        // The old behaviour, kept as the counter-example: `applying` sorts, so
+        // the row shot from the bottom to the top mid-word.
+        let jumped = ChapterTableView.applying(start: half, toChapterWith: edited.id, in: chapters)
+        XCTAssertEqual(jumped[0].id, edited.id, "which is exactly the jump being fixed")
+    }
+
+    /// Why `MetadataSheet` holds the paste box back while a time field is
+    /// focused: regenerating from a transiently unsorted array produces text
+    /// the parser rejects outright, which would flash a red error under a
+    /// half-typed time.
+    func testRegeneratingFromAnUnsortedArrayWouldNotParse() {
+        let edited = Chapter(start: 1, title: "Cold open")
+        let chapters = [Chapter(start: 0, title: "Intro"), edited, Chapter(start: 120, title: "Outro")]
+        let unsorted = ChapterTableView.setting(start: 60, toChapterWith: chapters[0].id, in: chapters)
+
+        XCTAssertEqual(
+            ChapterParser.parse(MetadataSheet.text(from: unsorted), duration: 10_000),
+            .failure(.outOfOrder(number: 2))
+        )
+    }
+
+    /// And what happens on blur: the sort restores normal form, after which the
+    /// usual one-pass sync applies unchanged.
+    func testATransientlyUnsortedArraySettlesOnBlur() throws {
+        let edited = Chapter(start: 1, title: "Cold open")
+        let chapters = [Chapter(start: 0, title: "Intro"), edited, Chapter(start: 120, title: "Outro")]
+        let unsorted = ChapterTableView.setting(start: 200, toChapterWith: edited.id, in: chapters)
+        XCTAssertEqual(unsorted.map(\.start), [0, 200, 120], "unsorted, as a focused time field leaves it")
+
+        let settled = ChapterTableView.sorted(unsorted)
+        XCTAssertEqual(settled.map(\.start), [0, 120, 200])
+        XCTAssertEqual(Set(settled.map(\.id)), Set(chapters.map(\.id)), "no row is lost by settling")
+        XCTAssertEqual(settled[2].id, edited.id, "and the edited row carries its identity to its new place")
+        try assertConverges(settled)
+    }
+
+    /// Settling an array that is already in order must be a no-op, or the blur
+    /// would churn ids on every row for nothing.
+    func testSettlingAnAlreadySortedArrayChangesNothing() {
+        let chapters = [Chapter(start: 0, title: "One"), Chapter(start: 60, title: "Two")]
+        XCTAssertEqual(ChapterTableView.sorted(chapters), chapters)
     }
 
     func testApplyingATitleDoesNotReorder() {

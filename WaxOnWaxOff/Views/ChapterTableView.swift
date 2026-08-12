@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The tabular half of the chapter editor: one editable row per chapter,
-/// sitting under `MetadataSheet`'s paste box and editing the same
+/// sitting above `MetadataSheet`'s paste box and editing the same
 /// `[Chapter]`.
 ///
 /// Three decisions shape everything below.
@@ -26,6 +26,17 @@ import SwiftUI
 /// so the round trip above cannot rewrite text under the cursor, and a
 /// half-typed or unparsable timestamp stays on screen instead of being
 /// reverted to the old value.
+///
+/// One consequence of the second point deserves its own note. Because every
+/// parseable keystroke commits, and because `sorted` is part of normal form,
+/// re-sorting on each of those keystrokes moves the row out from under the
+/// cursor on a half-typed value — `00:01` briefly reads `00:0`, which is a
+/// perfectly valid zero, so the row shoots to the top of the list before the
+/// user has finished. Committing and ordering are therefore separated:
+/// `timeBinding` writes through `setting(start:…)`, which does not re-sort,
+/// and the array is left transiently out of order until the field loses
+/// focus. `isEditingTime` tells `MetadataSheet` that is happening so it can
+/// hold the paste box and re-sort at the right moment.
 struct ChapterTableView: View {
     @Binding var chapters: [Chapter]
     /// nil while the file is still being analyzed. Matches `MetadataSheet`:
@@ -36,6 +47,12 @@ struct ChapterTableView: View {
     /// leaves the model holding the row's *previous* start, so saving while
     /// one is on screen would commit a value the user has visibly replaced.
     @Binding var timeError: String?
+    /// True exactly while a row's *time* field holds focus, which is exactly
+    /// when `chapters` may be out of order. The sheet owns the response to it:
+    /// it defers regenerating the paste box while this is true and re-sorts
+    /// when it goes false. Reported rather than acted on here because both of
+    /// those belong to the surface that owns the text.
+    @Binding var isEditingTime: Bool
 
     /// Literal field contents for rows the user has touched. An entry present
     /// here wins over the model, which is what stops a regenerated round trip
@@ -47,6 +64,13 @@ struct ChapterTableView: View {
     private enum Field: Hashable {
         case time(UUID)
         case title(UUID)
+    }
+
+    /// Whether focus is in a time field — including "nowhere", which is what
+    /// clicking into the paste box or onto the sheet's background looks like.
+    private static func isTimeField(_ field: Field?) -> Bool {
+        if case .time = field { return true }
+        return false
     }
 
     /// Parsing with an unbounded length while the duration is unknown, for the
@@ -61,7 +85,7 @@ struct ChapterTableView: View {
 
         return VStack(alignment: .leading, spacing: 4) {
             if chapters.isEmpty {
-                Text("No chapters yet. Paste them above, or add one below.")
+                Text("No chapters yet. Add one, or paste a list below.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -93,7 +117,19 @@ struct ChapterTableView: View {
         }
         // Drafts are released on blur, not on every keystroke: releasing while
         // the field is focused would snap "1:30" to "01:30" as it is typed.
-        .onChange(of: focused) { previous, _ in releaseDraft(for: previous) }
+        .onChange(of: focused) { previous, current in
+            releaseDraft(for: previous)
+            // Reported after the draft is released so that when the sheet
+            // settles the order, the field it is about to move is already
+            // showing the model's value rather than the last keystrokes.
+            //
+            // Tabbing from one time field straight to another keeps this true,
+            // so no re-sort happens between them. Settling there would move
+            // rows while the user is mid-edit in the next field, which is the
+            // behaviour this whole arrangement exists to stop.
+            let editingTime = Self.isTimeField(current)
+            if isEditingTime != editingTime { isEditingTime = editingTime }
+        }
         // A paste-box edit can retitle or delete a row, which changes or
         // removes its id. Drafts keyed to ids that no longer exist would
         // otherwise sit there forever holding Save disabled.
@@ -178,7 +214,11 @@ struct ChapterTableView: View {
                 // keystrokes on screen and `timeError` blocks Save until it is
                 // either fixed or abandoned.
                 if let start = Self.seconds(fromStamp: typed, duration: limit) {
-                    chapters = Self.applying(start: start, toChapterWith: chapter.id, in: chapters)
+                    // `setting`, not `applying`: the value lands now, the row
+                    // order waits for blur. See the type's doc comment — a
+                    // half-typed `00:0` is a valid zero, and re-sorting on it
+                    // would throw the row to the top of the list mid-word.
+                    chapters = Self.setting(start: start, toChapterWith: chapter.id, in: chapters)
                 }
                 refreshTimeError()
             }
@@ -323,10 +363,14 @@ struct ChapterTableView: View {
         chapters.sorted { $0.start < $1.start }
     }
 
-    /// Moves one chapter to a new start. Mutates in place and re-sorts, so a
-    /// row that changes position carries its `id` — and therefore its drafts
-    /// and its focus — with it rather than swapping contents with a neighbour.
-    nonisolated static func applying(
+    /// Writes a new start and leaves the array in whatever order it was in.
+    /// This is what a keystroke commits: the value is never lost, and the row
+    /// the user is typing in does not move.
+    ///
+    /// The array it returns may therefore be out of order, which is a state no
+    /// consumer outside the sheet is allowed to see. `MetadataSheet` restores
+    /// the order in `settleChapterOrder()` on blur and again before saving.
+    nonisolated static func setting(
         start: TimeInterval,
         toChapterWith id: UUID,
         in chapters: [Chapter]
@@ -334,7 +378,19 @@ struct ChapterTableView: View {
         guard let index = chapters.firstIndex(where: { $0.id == id }) else { return chapters }
         var updated = chapters
         updated[index].start = start
-        return sorted(updated)
+        return updated
+    }
+
+    /// Moves one chapter to a new start and restores the ordering. Mutates in
+    /// place and re-sorts, so a row that changes position carries its `id` —
+    /// and therefore its drafts and its focus — with it rather than swapping
+    /// contents with a neighbour.
+    nonisolated static func applying(
+        start: TimeInterval,
+        toChapterWith id: UUID,
+        in chapters: [Chapter]
+    ) -> [Chapter] {
+        sorted(setting(start: start, toChapterWith: id, in: chapters))
     }
 
     /// No re-sort: a title cannot change the ordering, and re-sorting here

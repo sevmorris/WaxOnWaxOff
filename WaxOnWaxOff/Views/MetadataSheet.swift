@@ -30,7 +30,15 @@ struct MetadataSheet: View {
     /// causes and both have to block Save.
     @State private var chapterTimeError: String?
     @State private var artworkNote: String?
+    /// Why the last dragged file was refused, or nil. Only a drop sets this;
+    /// the `Choose…` panel cannot produce an unacceptable file because it
+    /// filters by content type before the user can pick.
+    @State private var artworkDropError: String?
     @State private var artworkThumbnail: NSImage?
+    @State private var isDropTargeted = false
+    /// True while a chapter row's time field holds focus, reported up by
+    /// `ChapterTableView`. See `settleChapterOrder()`.
+    @State private var isEditingChapterTime = false
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -196,16 +204,28 @@ struct MetadataSheet: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .help(url.path)
-                        if let artworkNote {
-                            Text(artworkNote)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
                     } else {
                         Text("No artwork")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                    // The refusal outranks the dimension note and shows in both
+                    // states. Kept in its own property rather than written into
+                    // `artworkNote`: that line sits directly under the current
+                    // file's name, so "cover.png / Not a PNG or JPEG image"
+                    // would read as a verdict on the artwork already set rather
+                    // than on the thing just dropped. It also has to appear
+                    // when nothing is set at all, where there is no note line.
+                    if let artworkDropError {
+                        Text(artworkDropError)
+                            .font(.caption2)
+                            .foregroundStyle(Color.meterCritical)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if draft.artworkURL != nil, let artworkNote {
+                        Text(artworkNote)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 8)
@@ -221,6 +241,27 @@ struct MetadataSheet: View {
             .padding(10)
             .background(.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.accentColor, lineWidth: 2)
+                    .opacity(isDropTargeted ? 1 : 0)
+            )
+            // The whole well is the target, not just the thumbnail: a 56-point
+            // square is a small thing to hit with a dragged file.
+            //
+            // `isTargeted` can only say that a file is over the well, since the
+            // drop machinery hands the URLs over at drop time and not before.
+            // Whether it is usable art is decided in `acceptDrop`, which is why
+            // a refusal has to be visible afterwards rather than the highlight
+            // simply not appearing.
+            .dropDestination(for: URL.self) { urls, _ in
+                acceptDrop(urls)
+            } isTargeted: { targeted in
+                isDropTargeted = targeted
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Artwork")
+            .accessibilityHint("Drop a PNG or JPEG image here, or use the Choose button.")
         }
     }
 
@@ -259,7 +300,29 @@ struct MetadataSheet: View {
         draft.artworkURL = url
     }
 
+    /// Returns whether the drop was taken, which is what tells AppKit to show
+    /// the accept animation rather than the file snapping back.
+    @discardableResult
+    private func acceptDrop(_ urls: [URL]) -> Bool {
+        switch ArtworkInspector.evaluate(drop: urls) {
+        case .accepted(let url):
+            // Cleared explicitly as well as in `loadArtwork`: dropping the file
+            // that is already set leaves `artworkURL` unchanged, so the
+            // `onChange` that normally does this would not fire.
+            artworkDropError = nil
+            draft.artworkURL = url
+            return true
+        case .rejected(let reason):
+            artworkDropError = reason
+            return false
+        }
+    }
+
     private func loadArtwork(_ url: URL?) {
+        // Cleared here rather than at each call site: every route that changes
+        // the artwork — drop, panel, Clear — goes through this, so a stale
+        // refusal cannot outlive the thing it was refusing.
+        artworkDropError = nil
         guard let url else {
             artworkThumbnail = nil
             artworkNote = nil
@@ -271,10 +334,24 @@ struct MetadataSheet: View {
 
     // MARK: - Chapters
 
+    /// Table first, paste box second. The list is what a returning user comes
+    /// back to edit; pasting is the one-off that starts it off. The two halves
+    /// are otherwise independent — swapping the order back is moving one block
+    /// and rewording the two captions that say which way to look.
     private var chapterEditor: some View {
         field("Chapters") {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Paste one per line: MM:SS Title or HH:MM:SS Title. Edit them in the list below.")
+                ChapterTableView(
+                    chapters: chaptersFromTable,
+                    duration: duration,
+                    timeError: $chapterTimeError,
+                    isEditingTime: $isEditingChapterTime
+                )
+
+                Divider()
+                    .padding(.vertical, 4)
+
+                Text("Or paste a list, one per line: MM:SS Title or HH:MM:SS Title. Pasted chapters appear in the list above.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -304,17 +381,15 @@ struct MetadataSheet: View {
                     .accessibilityLabel("Chapters")
                     .accessibilityHint("One per line: minutes colon seconds, or hours colon minutes colon seconds, followed by a title.")
 
+                // Kept with the paste box rather than with the table: the error
+                // half of it names a line number in this text.
                 status
-
-                Divider()
-                    .padding(.vertical, 4)
-
-                ChapterTableView(
-                    chapters: chaptersFromTable,
-                    duration: duration,
-                    timeError: $chapterTimeError
-                )
             }
+        }
+        // Fires when the last focused time field is left — including for the
+        // paste box, since clicking into it takes focus off the row.
+        .onChange(of: isEditingChapterTime) { _, editing in
+            if !editing { settleChapterOrder() }
         }
     }
 
@@ -340,23 +415,77 @@ struct MetadataSheet: View {
     /// that parsed, so regenerating from a table edit replaces broken text with
     /// text matching what the user was just editing, visibly, and clears the
     /// error rather than leaving the two surfaces permanently disagreeing.
+    ///
+    /// One case suspends all of that. While a row's *time* field is focused the
+    /// table writes a chapter whose start is correct but whose position is not,
+    /// because re-sorting under the cursor is what made a half-typed time throw
+    /// its row across the list. Sorting and regeneration wait for
+    /// `settleChapterOrder()`; the value itself never does.
     private var chaptersFromTable: Binding<[Chapter]> {
         Binding(
             get: { draft.chapters },
             set: { updated in
                 draft.chapters = updated
-                let regenerated = Self.text(from: updated)
-                guard regenerated != chapterText else {
-                    // Same text, so the editor's `onChange` will not fire.
-                    // Reparse by hand so `parseError` still reflects what the
-                    // table just did — an edit that duplicates a start, for
-                    // instance, has to surface even when the text is identical.
-                    reparse()
+                guard !isEditingChapterTime else {
+                    // A time field is focused, so `updated` may be out of
+                    // order and regenerating from it would produce text that
+                    // `ChapterParser` rejects as `.outOfOrder` — a red error
+                    // flashing under a half-typed time, and a paste box the
+                    // user is not even looking at rewriting itself.
+                    //
+                    // The value is committed above regardless; only the text
+                    // and the ordering wait for `settleChapterOrder()`.
+                    validate(ChapterTableView.sorted(updated))
                     return
                 }
-                chapterText = regenerated
+                regeneratePasteBox(from: updated)
             }
         )
+    }
+
+    /// Restores the ordering the rest of the app depends on, and resyncs the
+    /// paste box, once the user has left the time field.
+    ///
+    /// `ChapterMetadataFile.contents(for:duration:)` is documented as requiring
+    /// a sorted array and deliberately does not re-sort — an unsorted one
+    /// yields a chapter whose END precedes its START. Nothing unsorted may
+    /// escape this sheet, so the two exits are covered: this, on blur, and
+    /// `committed(_:)`, for the Save that arrives while a field still has
+    /// focus.
+    private func settleChapterOrder() {
+        let ordered = ChapterTableView.sorted(draft.chapters)
+        draft.chapters = ordered
+        regeneratePasteBox(from: ordered)
+    }
+
+    private func regeneratePasteBox(from chapters: [Chapter]) {
+        let regenerated = Self.text(from: chapters)
+        guard regenerated != chapterText else {
+            // Same text, so the editor's `onChange` will not fire. Reparse by
+            // hand so `parseError` still reflects what the table just did — an
+            // edit that duplicates a start, for instance, has to surface even
+            // when the text is identical.
+            reparse()
+            return
+        }
+        chapterText = regenerated
+    }
+
+    /// Refreshes `parseError` for chapters that have not been written to the
+    /// paste box, without touching either the box or `draft.chapters`.
+    ///
+    /// This is what keeps Save honestly disabled during a deferred edit. Retype
+    /// one row's time to match another's and the list stops being valid
+    /// chapters; before the deferral that surfaced immediately, and it still
+    /// has to, or Save would go live on an array the parser rejects.
+    private func validate(_ chapters: [Chapter]) {
+        let limit = duration ?? .greatestFiniteMagnitude
+        switch ChapterParser.parse(Self.text(from: chapters), duration: limit) {
+        case .success:
+            parseError = nil
+        case .failure(let error):
+            parseError = error.errorDescription
+        }
     }
 
     @ViewBuilder
@@ -403,14 +532,31 @@ struct MetadataSheet: View {
     }
 
     private func save() {
+        onSave(Self.committed(draft))
+        dismiss()
+    }
+
+    /// What Save actually commits.
+    ///
+    /// Static and pure so the two normalizations below are testable, and
+    /// because both of them are silent corruption if they are ever dropped.
+    ///
+    /// The sort is not belt and braces. A time field commits on every parseable
+    /// keystroke precisely because a macOS button click does not reliably end
+    /// field editing — so the click that reaches Save is exactly the one that
+    /// may not have blurred the field, and `settleChapterOrder()` may therefore
+    /// never have run. Committing that array unsorted would hand
+    /// `ChapterMetadataFile` a list it documents as impossible and get back a
+    /// chapter whose END precedes its START.
+    nonisolated static func committed(_ draft: EpisodeMetadata) -> EpisodeMetadata {
         var committed = draft
         // Trim here rather than only in the encoder: `EpisodeMetadata.isEmpty`
         // tests the raw strings, so a stray space would make an otherwise
         // untagged file look tagged everywhere that flag is displayed.
         committed.podcastName = draft.podcastName.trimmingCharacters(in: .whitespacesAndNewlines)
         committed.episodeTitle = draft.episodeTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        onSave(committed)
-        dismiss()
+        committed.chapters = ChapterTableView.sorted(draft.chapters)
+        return committed
     }
 
     /// Reuses the previous chapters' ids wherever an entry is unchanged.

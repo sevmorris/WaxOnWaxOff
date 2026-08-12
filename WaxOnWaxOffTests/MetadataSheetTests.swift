@@ -222,6 +222,79 @@ final class MetadataSheetTests: XCTestCase {
         XCTAssertTrue(MetadataSheet.preservingIdentity(of: previous, in: []).isEmpty)
     }
 
+    // MARK: - committed(_:)
+
+    func testCommittedTrimsTheTwoNames() {
+        var draft = EpisodeMetadata()
+        draft.podcastName = "  The Show \n"
+        draft.episodeTitle = "\tEpisode 12  "
+
+        let committed = MetadataSheet.committed(draft)
+        XCTAssertEqual(committed.podcastName, "The Show")
+        XCTAssertEqual(committed.episodeTitle, "Episode 12")
+    }
+
+    /// The scenario the keystroke-commit design exists to protect: a macOS
+    /// button click does not reliably end field editing, so the click that
+    /// reaches Save is exactly the one that may not have blurred the time
+    /// field — and the array is therefore still in the order the user was
+    /// typing in rather than in time order.
+    func testCommittedSortsChaptersLeftUnsortedByAFocusedTimeField() {
+        let edited = Chapter(start: 200, title: "Cold open")
+        var draft = EpisodeMetadata()
+        draft.chapters = [Chapter(start: 0, title: "Intro"), edited, Chapter(start: 120, title: "Outro")]
+
+        let committed = MetadataSheet.committed(draft)
+        XCTAssertEqual(committed.chapters.map(\.start), [0, 120, 200])
+        XCTAssertEqual(committed.chapters.map(\.title), ["Intro", "Outro", "Cold open"])
+        XCTAssertEqual(Set(committed.chapters.map(\.id)), Set(draft.chapters.map(\.id)), "no chapter is lost")
+    }
+
+    func testCommittedLeavesSortedChaptersExactlyAsTheyAre() {
+        var draft = EpisodeMetadata()
+        draft.chapters = [Chapter(start: 0, title: "One"), Chapter(start: 60, title: "Two")]
+        XCTAssertEqual(MetadataSheet.committed(draft).chapters, draft.chapters)
+    }
+
+    /// Why the sort is in `committed(_:)` and not merely tidy.
+    /// `ChapterMetadataFile.contents(for:duration:)` is documented as requiring
+    /// a sorted array and deliberately does not re-sort: an unsorted one yields
+    /// a chapter whose END precedes its START, which is a broken file rather
+    /// than a broken sheet.
+    func testCommittedChaptersSatisfyTheChapterFilePrecondition() throws {
+        let edited = Chapter(start: 200, title: "Cold open")
+        var draft = EpisodeMetadata()
+        draft.chapters = [Chapter(start: 0, title: "Intro"), edited, Chapter(start: 120, title: "Outro")]
+
+        // The counter-example first, so the assertion below is not vacuous.
+        let raw = try Self.chapterBounds(ChapterMetadataFile.contents(for: draft.chapters, duration: 300))
+        XCTAssertTrue(raw.contains { $0.end < $0.start }, "an unsorted array really does invert a chapter")
+
+        let good = try Self.chapterBounds(
+            ChapterMetadataFile.contents(for: MetadataSheet.committed(draft).chapters, duration: 300)
+        )
+        XCTAssertEqual(good.count, 3)
+        for bounds in good {
+            XCTAssertLessThan(bounds.start, bounds.end, "every chapter ends after it starts")
+        }
+    }
+
+    /// START/END pairs from an ffmetadata file, in order.
+    private static func chapterBounds(_ contents: String) throws -> [(start: Int, end: Int)] {
+        var starts: [Int] = []
+        var ends: [Int] = []
+        for line in contents.split(whereSeparator: \.isNewline) {
+            if line.hasPrefix("START="), let value = Int(line.dropFirst("START=".count)) {
+                starts.append(value)
+            }
+            if line.hasPrefix("END="), let value = Int(line.dropFirst("END=".count)) {
+                ends.append(value)
+            }
+        }
+        XCTAssertEqual(starts.count, ends.count)
+        return Array(zip(starts, ends)).map { (start: $0.0, end: $0.1) }
+    }
+
     /// The whole point, end to end: render chapters to text, parse them back the
     /// way `reparse()` does, and confirm identity survives the trip.
     func testIdentitySurvivesAFullRenderParseCycle() throws {

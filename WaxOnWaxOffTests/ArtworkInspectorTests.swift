@@ -1,4 +1,5 @@
 import XCTest
+import UniformTypeIdentifiers
 @testable import WaxOnWaxOff
 
 /// Covers `ArtworkInspector`, which reads cover-art dimensions and thumbnails
@@ -60,6 +61,71 @@ final class ArtworkInspectorTests: XCTestCase {
         let missing = FileManager.default.temporaryDirectory
             .appendingPathComponent("waxoff-not-here-\(UUID().uuidString).png")
         XCTAssertNil(ArtworkInspector.thumbnail(for: missing, maxPixelSize: 128))
+    }
+
+    // MARK: - Dropped files
+
+    func testDropAcceptsAPNG() throws {
+        let url = try makeImage(width: 1400, height: 1400, name: "dropped.png")
+        XCTAssertEqual(ArtworkInspector.evaluate(drop: [url]), .accepted(url))
+    }
+
+    func testDropAcceptsAJPEG() throws {
+        let url = try makeImage(width: 1400, height: 1400, name: "dropped.jpg")
+        XCTAssertEqual(ArtworkInspector.evaluate(drop: [url]), .accepted(url))
+    }
+
+    /// The reason the check reads the file's header instead of its path
+    /// extension. macOS binds a file's type from its extension, so this file
+    /// claims to be `public.png` and any extension-based test — including
+    /// `URLResourceValues.contentType` — accepts it. It would then be handed to
+    /// FFmpeg as cover art and fail the encode with nothing pointing back at
+    /// the drag that caused it.
+    func testDropRejectsANonImageWearingAPNGExtension() throws {
+        let url = workDir.appendingPathComponent("liar.png")
+        try "this is not an image".write(to: url, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(
+            (try url.resourceValues(forKeys: [.contentTypeKey]).contentType)?.identifier,
+            "public.png",
+            "the extension alone would vouch for this file"
+        )
+        XCTAssertEqual(ArtworkInspector.evaluate(drop: [url]), .rejected("Not a PNG or JPEG image"))
+    }
+
+    /// A readable image format that is still not one of the two the encoder
+    /// takes. Refused up front rather than at delivery.
+    func testDropRejectsAnotherImageFormat() throws {
+        let url = try makeImage(width: 200, height: 200, name: "other.tiff")
+        XCTAssertEqual(ArtworkInspector.evaluate(drop: [url]), .rejected("Not a PNG or JPEG image"))
+    }
+
+    /// A directory reaching FFmpeg as `-i` fails the whole encode, so it must
+    /// never be set as artwork in the first place.
+    func testDropRejectsADirectory() throws {
+        let dir = workDir.appendingPathComponent("folder.png", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        XCTAssertEqual(ArtworkInspector.evaluate(drop: [dir]), .rejected("Not a PNG or JPEG image"))
+    }
+
+    func testDropRejectsAMissingFile() {
+        let missing = workDir.appendingPathComponent("gone-\(UUID().uuidString).png")
+        XCTAssertEqual(ArtworkInspector.evaluate(drop: [missing]), .rejected("Not a PNG or JPEG image"))
+    }
+
+    /// One episode has one cover. Picking silently from a multi-file drag would
+    /// leave the user unsure which one they got.
+    func testDropRejectsSeveralFiles() throws {
+        let a = try makeImage(width: 1400, height: 1400, name: "one.png")
+        let b = try makeImage(width: 1400, height: 1400, name: "two.png")
+        XCTAssertEqual(
+            ArtworkInspector.evaluate(drop: [a, b]),
+            .rejected("Drop a single PNG or JPEG image")
+        )
+    }
+
+    func testDropOfNothingIsRejectedRatherThanAccepted() {
+        XCTAssertEqual(ArtworkInspector.evaluate(drop: []), .rejected("Nothing to use as artwork"))
     }
 
     // MARK: - Fixtures
