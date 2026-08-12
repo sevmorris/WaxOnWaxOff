@@ -25,6 +25,10 @@ struct MetadataSheet: View {
     @State private var draft: EpisodeMetadata
     @State private var chapterText: String
     @State private var parseError: String?
+    /// Set by `ChapterTableView` while a row's timestamp field holds something
+    /// unparsable. Separate from `parseError` because the two have different
+    /// causes and both have to block Save.
+    @State private var chapterTimeError: String?
     @State private var artworkNote: String?
     @State private var artworkThumbnail: NSImage?
     @Environment(\.dismiss) private var dismiss
@@ -51,22 +55,36 @@ struct MetadataSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
+        // Two zones, deliberately. Everything editable scrolls; the button row
+        // is a sibling of the scroller, not a child, so it is always on screen.
+        // Previously the whole sheet was one uncapped VStack: a long chapter
+        // list grew the sheet past the window and pushed Cancel and Save off
+        // the bottom, leaving a sheet that could be neither saved nor
+        // dismissed. A chapter table only makes that easier to hit.
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
 
-            if !appliesToOutput {
-                Label(
-                    "Metadata applies to MP3 output only. The current output mode writes no MP3.",
-                    systemImage: "info.circle"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                    if !appliesToOutput {
+                        Label(
+                            "Metadata applies to MP3 output only. The current output mode writes no MP3.",
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    textFields
+                    artworkWell
+                    chapterEditor
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            textFields
-            artworkWell
-            chapterEditor
+            Divider()
 
             HStack {
                 Spacer()
@@ -76,20 +94,29 @@ struct MetadataSheet: View {
                     .keyboardShortcut(.defaultAction)
                     // Saving with an unparsable box would silently keep the
                     // last chapters that *did* parse, which no longer match
-                    // the text on screen.
-                    .disabled(parseError != nil)
-                    .help(parseError == nil ? "" : "Fix the chapter error before saving")
+                    // the text on screen. Same for an unparsable row time: the
+                    // model still holds that row's previous start.
+                    .disabled(saveBlockedReason != nil)
+                    .help(saveBlockedReason ?? "")
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
         }
-        .padding(24)
-        // Width is fixed so the labelled fields line up; height is a floor, not
-        // a cap. A long parse error wraps onto two or three lines and a fixed
-        // height would clip it, which is exactly the text the user needs.
+        // Width is fixed so the labelled fields line up. The height cap is what
+        // keeps the sheet inside the window: `WaxOffMainView` sets the window's
+        // content minimum to 624, so 600 always fits and the scroller absorbs
+        // any amount of chapter content beyond it.
         .frame(width: 520)
-        .frame(minHeight: 560)
+        .frame(minHeight: 420, maxHeight: 600)
         .onChange(of: draft.artworkURL, initial: true) { _, url in
             loadArtwork(url)
         }
+    }
+
+    private var saveBlockedReason: String? {
+        if parseError != nil { return "Fix the chapter error before saving" }
+        if chapterTimeError != nil { return "Fix the chapter time before saving" }
+        return nil
     }
 
     private var header: some View {
@@ -247,20 +274,22 @@ struct MetadataSheet: View {
     private var chapterEditor: some View {
         field("Chapters") {
             VStack(alignment: .leading, spacing: 6) {
-                Text("One per line: MM:SS Title or HH:MM:SS Title")
+                Text("Paste one per line: MM:SS Title or HH:MM:SS Title. Edit them in the list below.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                // Deliberately uncapped: with no `maxHeight` and no enclosing
-                // ScrollView, a very long pasted list grows the sheet rather
-                // than scrolling inside a fixed box. A stopgap, not an
-                // oversight — Task 9 replaces this box with a real chapter
-                // table, which is where the scrolling belongs.
+                // A fixed height, not a floor. `TextEditor` is itself a scroll
+                // view, and inside the sheet's outer `ScrollView` it is offered
+                // unbounded height — with only a `minHeight` it grows to fit
+                // its content instead of scrolling, which is the same runaway
+                // growth the outer scroller was added to prevent. Pinning the
+                // height makes it a bounded box that scrolls internally.
                 TextEditor(text: $chapterText)
                     .font(.system(.body, design: .monospaced))
                     .scrollContentBackground(.hidden)
                     .padding(4)
-                    .frame(minHeight: 140)
+                    .frame(height: 140)
                     .background(.primary.opacity(0.05))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(
@@ -276,8 +305,58 @@ struct MetadataSheet: View {
                     .accessibilityHint("One per line: minutes colon seconds, or hours colon minutes colon seconds, followed by a title.")
 
                 status
+
+                Divider()
+                    .padding(.vertical, 4)
+
+                ChapterTableView(
+                    chapters: chaptersFromTable,
+                    duration: duration,
+                    timeError: $chapterTimeError
+                )
             }
         }
+    }
+
+    /// The binding the table writes through.
+    ///
+    /// Note what this is *not*: an `onChange(of: draft.chapters)` observer that
+    /// regenerates `chapterText`. That would also fire while the user types in
+    /// the paste box — typing `1:30 Intro` parses, sets `draft.chapters`, and
+    /// the observer would immediately rewrite the box to the canonical
+    /// `01:30 Intro`, moving the caret mid-word. Regeneration has to be scoped
+    /// to writes that actually came from the table, so it lives in the setter.
+    ///
+    /// Assigning `chapterText` fires the editor's own `onChange`, which calls
+    /// `reparse()`. That is the whole sync: table → chapters → text → parse →
+    /// chapters. It settles in one pass because the table only ever writes
+    /// normalized chapters, so the reparse returns exactly what it was given
+    /// and `preservingIdentity` hands back the same ids — `draft.chapters` is
+    /// then unchanged and nothing fires again. `ChapterTableTests` pins that
+    /// fixpoint for every edit the table can make.
+    ///
+    /// A table edit does overwrite a paste box the user has left in an
+    /// unparsable state. That is intentional: the table shows the last chapters
+    /// that parsed, so regenerating from a table edit replaces broken text with
+    /// text matching what the user was just editing, visibly, and clears the
+    /// error rather than leaving the two surfaces permanently disagreeing.
+    private var chaptersFromTable: Binding<[Chapter]> {
+        Binding(
+            get: { draft.chapters },
+            set: { updated in
+                draft.chapters = updated
+                let regenerated = Self.text(from: updated)
+                guard regenerated != chapterText else {
+                    // Same text, so the editor's `onChange` will not fire.
+                    // Reparse by hand so `parseError` still reflects what the
+                    // table just did — an edit that duplicates a start, for
+                    // instance, has to surface even when the text is identical.
+                    reparse()
+                    return
+                }
+                chapterText = regenerated
+            }
+        )
     }
 
     @ViewBuilder
