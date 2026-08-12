@@ -124,6 +124,41 @@ struct HelpView: View {
                     definition("WAV Only (Mastering)", "−18 LUFS, −1.0 dBTP, WAV only at 48 kHz. Use this preset to deliver to a mastering engineer or a video platform.")
                     text("To save your own preset, use the Preset menu › Save Current Settings…. Custom presets stay available after you restart the app. To delete a custom preset, use Manage Presets… in the same menu.")
                 }
+                section("WaxOff — Episode Metadata") {
+                    text("""
+                    WaxOff can write podcast metadata into a delivered MP3 file. Select one \
+                    file in the list. Click Metadata in the toolbar. A sheet opens for that \
+                    file. The Metadata button is available only when exactly one file is \
+                    selected. The button is not available while a batch delivers. The button \
+                    stays available during the verification.
+                    """)
+                    text("""
+                    Metadata applies to MP3 output only. WaxOff writes the episode metadata \
+                    into the MP3 file. The WAV file keeps only the metadata of the source \
+                    file. The sheet shows a notice when the output mode writes no MP3. \
+                    Metadata belongs to one file. A preset does not keep metadata. Settings \
+                    does not keep metadata. WaxOff writes the tags as ID3v2.3.
+                    """)
+                    definition("Podcast Name", "This is the name of the show. WaxOff writes it as the ID3 album tag.")
+                    definition("Episode Title", "This is the title of the episode. WaxOff writes it as the ID3 title tag. Leave the field empty to use the name of the delivered file. All the earlier versions do the same.")
+                    definition("Artwork", "Use a PNG or JPEG image for the front cover. Drag one image onto the artwork area, or click Choose…. The sheet refuses a different type of file and shows the reason. Apple Podcasts asks for a square image from 1400 to 3000 pixels. The sheet shows a note for a different shape or size. The note is advice only. WaxOff delivers the file in all conditions.")
+                    definition("Chapters", "The chapter table is first. Each row is one chapter. You can change a time, change a title, remove a chapter, or add a chapter. The paste box is below the table. Paste one chapter on each line. Use MM:SS Title or HH:MM:SS Title. The table and the box always show the same chapters.")
+                    text("""
+                    Each chapter time must be later than the time before it. No chapter time \
+                    can be at or after the end of the audio. Each chapter must have a title. \
+                    An error message names the line that is not correct. The Save button is \
+                    not available while an error message shows.
+                    """)
+                    text("""
+                    A tag marker shows on the row of a file that has metadata. Put the pointer \
+                    on the marker to see what the file has. The marker stays after the \
+                    delivery.
+                    """)
+                    text("""
+                    WaxOff does not write an episode description. The RSS feed of your podcast \
+                    supplies the description to the podcast apps.
+                    """)
+                }
 
                 dividerRow
 
