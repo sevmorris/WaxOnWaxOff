@@ -22,7 +22,7 @@ struct WaxOffMainView: View {
     /// edits what it was opened on, and `updateMetadata` already no-ops if that
     /// row is gone by the time Save lands.
     ///
-    /// It copies four fields rather than holding the `FileItem` itself, even
+    /// It copies five fields rather than holding the `FileItem` itself, even
     /// though `FileItem` is already `Identifiable` and would bind to
     /// `.sheet(item:)` directly. Doing that would pin `waveform`,
     /// `outputWaveform`, `analysisStats`, `outputStats` and `outputFileInfo`
@@ -30,12 +30,17 @@ struct WaxOffMainView: View {
     private struct MetadataTarget: Identifiable {
         let id: UUID
         let fileName: String
+        /// The source file itself, not just its name: the Episode Title
+        /// placeholder is the stem `DeliveryProcessor` will deliver this file
+        /// under, and that is computed from the whole URL.
+        let sourceURL: URL
         let duration: TimeInterval?
         let metadata: EpisodeMetadata
 
         init(file: FileItem) {
             self.id = file.id
             self.fileName = file.url.lastPathComponent
+            self.sourceURL = file.url
             // The optional passes straight through. Coalescing to 0 would make
             // `ChapterParser`'s `start < duration` check reject every line the
             // user pastes into a file that is still analyzing.
@@ -126,6 +131,15 @@ struct WaxOffMainView: View {
                 // input here that is not per-file, and the notice should be
                 // right even if something changed it while the sheet is up.
                 appliesToOutput: viewModel.settings.outputMode != .wav,
+                // Same reason for the target loudness: it is a settings value,
+                // and it is part of the delivered name. Reading it live keeps
+                // the placeholder honest if the target changes with the sheet
+                // open. The stem itself comes from `DeliveryProcessor`, which
+                // is what actually names the file.
+                deliveredStem: DeliveryProcessor.deliveredStem(
+                    forSource: target.sourceURL,
+                    targetLUFS: viewModel.settings.targetLUFS
+                ),
                 metadata: target.metadata
             ) { updated in
                 viewModel.updateMetadata(updated, for: target.id)

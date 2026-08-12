@@ -20,6 +20,13 @@ struct MetadataSheet: View {
     /// edited here reaches a delivered file. Passed in rather than read from
     /// settings so this view stays independent of the settings model.
     let appliesToOutput: Bool
+    /// The stem the delivered file is expected to get, shown as the Episode
+    /// Title placeholder because an empty title is tagged with exactly that.
+    /// Computed by the caller from `DeliveryProcessor.deliveredStem(forSource:targetLUFS:)`
+    /// — the same definition delivery names the file with — rather than
+    /// derived here from `fileName`, which is the source name and does not
+    /// carry the loudness suffix.
+    let deliveredStem: String
     let onSave: (EpisodeMetadata) -> Void
 
     @State private var draft: EpisodeMetadata
@@ -45,12 +52,14 @@ struct MetadataSheet: View {
         fileName: String,
         duration: TimeInterval?,
         appliesToOutput: Bool,
+        deliveredStem: String,
         metadata: EpisodeMetadata,
         onSave: @escaping (EpisodeMetadata) -> Void
     ) {
         self.fileName = fileName
         self.duration = duration
         self.appliesToOutput = appliesToOutput
+        self.deliveredStem = deliveredStem
         self.onSave = onSave
         self._draft = State(initialValue: metadata)
         // Seeded here rather than in `onAppear`: seeding on appear means the
@@ -158,7 +167,7 @@ struct MetadataSheet: View {
                     // "fall back to the output stem", which is what WaxOff did
                     // before this feature existed. Pre-filling would turn that
                     // fallback into an explicit override the user never chose.
-                    TextField("", text: $draft.episodeTitle, prompt: Text(defaultTitle))
+                    TextField("", text: $draft.episodeTitle, prompt: Text(deliveredStem))
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
                     Text("Leave empty to use the output file name.")
@@ -181,14 +190,6 @@ struct MetadataSheet: View {
                 .kerning(0.4)
             content()
         }
-    }
-
-    /// The stem WaxOff tags with when Episode Title is left empty. Approximate
-    /// by one hop: if the delivered name collides in the output directory the
-    /// allocator appends a suffix, so the real stem can differ. Close enough
-    /// for a placeholder, and never written anywhere.
-    private var defaultTitle: String {
-        (fileName as NSString).deletingPathExtension
     }
 
     // MARK: - Artwork

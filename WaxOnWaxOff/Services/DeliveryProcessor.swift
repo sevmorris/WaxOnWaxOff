@@ -54,6 +54,30 @@ typealias DeferredVerification = @Sendable () async -> Void
 
 actor DeliveryProcessor {
 
+    /// The stem WaxOff will give the delivered file, and therefore the ID3
+    /// title it falls back to when the user sets no episode title. Shared with
+    /// the metadata sheet so its placeholder cannot drift from what delivery
+    /// actually writes — the two disagreed until this was factored out: the
+    /// sheet showed the source stem, delivery wrote the stem plus the loudness
+    /// suffix.
+    ///
+    /// This is the expected name, not a guarantee: `OutputAllocator` appends a
+    /// short tag if two inputs in one batch compute the same name.
+    nonisolated static func deliveredStem(forSource input: URL, targetLUFS: Double) -> String {
+        "\(input.deletingPathExtension().lastPathComponent)-lev\(formatNumber(targetLUFS))LUFS"
+    }
+
+    /// The allocator a batch delivers through. A factory rather than an inline
+    /// closure in `run` so the naming the placeholder relies on is reachable
+    /// from a test: `DeliveredStemTests` drives this exact allocator and
+    /// compares what it hands back with `deliveredStem`, so a change to one and
+    /// not the other fails rather than shipping a placeholder that lies.
+    nonisolated static func outputAllocator(targetLUFS: Double) -> OutputAllocator {
+        OutputAllocator { input in
+            "\(deliveredStem(forSource: input, targetLUFS: targetLUFS)).wav"
+        }
+    }
+
     func run(
         inputs: [DeliveryJobInput],
         settings: WaxOffSettings,
@@ -76,10 +100,7 @@ actor DeliveryProcessor {
         }
 
         let tools = try await FFmpegManager.shared.ensureTools()
-        let lufsTag = formatNumber(settings.targetLUFS)
-        let allocator = OutputAllocator { [lufsTag] input in
-            "\(input.deletingPathExtension().lastPathComponent)-lev\(lufsTag)LUFS.wav"
-        }
+        let allocator = Self.outputAllocator(targetLUFS: settings.targetLUFS)
 
         // Verifications flow from delivery jobs into an independent bounded
         // pool that drains them concurrently with delivery. The pool is sized
@@ -251,9 +272,9 @@ actor DeliveryProcessor {
 
         let allocatedURL = allocator.allocate(for: url, in: outputDir)
         let outputStem = allocatedURL.deletingPathExtension().lastPathComponent
-        let lufs = formatNumber(settings.targetLUFS)
+        let lufs = Self.formatNumber(settings.targetLUFS)
         let tp = String(format: "%.1f", settings.truePeak)
-        let lra = formatNumber(settings.lra)
+        let lra = Self.formatNumber(settings.lra)
 
         onLog?("▶ \(url.lastPathComponent)", .info)
         onLog?("  target: \(lufs) LUFS  |  TP \(tp) dBTP  |  LRA \(lra) LU", .verbose)
@@ -435,7 +456,9 @@ actor DeliveryProcessor {
     /// Whole numbers render without a decimal ("9"), fractions render with one ("9.5").
     /// Used for both display strings and FFmpeg filter parameters — `loudnorm`
     /// accepts either form.
-    private func formatNumber(_ value: Double) -> String {
+    /// Uses no instance state, and `deliveredStem` — which the metadata sheet
+    /// calls from the main actor — needs it, so it is `nonisolated static`.
+    private nonisolated static func formatNumber(_ value: Double) -> String {
         value == value.rounded() ? "\(Int(value))" : String(format: "%.1f", value)
     }
 
@@ -491,9 +514,9 @@ actor DeliveryProcessor {
         upmixToStereo: Bool,
         fileDuration: TimeInterval?
     ) async throws -> LoudnormMeasurements? {
-        let lufs = formatNumber(settings.targetLUFS)
+        let lufs = Self.formatNumber(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
-        let lra  = formatNumber(settings.lra)
+        let lra  = Self.formatNumber(settings.lra)
         // A mono source delivered as stereo is upmixed to dual-mono first so loudnorm
         // measures the stereo signal — matching what renderWAV will produce. (Skipped
         // for true mono delivery, where both passes operate on the native single channel.)
@@ -600,9 +623,9 @@ actor DeliveryProcessor {
         settings: WaxOffSettings,
         fileDuration: TimeInterval?
     ) async -> LoudnormMeasurements? {
-        let lufs = formatNumber(settings.targetLUFS)
+        let lufs = Self.formatNumber(settings.targetLUFS)
         let tp   = String(format: "%.1f", settings.truePeak)
-        let lra  = formatNumber(settings.lra)
+        let lra  = Self.formatNumber(settings.lra)
         let args = [
             "-hide_banner", "-nostats", "-y",
             "-i", output.path, "-map", "0:a:0",
