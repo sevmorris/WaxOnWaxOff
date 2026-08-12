@@ -113,26 +113,10 @@ struct ContentView: View {
                 .help(viewModel.isAnyFileAnalyzing ? "Waiting for analysis to complete…" : "")
             }
 
-            // Editing the list is refused while a batch runs. The batch works
-            // from a snapshot taken at Process, so removing rows does not stop
-            // anything — the completion callbacks just stop finding their rows,
-            // and files keep landing on disk with nothing in the UI to show for
-            // them. WaxOff has the same guard, with a tail exemption it needs
-            // and WaxOn does not have.
-            Button {
-                viewModel.removeSelected()
-            } label: {
-                Label("Remove", systemImage: "minus.circle")
-            }
-            .disabled(viewModel.selectedFileIDs.isEmpty || !viewModel.canEditFileList)
-
-            Button {
-                viewModel.clearAll()
-            } label: {
-                Label("Clear", systemImage: "trash")
-            }
-            .disabled(viewModel.files.isEmpty || !viewModel.canEditFileList)
-            .keyboardShortcut(.delete, modifiers: [.command, .option])
+            // Remove and Clear used to sit here. They manage rows of the list,
+            // not the document, so they now live in `FileListActionBar` under
+            // the list itself. The top bar keeps what acts on the whole
+            // document: mode, preset, Process/Cancel, the settings toggle.
 
             Divider()
                 .frame(height: 20)
@@ -158,8 +142,40 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
     private var fileListSection: some View {
+        // The bar is outside the empty/populated branch on purpose: Add is the
+        // only keyboard-reachable way into an empty list, so hiding it with the
+        // list would hide it at exactly the moment it is needed.
+        VStack(spacing: 0) {
+            fileListContent
+            FileListActionBar(
+                // The empty guard is not cosmetic: `addFiles` assigns its result
+                // to `alertMessage`, so handing it a cancelled panel's empty
+                // array would clear a message the user has not read yet.
+                add: {
+                    let urls = AudioFilePicker.chooseFiles(
+                        validExtensions: viewModel.fileQueue.validExtensions
+                    )
+                    guard !urls.isEmpty else { return }
+                    viewModel.addFiles(urls)
+                },
+                removeSelected: { viewModel.removeSelected() },
+                canRemove: !viewModel.selectedFileIDs.isEmpty && viewModel.canEditFileList,
+                clearAll: { viewModel.clearAll() },
+                // Editing the list is refused while a batch runs. The batch
+                // works from a snapshot taken at Process, so removing rows does
+                // not stop anything — the completion callbacks just stop
+                // finding their rows, and files keep landing on disk with
+                // nothing in the UI to show for them. WaxOff has the same
+                // guard, with a tail exemption it needs and WaxOn does not
+                // have.
+                canClear: !viewModel.files.isEmpty && viewModel.canEditFileList
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var fileListContent: some View {
         if viewModel.files.isEmpty {
             EmptyStateView(mode: appState.mode ?? .waxOn)
         } else {

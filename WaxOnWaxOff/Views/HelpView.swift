@@ -31,6 +31,23 @@ struct HelpView: View {
                     """)
                 }
 
+                section("The File List Bar") {
+                    text("""
+                    A bar is below the file list. It holds the controls for the list and for \
+                    the selected rows. The toolbar at the top of the window holds only the \
+                    controls that apply to all the files.
+                    """)
+                    definition("+", "A dialog opens. Select one file, more than one file, or a folder. Click Add. The dialog accepts the same files as a drag. WaxOn/WaxOff scans a folder and its subfolders for supported audio files. This button stays available while a batch runs.")
+                    definition("−", "This button removes the selected rows from the list. It is available only when you select one row or more. It is not available while a batch runs. You can also press Delete.")
+                    definition("Metadata", "WaxOff only. A sheet opens for the selected file. Refer to WaxOff — Episode Metadata below.")
+                    definition("Clear All", "This button removes all the rows from the list. It is not available while a batch runs. You can also press Command-Option-Delete.")
+                    text("""
+                    The buttons show their names when the file list is wide. If you make the \
+                    list narrow, the buttons show only their icons. Put the pointer on a \
+                    button to see its name.
+                    """)
+                }
+
                 dividerRow
 
                 section("WaxOn — Raw Recording Prep") {
@@ -45,7 +62,7 @@ struct HelpView: View {
                 section("WaxOn — Quick Start") {
                     steps([
                         "Set the sample rate and the output channels in Settings. The toggles and the knobs are in the control bar.",
-                        "Drag your audio files onto the window or onto the file list.",
+                        "Drag your audio files onto the window or onto the file list. As an alternative, click the plus button in the bar below the file list.",
                         "Click Process. WaxOn writes the output files to the folder of the source files."
                     ])
                 }
@@ -90,7 +107,7 @@ struct HelpView: View {
                 section("WaxOff — Quick Start") {
                     steps([
                         "Select a preset from the menu in the header. As an alternative, set your own values.",
-                        "Drag your finished mix file onto the window.",
+                        "Drag your finished mix file onto the window. As an alternative, click the plus button in the bar below the file list.",
                         "Click Process. WaxOff writes the output files to the folder of the source file."
                     ])
                 }
@@ -127,10 +144,10 @@ struct HelpView: View {
                 section("WaxOff — Episode Metadata") {
                     text("""
                     WaxOff can write podcast metadata into a delivered MP3 file. Select one \
-                    file in the list. Click Metadata in the toolbar. A sheet opens for that \
-                    file. The Metadata button is available only when exactly one file is \
-                    selected. The button is not available while a batch delivers. The button \
-                    stays available during the verification.
+                    file in the list. Click Metadata in the bar below the file list. A sheet \
+                    opens for that file. The Metadata button is available only when exactly \
+                    one file is selected. The button is not available while a batch delivers. \
+                    The button stays available during the verification.
                     """)
                     text("""
                     Metadata applies to MP3 output only. WaxOff writes the episode metadata \

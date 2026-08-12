@@ -510,7 +510,7 @@
     <p>Both modes share the same window layout, divided into four areas.</p>
 
     <h3>Toolbar</h3>
-    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left. The Preset picker is next to it. The action buttons (Process, Remove, Clear) are after the Preset picker. In WaxOff there is also a Metadata button after Clear. Refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>. When a batch runs, the Process button becomes Cancel. In WaxOff, the buttons change again when the delivery is complete and the verification continues. Refer to <a href="#waxoff-verification">Verification</a>. The settings-sidebar toggle is at the far right of the toolbar.</p>
+    <p>The top bar contains the mode switcher (WaxOn | WaxOff) on the left. The Preset picker is next to it. The <strong>Process</strong> button is after the Preset picker. When a batch runs, the Process button becomes Cancel. In WaxOff, the buttons change again when the delivery is complete and the verification continues. Refer to <a href="#waxoff-verification">Verification</a>. The settings-sidebar toggle is at the far right of the toolbar. The toolbar holds only the controls that apply to all the files. The controls that apply to one row are in the file-list bar. Refer to <a href="#file-list-bar">File List Bar</a> below.</p>
 
     <h3>File List</h3>
     <p>The left panel shows all the loaded files. Each row shows the filename and a status label. Drag a row to change its position. Drag the vertical divider to change the size of the panel. You can also drag a folder onto the list. The app scans the folder and its subfolders for supported audio files.</p>
@@ -527,7 +527,17 @@
     <p>An advisory banner shows above the list when two or more files are in the WaxOn queue and Phase Rotation is on. If you recorded the files at the same time in the same room, apply phase rotation once at the mix bus instead of once for each track. Refer to <a href="theory.html#phase-rotation">Phase Rotation</a> in the Theory of Operation.</p>
 
     <p>WaxOn processes more than one file at the same time. The number of files depends on the available CPU cores. A file that waits its turn shows a muted static progress bar. This shows that the file is in the queue and is not stalled.</p>
-    <p>To remove files, select them and press <kbd>Delete</kbd>. To clear the full list, press <kbd>⌘⌥Delete</kbd>.</p>
+
+    <h3 id="file-list-bar">File List Bar</h3>
+    <p>A bar is below the file list. It holds the controls that apply to the list and to the selected rows.</p>
+    <ul>
+      <li><strong>+</strong> (Add Files) — a dialog opens. Select one file, more than one file, or a folder. Click <strong>Add</strong>. The app accepts the same files as a drag. It scans a folder and its subfolders for supported audio files. This button stays available while a batch runs, as a drag does.</li>
+      <li><strong>−</strong> (Remove Selected) — this button removes the selected rows from the list. It is available only when one row or more are selected. It is not available while a batch runs.</li>
+      <li><strong>Metadata</strong> (WaxOff only) — a sheet opens for the selected file. Refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>.</li>
+      <li><strong>Clear All</strong> — this button removes all the rows from the list. It is not available while a batch runs.</li>
+    </ul>
+    <p>The buttons show their names when the panel is wide. If you make the panel narrow, the buttons show only their icons. Put the pointer on a button to see its name.</p>
+    <p>To remove files, you can also select them and press <kbd>Delete</kbd>. To clear the full list, you can also press <kbd>⌘⌥Delete</kbd>.</p>
 
     <h3>Waveform Panel</h3>
     <p>The right panel shows different content in different conditions:</p>
@@ -555,7 +565,7 @@
     <ol>
       <li>Click <strong>WaxOn</strong> in the toolbar. As an alternative, select WaxOn in the mode picker.</li>
       <li>Select a preset from the Preset menu in the toolbar. As an alternative, set the controls in the processor strip and the Settings sidebar.</li>
-      <li>Drag your audio files onto the window.</li>
+      <li>Drag your audio files onto the window. As an alternative, click <strong>+</strong> in the bar below the file list and select the files.</li>
       <li>Click <strong>Process</strong>.</li>
     </ol>
   </section>
@@ -738,7 +748,7 @@
     <ol>
       <li>Click <strong>WaxOff</strong> in the toolbar.</li>
       <li>Select a preset from the Preset menu in the toolbar. As an alternative, set the true peak and the target loudness in the processor strip.</li>
-      <li>Drag your finished mix file onto the window.</li>
+      <li>Drag your finished mix file onto the window. As an alternative, click <strong>+</strong> in the bar below the file list and select the file.</li>
       <li>Click <strong>Process</strong>.</li>
     </ol>
   </section>
@@ -923,7 +933,7 @@
     <ol>
       <li>Add your finished mix file to the WaxOff file list.</li>
       <li>Select one file. The <strong>Metadata</strong> button is available only when exactly one file is selected.</li>
-      <li>Click <strong>Metadata</strong> in the toolbar. The button is between <strong>Clear</strong> and the settings toggle. A sheet opens for the selected file.</li>
+      <li>Click <strong>Metadata</strong> in the bar below the file list. The button is between the <strong>−</strong> button and <strong>Clear All</strong>. A sheet opens for the selected file.</li>
       <li>Type the <strong>Podcast Name</strong>.</li>
       <li>Type the <strong>Episode Title</strong>. This step is optional. Refer to <strong>Fields</strong> below.</li>
       <li>Drag an image onto the artwork area, or click <strong>Choose…</strong>. This step is optional. Refer to <strong>Artwork</strong> below.</li>

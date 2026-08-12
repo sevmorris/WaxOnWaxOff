@@ -251,40 +251,11 @@ struct WaxOffMainView: View {
                 .help(viewModel.isAnyFileAnalyzing ? "Waiting for analysis to complete…" : "")
             }
 
-            // Editing the list is refused while renders are in flight. The
-            // batch works from a snapshot taken at Process, so removing rows
-            // does not stop anything — the completion callbacks just stop
-            // finding their rows, and files keep landing on disk with nothing
-            // in the UI to show for them. Still allowed during the tail, where
-            // the files are already written.
-            Button {
-                viewModel.removeSelected()
-            } label: {
-                Label("Remove", systemImage: "minus.circle")
-            }
-            .disabled(viewModel.selectedFileIDs.isEmpty || !viewModel.canEditFileList)
-
-            Button {
-                viewModel.clearAll()
-            } label: {
-                Label("Clear", systemImage: "trash")
-            }
-            .disabled(viewModel.files.isEmpty || !viewModel.canEditFileList)
-            .keyboardShortcut(.delete, modifiers: [.command, .option])
-
-            // Single selection only: every field the sheet edits is
-            // per-episode, so there is no sensible batch meaning for it. Gated on
-            // `canEditFileList` for the same reason Remove and Clear are — the
-            // run works from a snapshot taken at Process, so an edit made
-            // mid-batch would never reach the file being delivered.
-            Button {
-                guard let file = selectedFile else { return }
-                metadataTarget = MetadataTarget(file: file)
-            } label: {
-                Label("Metadata", systemImage: "tag")
-            }
-            .disabled(viewModel.selectedFileIDs.count != 1 || !viewModel.canEditFileList)
-            .help("Edit podcast metadata for the selected file")
+            // Remove, Clear and Metadata used to sit here. All three manage a
+            // row of the list rather than the document, so they now live in
+            // `FileListActionBar` under the list itself. The top bar keeps what
+            // acts on the whole document: mode, preset, Process/Cancel, the
+            // verification readout, the settings toggle.
 
             Divider()
                 .frame(height: 20)
@@ -310,12 +281,50 @@ struct WaxOffMainView: View {
         }
     }
 
-    @ViewBuilder
     private var fileListSection: some View {
-        if viewModel.files.isEmpty {
-            EmptyStateView(mode: .waxOff)
-        } else {
-            DeliveryFileListView(viewModel: viewModel)
+        // The bar is outside the empty/populated branch on purpose: Add is the
+        // only keyboard-reachable way into an empty list, so hiding it with the
+        // list would hide it at exactly the moment it is needed.
+        VStack(spacing: 0) {
+            if viewModel.files.isEmpty {
+                EmptyStateView(mode: .waxOff)
+            } else {
+                DeliveryFileListView(viewModel: viewModel)
+            }
+
+            FileListActionBar(
+                // The empty guard is not cosmetic: `addFiles` assigns its result
+                // to `alertMessage`, so handing it a cancelled panel's empty
+                // array would clear a message the user has not read yet.
+                add: {
+                    let urls = AudioFilePicker.chooseFiles(
+                        validExtensions: viewModel.fileQueue.validExtensions
+                    )
+                    guard !urls.isEmpty else { return }
+                    viewModel.addFiles(urls)
+                },
+                removeSelected: { viewModel.removeSelected() },
+                // Editing the list is refused while renders are in flight. The
+                // batch works from a snapshot taken at Process, so removing rows
+                // does not stop anything — the completion callbacks just stop
+                // finding their rows, and files keep landing on disk with
+                // nothing in the UI to show for them. Still allowed during the
+                // tail, where the files are already written.
+                canRemove: !viewModel.selectedFileIDs.isEmpty && viewModel.canEditFileList,
+                clearAll: { viewModel.clearAll() },
+                canClear: !viewModel.files.isEmpty && viewModel.canEditFileList,
+                editMetadata: {
+                    guard let file = selectedFile else { return }
+                    metadataTarget = MetadataTarget(file: file)
+                },
+                // Single selection only: every field the sheet edits is
+                // per-episode, so there is no sensible batch meaning for it.
+                // Gated on `canEditFileList` for the same reason Remove and
+                // Clear are — the run works from a snapshot taken at Process, so
+                // an edit made mid-batch would never reach the file being
+                // delivered.
+                canEditMetadata: viewModel.selectedFileIDs.count == 1 && viewModel.canEditFileList
+            )
         }
     }
 
