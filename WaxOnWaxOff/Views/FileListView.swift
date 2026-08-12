@@ -106,6 +106,12 @@ struct FileRowView: View {
     /// Declared last and defaulted to nil so this is purely additive: WaxOn's
     /// call site is unchanged and its rows render exactly as before.
     var phase: String? = nil
+    /// Whether a metadata marker may appear on this row. WaxOff only — WaxOn
+    /// does not carry per-episode podcast metadata. Declared last and defaulted
+    /// to false so this is purely additive: WaxOn's call site is unchanged.
+    /// Gating on the flag rather than on `metadata.isEmpty` alone keeps the
+    /// badge from silently appearing in WaxOn if it ever gains metadata.
+    var showsMetadataBadge: Bool = false
 
     /// The warning triangle uses the same mode-aware FLOOR classifier as the stats
     /// panel: it fires only at a flagged severity, and never in WaxOff (where a mix may
@@ -130,6 +136,31 @@ struct FileRowView: View {
                         .background(.secondary.opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                         .help(badge.help)
+                }
+
+                // Deliberately NOT gated on `!file.isProcessed`, which is where
+                // the channel badge above does disappear. The analogy does not
+                // hold: that badge forecasts a conversion that has not happened
+                // yet and is rightly moot once it has. This one records
+                // something already written into the delivered file — a fact,
+                // not a forecast. A finished batch is exactly when someone wants
+                // to scan the list and confirm every episode was tagged, so
+                // hiding it at completion would remove the badge at the one
+                // moment `metadataSummary` is most worth reading.
+                if showsMetadataBadge, !file.metadata.isEmpty {
+                    Image(systemName: "tag.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .help(Self.metadataSummary(file.metadata))
+                        .accessibilityLabel("Has podcast metadata")
+                        // `.help` becomes VoiceOver's *hint*, which is spoken
+                        // only when "Speak hints automatically" is enabled and
+                        // then only after a pause — so on hover a sighted user
+                        // would get the podcast, title, artwork and chapter
+                        // count while a VoiceOver user got "has podcast
+                        // metadata" and nothing else. A value is always
+                        // announced with the element.
+                        .accessibilityValue(Self.metadataSummary(file.metadata))
                 }
 
                 if showsNoiseFloorWarning {
@@ -210,5 +241,35 @@ struct FileRowView: View {
                 .font(.caption)
                 .foregroundStyle(.red)
         }
+    }
+
+    /// Tooltip listing what this file carries, so a batch shows at a glance
+    /// which episodes are tagged without opening each sheet. One field per
+    /// line: AppKit tooltips wrap on newlines, and the alternative separators
+    /// (" • ", ", ") run together with titles that contain the same
+    /// punctuation.
+    ///
+    /// `nonisolated` so the tests can call it off the main actor, matching
+    /// `MetadataSheet`'s static helpers.
+    ///
+    /// The newline separator is the one thing here that has never been looked
+    /// at: no other `.help()` string in this codebase spans multiple lines, and
+    /// the machine this was written on could not grant Screen Recording
+    /// permission, so the rendered tooltip was never seen. AppKit tooltips are
+    /// documented to honor newlines; if this one instead renders as a single
+    /// run-together line, the fix is entirely local to this function and its
+    /// tests.
+    nonisolated static func metadataSummary(_ metadata: EpisodeMetadata) -> String {
+        var parts: [String] = []
+        if !metadata.podcastName.isEmpty { parts.append("Podcast: \(metadata.podcastName)") }
+        if !metadata.episodeTitle.isEmpty { parts.append("Title: \(metadata.episodeTitle)") }
+        if metadata.artworkURL != nil { parts.append("Artwork set") }
+        if !metadata.chapters.isEmpty {
+            // The supplied wording said "\(count) chapters" unconditionally,
+            // which renders "1 chapters". Matches the sheet's own phrasing.
+            let count = metadata.chapters.count
+            parts.append("\(count) chapter\(count == 1 ? "" : "s")")
+        }
+        return parts.isEmpty ? "No metadata" : parts.joined(separator: "\n")
     }
 }
