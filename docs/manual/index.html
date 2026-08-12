@@ -522,7 +522,7 @@
       <li><strong>Output: …</strong> — the file is processed. A green ✓ Complete indicator shows next to the filename. Click the folder icon to show the output file in the Finder</li>
       <li><strong>Error</strong> — the process failed and the message shows in the row</li>
     </ul>
-    <p>In WaxOn, a file with a high estimated noise floor shows an orange warning triangle next to the filename. Put the pointer on the badge to see the detail. WaxOn also shows a badge for a channel conversion. A stereo source with Channels set to Mono shows a <strong>STEREO→MONO L</strong> or <strong>STEREO→MONO R</strong> badge. A source with more than two channels shows <strong>MULTI→MONO</strong>. In WaxOff, a mono source shows a <strong>MONO</strong> badge. By default WaxOff upmixes the file to dual-mono stereo before it processes the audio. If you select Mono delivery, WaxOff does not upmix the file. In WaxOff, a file that has podcast metadata also shows a tag marker next to the filename. Refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>.</p>
+    <p>In WaxOn, a file with a high estimated noise floor shows an orange warning triangle next to the filename. Put the pointer on the badge to see the detail. WaxOn also shows a badge for a channel conversion. A stereo source with Channels set to Mono shows a <strong>STEREO→MONO L</strong> or <strong>STEREO→MONO R</strong> badge. A source with more than two channels shows <strong>MULTI→MONO</strong>. In WaxOff, a mono source shows a <strong>MONO</strong> badge. By default WaxOff upmixes the file to dual-mono stereo before it processes the audio. If you select Mono delivery, WaxOff does not upmix the file. In WaxOff, a file that has podcast metadata also shows a tag badge next to the filename. Refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>.</p>
 
     <p>An advisory banner shows above the list when two or more files are in the WaxOn queue and Phase Rotation is on. If you recorded the files at the same time in the same room, apply phase rotation once at the mix bus instead of once for each track. Refer to <a href="theory.html#phase-rotation">Phase Rotation</a> in the Theory of Operation.</p>
 
@@ -906,7 +906,7 @@
     <p>WaxOff outputs stereo (2 channels) by default. WaxOff accepts a mono input. By default, WaxOff upmixes a mono source to dual-mono stereo before it processes the audio. The <strong>Channels</strong> control in WaxOff Settings can instead deliver a mono source as one channel. The control is available only when all the loaded sources are mono. The control applies to the full batch, not to one file. A stereo source always stays stereo. The control has no effect on a stereo source.</p>
 
     <h3>Metadata</h3>
-    <p>WaxOff copies the metadata from the source file to the output files. WaxOff replaces the title tag with the name of the delivered file. The source title tag is frequently an old working name. To write the show name, the episode title, the cover art, and the chapters of one episode, refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>.</p>
+    <p>WaxOff copies the metadata from the source file to the output files. WaxOff replaces the title tag of the MP3 file with the name of the delivered file. The source title tag is frequently an old working name. To write the show name, the episode title, the cover art, and the chapters of one episode, refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>.</p>
 
     <h3>Location</h3>
     <p>By default, WaxOff writes the output files to the folder of the source file. If you set a custom output directory, WaxOff writes all the files to that directory. If it cannot write to either location, WaxOff uses <code>~/Music/WaxOnWaxOff/</code> instead. If it cannot create or write to that folder, WaxOff uses the Desktop as the last choice. WaxOff asks you to confirm this if more than one file in the batch goes there. WaxOff overwrites an existing file with the same name.</p>
@@ -929,10 +929,10 @@
       <li>Drag an image onto the artwork area, or click <strong>Choose…</strong>. This step is optional. Refer to <strong>Artwork</strong> below.</li>
       <li>Add the chapters in the table, or paste a list into the box below the table. This step is optional. Refer to <strong>Chapters</strong> below.</li>
       <li>Click <strong>Save</strong>.</li>
-      <li>Do steps 2 to 8 again for each different file.</li>
+      <li>Do steps 2 to 8 again for each other file.</li>
       <li>Click <strong>Process</strong>. WaxOff writes the metadata into the MP3 output.</li>
     </ol>
-    <p>The <strong>Metadata</strong> button is not available while a batch is in delivery. A batch uses the file list as it was when you clicked Process. Thus a change during the delivery does not go into the file. The button is available again during the verification, because the files are already written. Refer to <a href="#waxoff-verification">Verification</a>.</p>
+    <p>The <strong>Metadata</strong> button is not available while a batch is in delivery. A batch uses the file list from the moment you click Process. Thus a change during the delivery does not go into the file. The button is available again during the verification, because the files are already written. Refer to <a href="#waxoff-verification">Verification</a>.</p>
 
     <h3>Fields</h3>
     <table class="settings-table">
@@ -952,7 +952,7 @@
         <tr>
           <td>Episode Title</td>
           <td>TIT2 (title)</td>
-          <td>This is the title of the episode. If the field is empty, WaxOff uses the name of the delivered file without the file extension, for example <code>episode-42-lev-18LUFS</code>. This is the behaviour of all the earlier versions. The placeholder in the field shows that name. The name includes the loudness suffix, thus it is not the same as the name of the source file. Refer to <a href="#waxoff-output">WaxOff Output Files</a>.</td>
+          <td>This is the title of the episode. If the field is empty, WaxOff uses the name of the delivered file without the file extension, for example <code>episode-42-lev-18LUFS</code>. This is the behaviour of all the earlier versions. The placeholder in the field shows that name. The name includes the loudness suffix. Thus it is not the same as the name of the source file. Refer to <a href="#waxoff-output">WaxOff Output Files</a>.</td>
         </tr>
         <tr>
           <td>Artwork</td>
@@ -988,19 +988,19 @@ HH:MM:SS Title</code></pre>
     <p>The sheet compares the chapter times with the length of the file. If the analysis of the file is not complete, the sheet cannot do this comparison. The sheet tells you when this occurs.</p>
 
     <h3>Artwork</h3>
-    <p>Use a PNG or JPEG image. WaxOff writes the image as the front cover of the MP3 file. There are two ways to set it:</p>
+    <p>Use a PNG or JPEG image. WaxOff writes the image as the front cover of the MP3 file. Set the artwork in one of two ways:</p>
     <ul>
       <li>Drag one image file onto the artwork area of the sheet.</li>
       <li>Click <strong>Choose…</strong> and select the image file.</li>
     </ul>
-    <p>WaxOff accepts a PNG image or a JPEG image only. If you drag a different type of file, a folder, or more than one file, WaxOff refuses the drop and shows the reason below the file name. WaxOff reads the content of the file to identify the type. A different type of file with a <code>.png</code> or <code>.jpg</code> name is refused.</p>
+    <p>WaxOff accepts a PNG image or a JPEG image only. If you drag a different type of file, a folder, or more than one file, WaxOff refuses the drop. The reason shows in the artwork area, below the name of the current image or below <strong>No artwork</strong>. WaxOff reads the content of the file to identify the type. WaxOff also refuses a different type of file that has a <code>.png</code> or <code>.jpg</code> name.</p>
     <p>The sheet shows a thumbnail of the image and the pixel size. Click <strong>Clear</strong> to remove the artwork.</p>
     <p>Apple Podcasts asks for a square image from 1400 × 1400 to 3000 × 3000 pixels. The sheet shows a note if the image is not square, or is below 1400 px, or is above 3000 px. The note is guidance only. WaxOff delivers the file in all conditions.</p>
 
-    <h3>The Tag Marker</h3>
-    <p>A tag marker shows in the file list on the row of each file that has metadata. Put the pointer on the marker to see a list of what that file has. The marker stays after the delivery. Thus you can look at a completed batch and see which episodes are tagged.</p>
+    <h3>The Tag Badge</h3>
+    <p>A tag badge shows in the file list on the row of each file that has metadata. Put the pointer on the badge to see a list of what that file has. The badge stays after the delivery. Thus you can look at a completed batch and see which episodes are tagged.</p>
 
-    <h3>If Part of the Metadata Cannot Be Written</h3>
+    <h3>Metadata That Cannot Be Written</h3>
     <p>WaxOff always delivers the audio. If part of the metadata cannot be written, WaxOff writes a message to the Console and continues:</p>
     <ul>
       <li>Artwork that is missing, unreadable, or a folder — WaxOff encodes the file with no cover art.</li>

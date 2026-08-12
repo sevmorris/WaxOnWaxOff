@@ -140,9 +140,9 @@ struct HelpView: View {
                     does not keep metadata. WaxOff writes the tags as ID3v2.3.
                     """)
                     definition("Podcast Name", "This is the name of the show. WaxOff writes it as the ID3 album tag.")
-                    definition("Episode Title", "This is the title of the episode. WaxOff writes it as the ID3 title tag. Leave the field empty to use the name of the delivered file without the file extension. The placeholder in the field shows that name. The name includes the loudness suffix, thus it is not the same as the name of the source file. All the earlier versions do the same.")
-                    definition("Artwork", "Use a PNG or JPEG image for the front cover. Drag one image onto the artwork area, or click Choose…. The sheet refuses a different type of file and shows the reason. Apple Podcasts asks for a square image from 1400 to 3000 pixels. The sheet shows a note for a different shape or size. The note is advice only. WaxOff delivers the file in all conditions.")
-                    definition("Chapters", "The chapter table is first. Each row is one chapter. You can change a time, change a title, remove a chapter, or add a chapter. The paste box is below the table. Paste one chapter on each line. Use MM:SS Title or HH:MM:SS Title. The table and the box always show the same chapters.")
+                    definition("Episode Title", "This is the title of the episode. WaxOff writes it as the ID3 title tag. Leave the field empty to use the name of the delivered file without the file extension. The placeholder in the field shows that name. The name includes the loudness suffix. Thus it is not the same as the name of the source file. All the earlier versions do the same.")
+                    definition("Artwork", "Use a PNG or JPEG image for the front cover. Drag one image onto the artwork area, or click Choose…. If you drag a different type of file, WaxOff refuses it and shows the reason. Apple Podcasts asks for a square image from 1400 to 3000 pixels. The sheet shows a note for a different shape or size. The note is advice only. WaxOff delivers the file in all conditions.")
+                    definition("Chapters", "The chapter table is first. Each row is one chapter. Edit the time in the first field. Edit the title in the second field. Click the minus button to remove that chapter. Click Add Chapter to add a chapter. The paste box is below the table. Paste one chapter on each line. Use MM:SS Title or HH:MM:SS Title. The table and the box always show the same chapters.")
                     text("""
                     Each chapter time must be later than the time before it. No chapter time \
                     can be at or after the end of the audio. Each chapter must have a title. \
@@ -150,8 +150,8 @@ struct HelpView: View {
                     not available while an error message shows.
                     """)
                     text("""
-                    A tag marker shows on the row of a file that has metadata. Put the pointer \
-                    on the marker to see what the file has. The marker stays after the \
+                    A tag badge shows on the row of a file that has metadata. Put the pointer \
+                    on the badge to see what the file has. The badge stays after the \
                     delivery.
                     """)
                     text("""
