@@ -9,6 +9,8 @@
 set -euo pipefail
 
 REPO="sevmorris/WaxOnWaxOff"
+TAP_REPO="sevmorris/homebrew-tap"
+TAP_CASK_PATH="Casks/waxonwaxoff.rb"
 
 # ── Args ──────────────────────────────────────────────────────────────────────
 # One positional argument (the version) plus optional flags in any position.
@@ -444,6 +446,50 @@ ${CHANGES}"
         --notes "$RELEASE_NOTES"
 fi
 ok "Release published"
+
+# ── Bump Homebrew cask ────────────────────────────────────────────────────────
+# The only step in this script that writes to another repository. It runs after
+# the release is published, deliberately: the cask points at a download URL, so
+# bumping it before the asset exists would publish a cask that cannot install.
+#
+# Nothing here is covered by the EXIT trap, and nothing can be — BUMP_ACTIVE and
+# DOCS_ACTIVE are both disarmed well above this point, and by now the tag is
+# pushed and the release is public. A failure here is therefore loud and
+# terminal rather than reverting: the release stands, the cask does not move,
+# and the operator fixes the tap. Re-running the whole script afterwards is
+# safe, because the block below no-ops when the cask already carries this
+# version.
+step "Bumping Homebrew cask"
+DMG_SHA256=$(shasum -a 256 "$DMG" | awk '{print $1}')
+[[ -n "$DMG_SHA256" ]] || fail "Could not compute SHA256 of $DMG"
+# Explicit template rather than -t: BSD and GNU mktemp disagree on -t semantics.
+TAP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/homebrew-tap.XXXXXX")
+# SSH origin so the push uses the same key as the tag push above; a gh CLI clone
+# defaults to HTTPS and would prompt for credentials mid-release.
+git clone --quiet "git@github.com:${TAP_REPO}.git" "$TAP_DIR"
+CASK_FILE="$TAP_DIR/$TAP_CASK_PATH"
+[[ -f "$CASK_FILE" ]] || fail "Tap repo missing $TAP_CASK_PATH"
+# Both lines are bare-quoted strings on dedicated lines. The patterns span the
+# whole line so a stale value cannot survive the rewrite.
+sed -i '' "s|^  version \".*\"\$|  version \"${VERSION}\"|" "$CASK_FILE"
+sed -i '' "s|^  sha256 \".*\"\$|  sha256 \"${DMG_SHA256}\"|" "$CASK_FILE"
+# Verify both landed — sed -i silently no-ops on a pattern that never matched.
+grep -q "^  version \"${VERSION}\"\$" "$CASK_FILE" \
+    || fail "Cask version rewrite failed"
+grep -q "^  sha256 \"${DMG_SHA256}\"\$" "$CASK_FILE" \
+    || fail "Cask sha256 rewrite failed"
+(
+    cd "$TAP_DIR"
+    if [[ -z "$(git status --porcelain)" ]]; then
+        ok "Cask already at $VERSION"
+    else
+        git add "$TAP_CASK_PATH"
+        git commit --quiet -m "Bump waxonwaxoff to ${VERSION}"
+        git push --quiet origin HEAD
+        ok "Cask bumped to ${VERSION} (sha256 ${DMG_SHA256:0:12}…)"
+    fi
+)
+rm -rf "$TAP_DIR"
 
 # ── Remove old app release PAGES (keep the ${KEEP_RELEASES} most recent) ─────
 # This prunes the GitHub release page and its DMG asset. It does NOT touch the
