@@ -143,6 +143,43 @@
       flex-wrap: wrap;
     }
 
+    .hero-install {
+      margin-top: 18px;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .hero-install code {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 4px 10px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.78rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      /* SF Mono ligates `--` into a single long dash. Copying the command still
+         yields two hyphens, but anyone typing what they see gets it wrong. */
+      font-variant-ligatures: none;
+      color: var(--cream);
+      background: rgba(156, 138, 106, 0.10);
+      border: 1px solid var(--border);
+    }
+    @media (max-width: 640px) {
+      /* The command measures ~360px, which overflows a 375px phone. Give it its
+         own line and let it scroll inside its own box, so the page itself never
+         scrolls sideways. */
+      .hero-install code {
+        display: block;
+        margin: 8px auto 0;
+        max-width: 100%;
+        overflow-x: auto;
+        font-size: 0.72rem;
+      }
+    }
     .hero-meta {
       margin-top: 20px;
       font-family: var(--font-ui);
@@ -453,6 +490,7 @@
         <a href="manual/theory.html" class="btn btn-secondary">Theory of Operation</a>
         <a href="https://github.com/sevmorris/WaxOnWaxOff" class="btn btn-secondary">GitHub</a>
       </div>
+      <p class="hero-install">or <code>brew install --cask sevmorris/tap/waxonwaxoff</code></p>
       <p class="hero-meta">macOS 14+ &nbsp;·&nbsp; Apple Silicon (M-series) &nbsp;·&nbsp; Free</p>
     </section>
 
