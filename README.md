@@ -8,7 +8,7 @@
   <br />
   <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.6.1.dmg"><strong>Download Latest (DMG)</strong></a>
   <br />
-  <sub>or <code>brew install --cask sevmorris/tap/waxonwaxoff</code></sub>
+  or <code>brew install --cask sevmorris/tap/waxonwaxoff</code>
   <br />
   <br />
   <a href="https://sevmorris.github.io/WaxOnWaxOff/">App Page</a>
@@ -63,6 +63,24 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Mono Delivery:** Optional true single-channel output for mono sources (defaults to dual-mono stereo); never downmixes a stereo source.
 
 **Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
+
+---
+
+## Install
+
+**Homebrew**
+
+```sh
+brew install --cask sevmorris/tap/waxonwaxoff
+```
+
+Upgrade the same way you installed — `brew upgrade --cask waxonwaxoff`. The app also checks GitHub for new versions and offers a **Download** button, but that opens the DMG rather than installing it, so following it leaves Homebrew's records stale.
+
+**DMG**
+
+Download from the link above, open it, and drag **WaxOn/WaxOff** to your Applications folder.
+
+Either way you get the same notarized build. Requires macOS 14.0+ on Apple Silicon; the cask declares both, so Homebrew refuses rather than installing an app that cannot launch.
 
 ---
 

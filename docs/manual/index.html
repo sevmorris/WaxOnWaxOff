@@ -189,6 +189,10 @@
       padding: 2px 6px;
       border-radius: 3px;
       border: 1px solid var(--border);
+      /* SF Mono ligates `--` into a single long dash. Copying a command still
+         yields two hyphens, but anyone typing what they see gets it wrong —
+         and the Homebrew commands in Installation are meant to be typed. */
+      font-variant-ligatures: none;
     }
 
     pre {
