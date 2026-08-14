@@ -43,7 +43,11 @@ struct WaxOffSettingsView: View {
                             Text("Both").tag(OutputMode.both)
                         }
                         .pickerStyle(.segmented)
-                        Text("WaxOff upmixes a mono source to dual-mono stereo. Mono delivery prevents the upmix.")
+                        // Describes this picker. It used to carry the mono
+                        // upmix explanation, which belongs to Channels two rows
+                        // down — and Channels already states it correctly, so
+                        // the caption was both misplaced and duplicated.
+                        Text("Both writes a WAV file and an MP3 file.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

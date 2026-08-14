@@ -28,7 +28,7 @@ struct WaxOffControlBar: View {
                     set: { viewModel.settings.targetLUFS = ($0 * (-14 - (-24)) + (-24)).rounded() }
                 ),
                 step: 1.0 / 10.0,
-                help: "Integrated loudness target for the delivery output. −18 LUFS is the typical podcast standard; lower values leave more headroom, higher values sound louder on platforms that don't normalize on playback."
+                help: "Integrated loudness target for the delivery output. −18 LUFS is the typical podcast standard; lower values leave more headroom, higher values sound louder on platforms that do not normalize on playback."
             )
 
             Spacer()

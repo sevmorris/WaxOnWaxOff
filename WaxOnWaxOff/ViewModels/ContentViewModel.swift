@@ -92,9 +92,26 @@ final class ContentViewModel {
         showWaxonWarning = false
     }
 
-    func removeSelected() { fileQueue.removeSelected() }
-    func clearAll() { fileQueue.clearAll() }
-    func removeFiles(at offsets: IndexSet) { fileQueue.removeFiles(at: offsets) }
+    // Guarded here rather than at each call site. Disabling the toolbar's
+    // Remove and Clear covered one route into these and left the list's own
+    // two — swipe-to-delete and the Delete key — wide open, so the rule held
+    // only where somebody had remembered to apply it. Same shape as the
+    // toolbar deriving its own state: a rule enforced by the view is a rule
+    // with holes in it.
+    func removeSelected() {
+        guard canEditFileList else { return }
+        fileQueue.removeSelected()
+    }
+    func clearAll() {
+        guard canEditFileList else { return }
+        fileQueue.clearAll()
+    }
+    func removeFiles(at offsets: IndexSet) {
+        guard canEditFileList else { return }
+        fileQueue.removeFiles(at: offsets)
+    }
+    // Not guarded: reordering removes nothing, and the batch matches its
+    // callbacks to rows by id rather than by position.
     func moveFiles(from source: IndexSet, to destination: Int) { fileQueue.moveFiles(from: source, to: destination) }
 
     func applyPreset(_ preset: WaxOnPreset) {
@@ -191,7 +208,7 @@ final class ContentViewModel {
                 if batch.failures.isEmpty {
                     NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
                 } else if batch.successes.isEmpty {
-                    alertMessage = "Processing failed. Open the Console tab for details."
+                    alertMessage = "Processing failed. Select the console button at the top right of the waveform area to see the details."
                 } else {
                     alertMessage = "\(batch.successes.count) file\(batch.successes.count == 1 ? "" : "s") processed, \(batch.failures.count) failed. See Console for details."
                     NotificationService.showCompletionNotification(mode: .waxOn, fileCount: batch.successes.count)
@@ -202,7 +219,7 @@ final class ContentViewModel {
                 logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
                 log.append("✗ \(error.localizedDescription)", level: .info)
                 fileQueue.restoreProcessingRows()
-                alertMessage = "Processing failed. Open the Console tab for details."
+                alertMessage = "Processing failed. Select the console button at the top right of the waveform area to see the details."
             }
 
             isProcessing = false
