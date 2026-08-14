@@ -12,6 +12,9 @@ import SwiftUI
 struct WaxOnWaxOffApp: App {
     @State private var appState = AppState()
     @Environment(\.openWindow) private var openWindow
+    /// Published by whichever mode is on screen. Nil before a mode is chosen,
+    /// which is what disables the menu item on the mode picker.
+    @FocusedValue(\.addFiles) private var addFiles
 
     init() {
         // Purge this instance's own PID-scoped temp directory in case it already
@@ -46,6 +49,18 @@ struct WaxOnWaxOffApp: App {
             }
         }
         .commands {
+            // `after:` rather than `replacing:` — the default New Window item
+            // stays where it is; this only adds to that group.
+            CommandGroup(after: .newItem) {
+                Button("Add Files or Folder…") {
+                    if let addFiles { AddFilesPanel.present(addFiles) }
+                }
+                .keyboardShortcut("o", modifiers: .command)
+                // Until now drag-and-drop was the only way to get a file into
+                // the app, and Cmd+O did nothing at all.
+                .disabled(addFiles == nil)
+            }
+
             CommandGroup(replacing: .help) {
                 Button("WaxOn/WaxOff Help") {
                     openWindow(id: "help")

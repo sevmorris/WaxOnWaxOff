@@ -14,7 +14,7 @@ struct WaxOffSettingsView: View {
                     .padding(.top, 6)
                     .padding(.horizontal, 2)
 
-                row(nil) {
+                row("Sample Rate") {
                     VStack(alignment: .leading, spacing: 4) {
                         LabeledToggleSwitch(
                             selection: $viewModel.settings.sampleRate,
@@ -35,7 +35,7 @@ struct WaxOffSettingsView: View {
                 .opacity(viewModel.settings.outputMode == .mp3 ? 0.4 : 1)
                 .help(viewModel.settings.outputMode == .mp3 ? "MP3 always outputs at 44.1 kHz" : "")
 
-                row(nil) {
+                row("Output") {
                     VStack(alignment: .leading, spacing: 4) {
                         Picker("", selection: $viewModel.settings.outputMode) {
                             Text("WAV").tag(OutputMode.wav)
@@ -96,6 +96,9 @@ struct WaxOffSettingsView: View {
                             .lineLimit(2)
                             .truncationMode(.middle)
                             .foregroundStyle(.secondary)
+                            // Only the folder name is shown, so the full path
+                            // has to be reachable. WaxOn already does this.
+                            .help(path)
                     } else {
                         Text("Same as source")
                             .font(.system(size: 11))

@@ -69,7 +69,7 @@ struct HelpView: View {
                 section("WaxOn — Settings") {
                     definition("Sample Rate", "Select 44.1 kHz or 48 kHz. Use the same value as your DAW project.")
                     definition("Channels", "Select Mono or Stereo. Mono extracts one channel. Stereo sends the two channels of a stereo source through with no change. For a different channel count, FFmpeg converts the source to two channels with its default matrix. The app writes a warning to the console.")
-                    definition("Channel", "Select Left or Right. This is the channel that WaxOn extracts in Mono mode.")
+                    definition("Source Channel", "Select Left or Right. This is the channel that WaxOn extracts in Mono mode.")
                     definition("High Pass", "On uses 80 Hz. It removes rumble and proximity-effect bass. Off uses a 20 Hz DC floor only. WaxOn always removes the DC offset.")
                     definition("Phase Rotation", "WaxOn applies a 200 Hz allpass filter before normalization. The filter reduces the crest factor on asymmetric voice recordings. This gives 1–4 dB more headroom before the limiter. You cannot hear an effect on the audio character. The default is on.")
                     definition("Dynamic Leveling", "This setting turns on dynaudnorm. It increases the level of quiet voices. It decreases the level of loud voices. Use it for panel recordings, live Q&As, or multi-guest interviews. Do not use it for a solo voice. Strength controls the speed and the quantity of the adjustment.")

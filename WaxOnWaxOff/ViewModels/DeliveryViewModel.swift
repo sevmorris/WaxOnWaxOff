@@ -152,7 +152,7 @@ final class DeliveryViewModel {
         alertMessage = fileQueue.addFiles(
             urls,
             skippedFormatMessage: { count in
-                "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format."
+                "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, caf, aac, mp4, mov."
             },
             beforeCommit: { valid in
                 if valid.contains(where: OutputNaming.looksLikeWaxOffDelivery) {

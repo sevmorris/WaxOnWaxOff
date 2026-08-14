@@ -35,6 +35,10 @@ struct ConsoleView: View {
                         LazyVStack(alignment: .leading, spacing: 3) {
                             ForEach(entries) { entry in
                                 Text(entry.message)
+                                    // Every processing error points the user
+                                    // here. Reading it is not enough — a log
+                                    // line has to be able to leave the window.
+                                    .textSelection(.enabled)
                                     .font(.system(.caption, design: .monospaced))
                                     .foregroundStyle(entry.level == .verbose ? .secondary : .primary)
                                     .frame(maxWidth: .infinity, alignment: .leading)

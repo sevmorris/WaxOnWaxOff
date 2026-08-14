@@ -65,7 +65,7 @@ struct FileListView: View {
             let word = isLeft ? "left" : "right"
             return ChannelBadge(
                 label: "STEREO→MONO \(tag)",
-                help: "Stereo source — only the \(word) channel will be kept in the mono output. Switch Output to Stereo in Settings to keep both channels."
+                help: "Stereo source — only the \(word) channel will be kept in the mono output. Switch Channels to Stereo in Settings to keep both channels."
             )
         }
         return ChannelBadge(

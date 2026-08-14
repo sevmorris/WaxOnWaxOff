@@ -64,6 +64,11 @@ struct ContentView: View {
             viewModel.addFiles(urls)
             return !urls.isEmpty
         }
+        // Same entry point as the drop above, published so the File menu can
+        // reach it — the view models live here, not up in the Scene.
+        .focusedSceneValue(\.addFiles, AddFilesAction(mode: .waxOn) { urls in
+            viewModel.addFiles(urls)
+        })
         .alert("Error", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -140,6 +145,9 @@ struct ContentView: View {
                 Image(systemName: "slider.horizontal.3")
             }
             .help(showSettings ? "Hide Settings" : "Show Settings")
+            // The icon is the whole button, so the tooltip text is also the
+            // only name this control has. A .help() is not exposed as a label.
+            .accessibilityLabel(showSettings ? "Hide Settings" : "Show Settings")
         }
         .padding()
         .background(.regularMaterial)
@@ -234,6 +242,7 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .padding(8)
             .help(showConsole ? "Show Waveform" : "Show Console")
+            .accessibilityLabel(showConsole ? "Show Waveform" : "Show Console")
         }
     }
 

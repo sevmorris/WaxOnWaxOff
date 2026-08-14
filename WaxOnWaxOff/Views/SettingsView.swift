@@ -26,14 +26,21 @@ struct SettingsView: View {
                 }
 
                 row("Channels") {
-                    LabeledToggleSwitch(
-                        selection: $viewModel.settings.outputChannels,
-                        leftLabel: "Mono",
-                        leftValue: WaxOnSettings.OutputChannels.mono,
-                        rightLabel: "Stereo",
-                        rightValue: WaxOnSettings.OutputChannels.stereo
-                    )
-                    .frame(maxWidth: .infinity)
+                    VStack(alignment: .leading, spacing: 4) {
+                        LabeledToggleSwitch(
+                            selection: $viewModel.settings.outputChannels,
+                            leftLabel: "Mono",
+                            leftValue: WaxOnSettings.OutputChannels.mono,
+                            rightLabel: "Stereo",
+                            rightValue: WaxOnSettings.OutputChannels.stereo
+                        )
+                        .frame(maxWidth: .infinity)
+                        // The manual makes this case in Tips & Workflow, which
+                        // is three screens from the control that needs it.
+                        Text("Use Mono for one microphone. Use Stereo if one file contains two microphones.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 channelRow
@@ -87,7 +94,7 @@ struct SettingsView: View {
     private var channelRow: some View {
         let channelEnabled = viewModel.settings.outputChannels == .mono
         return VStack(alignment: .leading, spacing: 5) {
-            Text("CHANNEL")
+            Text("SOURCE CHANNEL")
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .kerning(0.4)

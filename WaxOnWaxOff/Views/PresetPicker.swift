@@ -94,6 +94,8 @@ struct SavePresetSheet: View {
                     onSave()
                 }
                 .buttonStyle(.borderedProminent)
+                // Return commits the sheet, matching ManagePresetsSheet.
+                .keyboardShortcut(.defaultAction)
                 .disabled(presetName.isEmpty)
             }
         }
