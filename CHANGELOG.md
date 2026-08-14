@@ -2,6 +2,34 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.7.0] — 2026-08-10
+
+**Interface**
+- You can add files from the menu bar. File ▸ Add Files or Folder…, or ⌘O. Until now dragging was the only way to get audio into the app: there was no button, no menu item, and ⌘O did nothing — so a keyboard-only user could not load anything at all. The panel takes files or a folder, and a folder chosen here is scanned exactly as a folder dropped on the window is, because both go through the same code
+- WaxOn explains when to use Stereo, at the control rather than in the manual. The Channels toggle offered Mono and Stereo as equal options and said nothing about which applies, so Stereo read as the more faithful choice and a single-voice recording landed in a two-channel file for no benefit. The reasoning was already correct in the manual, three screens away; two sentences of it now sit under the toggle
+- WaxOn's two channel controls no longer differ by one letter. CHANNELS (Mono/Stereo) and CHANNEL (Left/Right) rendered directly above one another, with the second enabled only when the first is Mono. The second is now SOURCE CHANNEL, which is what it selects
+
+**Fixed**
+- The file list cannot be edited while a batch is delivering. Disabling the toolbar's Remove and Clear covered one route and left three — swipe-to-delete and the Delete key, in both modes — so pressing Delete mid-batch removed rows the delivery was still writing to. The guard now sits in the view models, where every route reaches it. Reordering is still allowed: it removes nothing, and the batch matches its rows by identity rather than position
+- WaxOff shows why a file failed. It was handed the reason and displayed a fixed "see Console" string instead, so the row said less than it knew. WaxOn has always shown the reason
+- Four error alerts no longer send you to a "Console tab" that does not exist. The console is a toggle at the top right of the waveform area, and the alerts now say so
+- WaxOff lists the formats it accepts when it skips a file, as WaxOn does
+- The caption under WaxOff's output picker described the Channels control two rows below it, which already carries that explanation itself
+- The Save Preset sheet accepts Return
+- Console text can be selected and copied — it is where every processing error now points
+- Tooltips showing the full path on truncated filenames and output folders, present in WaxOn and missing in WaxOff, are in both
+
+**Accessibility**
+- The settings and console toggles in both modes have accessibility labels. They are icon-only buttons, and a tooltip is not read as a name
+- The knob no longer claims to be a button. It is adjustable, and reported itself with a trait that says otherwise
+
+**Documentation**
+- The Homebrew install is documented in the README, the app page, and the manual. `brew install --cask sevmorris/tap/waxonwaxoff`
+- The manual documents the WaxOff verification pass — what it is, why every row reads Complete while it runs, and what Stop verifying stops
+
+**Developer**
+- `release.sh` bumps the Homebrew cask when it publishes
+
 ## [2.6.1] — 2026-08-10
 
 Fixes and documentation. No audio processing changed — nothing in the signal chain, the filter graphs, or the delivered files is different from 2.6.0.
