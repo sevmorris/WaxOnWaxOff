@@ -64,6 +64,11 @@ struct ContentView: View {
             viewModel.addFiles(urls)
             return !urls.isEmpty
         }
+        // Same entry point as the drop above, published so the File menu can
+        // reach it — the view models live here, not up in the Scene.
+        .focusedSceneValue(\.addFiles, AddFilesAction(mode: .waxOn) { urls in
+            viewModel.addFiles(urls)
+        })
         .alert("Error", isPresented: alertBinding) {
             Button("OK", role: .cancel) {}
         } message: {
