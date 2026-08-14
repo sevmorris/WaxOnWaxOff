@@ -177,9 +177,26 @@ final class DeliveryViewModel {
         showWaxoffWarning = false
     }
 
-    func removeSelected() { fileQueue.removeSelected() }
-    func clearAll() { fileQueue.clearAll() }
-    func removeFiles(at offsets: IndexSet) { fileQueue.removeFiles(at: offsets) }
+    // Guarded here rather than at each call site. Disabling the toolbar's
+    // Remove and Clear covered one route into these and left the list's own
+    // two — swipe-to-delete and the Delete key — wide open, so the rule held
+    // only where somebody had remembered to apply it. Same shape as the
+    // toolbar deriving its own state: a rule enforced by the view is a rule
+    // with holes in it.
+    func removeSelected() {
+        guard canEditFileList else { return }
+        fileQueue.removeSelected()
+    }
+    func clearAll() {
+        guard canEditFileList else { return }
+        fileQueue.clearAll()
+    }
+    func removeFiles(at offsets: IndexSet) {
+        guard canEditFileList else { return }
+        fileQueue.removeFiles(at: offsets)
+    }
+    // Not guarded: reordering removes nothing, and the batch matches its
+    // callbacks to rows by id rather than by position.
     func moveFiles(from source: IndexSet, to destination: Int) { fileQueue.moveFiles(from: source, to: destination) }
 
     func applyPreset(_ preset: WaxOffPreset) {
@@ -329,7 +346,12 @@ final class DeliveryViewModel {
                             // failed file keeps a phase on its row forever.
                             self.filePhases.removeValue(forKey: failure.id)
                             guard let idx = self.files.firstIndex(where: { $0.id == failure.id }) else { return }
-                            self.files[idx].status = .error("Processing failed — see Console")
+                            // The reason, not a pointer to it. WaxOn has always
+                            // put `failure.message` on the row; WaxOff was
+                            // handed the same message and discarded it for a
+                            // constant, which sent the user to the console to
+                            // read something the row could have said.
+                            self.files[idx].status = .error(failure.message)
                         }
                     },
                     onPhase: { [weak self] id, phase in
@@ -368,7 +390,7 @@ final class DeliveryViewModel {
                         fileCount: batch.successes.count
                     )
                 } else if !batch.failures.isEmpty {
-                    alertMessage = "Processing failed. Open the Console tab for details."
+                    alertMessage = "Processing failed. Select the console button at the top right of the waveform area to see the details."
                 }
             } catch is CancellationError {
                 // User cancelled — cancelProcessing() already restored row state
@@ -376,7 +398,7 @@ final class DeliveryViewModel {
                 logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
                 log.append("✗ \(error.localizedDescription)", level: .info)
                 fileQueue.restoreProcessingRows()
-                alertMessage = "Processing failed. Open the Console tab for details."
+                alertMessage = "Processing failed. Select the console button at the top right of the waveform area to see the details."
             }
 
             isProcessing = false

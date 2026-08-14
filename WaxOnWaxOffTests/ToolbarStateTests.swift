@@ -86,6 +86,72 @@ final class ToolbarStateTests: XCTestCase {
                       "the tail's files are already on disk")
     }
 
+    // MARK: - The guard has to hold for every route, not just the toolbar
+
+    private func item(_ name: String) -> FileItem {
+        var f = FileItem(url: URL(fileURLWithPath: "/tmp/\(name).wav"))
+        f.status = .ready(AudioStats(rms: -20, peak: -3, crest: 17, lufs: -20))
+        return f
+    }
+
+    /// The hole this closes. Disabling the toolbar buttons left the list's own
+    /// delete paths — `.onDelete` and the Delete key — calling straight through,
+    /// so asserting on the model rather than on a button is the point.
+    func testDeliveringRefusesEveryRemovalRoute() {
+        let vm = viewModel(processing: true, verifying: false)
+        vm.files = [item("a"), item("b")]
+        vm.selectedFileIDs = [vm.files[0].id]
+
+        vm.removeSelected()
+        XCTAssertEqual(vm.files.count, 2, "Delete key and toolbar Remove share this path")
+
+        vm.removeFiles(at: IndexSet(integer: 0))
+        XCTAssertEqual(vm.files.count, 2, "swipe-to-delete shares this path")
+
+        vm.clearAll()
+        XCTAssertEqual(vm.files.count, 2, "Clear shares this path")
+    }
+
+    /// The tail stays editable on purpose — those files are already on disk.
+    func testVerifyingStillAllowsRemoval() {
+        let vm = viewModel(processing: true, verifying: true)
+        vm.files = [item("a"), item("b")]
+        vm.selectedFileIDs = [vm.files[0].id]
+        vm.removeSelected()
+        XCTAssertEqual(vm.files.count, 1, "the verification tail must stay editable")
+    }
+
+    func testIdleAllowsRemoval() {
+        let vm = viewModel(processing: false, verifying: false)
+        vm.files = [item("a"), item("b")]
+        vm.clearAll()
+        XCTAssertTrue(vm.files.isEmpty)
+    }
+
+    /// Reordering is deliberately still permitted: it removes nothing, and the
+    /// batch matches its callbacks to rows by id rather than by position.
+    func testDeliveringStillAllowsReordering() {
+        let vm = viewModel(processing: true, verifying: false)
+        vm.files = [item("a"), item("b")]
+        let firstID = vm.files[0].id
+        vm.moveFiles(from: IndexSet(integer: 0), to: 2)
+        XCTAssertEqual(vm.files.count, 2)
+        XCTAssertEqual(vm.files[1].id, firstID, "reorder must still take effect")
+    }
+
+    func testWaxOnDeliveringRefusesRemoval() {
+        let vm = ContentViewModel()
+        vm.files = [item("a"), item("b")]
+        vm.selectedFileIDs = [vm.files[0].id]
+        vm.isProcessing = true
+        vm.removeSelected()
+        vm.clearAll()
+        XCTAssertEqual(vm.files.count, 2, "WaxOn must refuse the same routes WaxOff does")
+        vm.isProcessing = false
+        vm.clearAll()
+        XCTAssertTrue(vm.files.isEmpty, "and allow them again once idle")
+    }
+
     // MARK: - WaxOn symmetry
 
     /// WaxOn has no tail, so the rule is the simpler half of WaxOff's.
