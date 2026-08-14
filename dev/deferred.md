@@ -17,6 +17,56 @@ on 2026-07-31 and the list went on asserting otherwise until an audit caught
 it. A copy of the tracker in a file that nobody updates is worse than no copy.
 Read the tracker.
 
+## From the UI audit, 2026-08-10
+
+A six-lens read of the view layer, findings adversarially verified. What was
+worth fixing shipped in 2.7.0. These are the ones left, with the reason each
+was left rather than done.
+
+Two are defect-shaped and belong in the tracker if they are ever scheduled;
+they sit here because nothing is scheduled and this file is the record of that.
+
+- **ToggleSwitch exposes no role, value or keyboard reach** — nine instances:
+  the four WaxOn switches via `WaxOnControlBar.switchCell`, and five more
+  through `LabeledToggleSwitch` in both settings views. Sibling `Text` labels
+  still give VoiceOver a name, so what is missing is state, role and
+  activation, not the whole control. The pattern to copy is already in the
+  repo at `RotaryKnobView.swift:43-57`. Mechanical, and these switches decide
+  what WaxOn does to the audio.
+
+- **WaxOff never reports a partial batch failure** — WaxOn does. Deliver ten
+  files, have three fail, and WaxOff gives no batch-level signal; only the rows
+  say so, and only since 2.7.0.
+
+- **Process has no keyboard shortcut and no menu item** — deliberately left.
+  2.7.0 added ⌘O for adding files, which was the harder gap because there was
+  no path at all. A Process shortcut needs a key chosen rather than guessed;
+  ⌘R is the obvious candidate.
+
+- **A modal titled "Error" carries routine notices and partial successes** —
+  needs a decision about what belongs in an alert versus inline, not a patch.
+
+- **`LabeledToggleSwitch`'s left/right labels are plain tap targets** — no
+  button role, no keyboard focus, selection conveyed only by font weight and a
+  primary/secondary colour. Bigger than the `ToggleSwitch` item above because
+  the fix changes the control's structure.
+
+- **Eight findings were never adjudicated** — the verify phase hit the session
+  limit twice. One of them, the `CHANNELS`/`CHANNEL` label collision, turned
+  out to be real and shipped in 2.7.0 after a screenshot surfaced it; the
+  earlier dismissal of it had compared definition-site line numbers rather
+  than render order. Treat the remaining seven as unverified rather than
+  false.
+
+- **Splitting a stereo file into two mono files** — considered and declined.
+  The documented workflow (manual, *WaxOn: Mono vs. Stereo for Podcasts*) is
+  to process the file as stereo and split in the DAW, which fits a tool that
+  runs *before* the session is open. It would also force the one-output-per-row
+  model open: `JobResult.output` and `FileStatus.processed(outputURL:)` are
+  both singular, and WaxOff already papers over the same limit by taking
+  `outputURLs.first` and silently dropping the MP3 from the row. Worth doing
+  properly, with that model fix, or not at all.
+
 ## Test gaps
 
 - **Duration parse-site validation** — the parse-site guard (T2-5) is
