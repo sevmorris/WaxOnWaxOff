@@ -211,6 +211,9 @@ struct WaxOffMainView: View {
                 Image(systemName: "slider.horizontal.3")
             }
             .help(showSettings ? "Hide Settings" : "Show Settings")
+            // The icon is the whole button, so the tooltip text is also the
+            // only name this control has. A .help() is not exposed as a label.
+            .accessibilityLabel(showSettings ? "Hide Settings" : "Show Settings")
         }
         .padding()
         .background(.regularMaterial)
@@ -244,6 +247,8 @@ struct WaxOffMainView: View {
                             .font(.headline)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                            // The full path, as WaxOn's identical header does.
+                            .help(file.url.path)
 
                         WaveformView(waveformData: file.outputWaveform ?? file.waveform)
                             .frame(maxWidth: .infinity, minHeight: 80, maxHeight: .infinity)
@@ -278,6 +283,7 @@ struct WaxOffMainView: View {
             .buttonStyle(.plain)
             .padding(8)
             .help(showConsole ? "Show Waveform" : "Show Console")
+            .accessibilityLabel(showConsole ? "Show Waveform" : "Show Console")
         }
     }
 
