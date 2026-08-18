@@ -348,6 +348,22 @@ struct MetadataSheet: View {
                     timeError: $chapterTimeError,
                     isEditingTime: $isEditingChapterTime
                 )
+                // Read-only while the paste box does not parse. The two
+                // surfaces disagree at that moment, and every way of resolving
+                // it silently loses somebody's work: rewriting the box discards
+                // what the user typed, and letting the table run ahead means the
+                // eventual reparse discards the table edits instead. Freezing
+                // the table leaves exactly one thing to do, in the one place
+                // that can be wrong. The state lasts a keystroke or two in
+                // normal use — it only persists if the user walks away from a
+                // broken line, which is precisely the case worth protecting.
+                .disabled(parseError != nil)
+
+                if parseError != nil {
+                    Text("Fix the chapter text below to edit this list.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
 
                 Divider()
                     .padding(.vertical, 4)
@@ -427,16 +443,20 @@ struct MetadataSheet: View {
             get: { draft.chapters },
             set: { updated in
                 draft.chapters = updated
-                guard !isEditingChapterTime else {
-                    // A time field is focused, so `updated` may be out of
-                    // order and regenerating from it would produce text that
-                    // `ChapterParser` rejects as `.outOfOrder` — a red error
-                    // flashing under a half-typed time, and a paste box the
-                    // user is not even looking at rewriting itself.
+                guard Self.mayRegeneratePasteBox(parseError: parseError,
+                                                 isEditingChapterTime: isEditingChapterTime) else {
+                    // Two reasons land here, and they want different things.
                     //
-                    // The value is committed above regardless; only the text
-                    // and the ordering wait for `settleChapterOrder()`.
-                    validate(ChapterTableView.sorted(updated))
+                    // A focused time field means `updated` may be out of order,
+                    // so regenerating would produce text `ChapterParser` rejects
+                    // as `.outOfOrder` — a red error flashing under a half-typed
+                    // time. Save still has to be gated, so validate a sorted
+                    // copy without writing either the sort or the text back.
+                    //
+                    // An unparsable box means the text on screen is the user's,
+                    // and its error already describes it. Leave both alone. The
+                    // value is committed above either way.
+                    if parseError == nil { validate(ChapterTableView.sorted(updated)) }
                     return
                 }
                 regeneratePasteBox(from: updated)
@@ -456,7 +476,28 @@ struct MetadataSheet: View {
     private func settleChapterOrder() {
         let ordered = ChapterTableView.sorted(draft.chapters)
         draft.chapters = ordered
+        // The table is read-only while the box does not parse, so no time
+        // field can be focused and this should be unreachable in that state.
+        // Guarded anyway: the ordering must always settle, but the user's text
+        // is never ours to overwrite.
+        guard Self.mayRegeneratePasteBox(parseError: parseError,
+                                         isEditingChapterTime: false) else { return }
         regeneratePasteBox(from: ordered)
+    }
+
+    /// Whether the paste box may be rewritten from the chapter list.
+    ///
+    /// Static and pure because both conditions are silent data loss when they
+    /// are wrong, and neither is visible in a screenshot.
+    ///
+    /// A focused time field blocks it because the array is transiently
+    /// unsorted. An unparsable box blocks it because the text there is the
+    /// user's, not ours — rewriting it discards what they typed, clears the
+    /// error that explained why Save was unavailable, and leaves the sheet
+    /// looking as though the edit had worked.
+    nonisolated static func mayRegeneratePasteBox(parseError: String?,
+                                                  isEditingChapterTime: Bool) -> Bool {
+        parseError == nil && !isEditingChapterTime
     }
 
     private func regeneratePasteBox(from chapters: [Chapter]) {
