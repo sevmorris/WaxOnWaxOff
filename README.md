@@ -22,7 +22,7 @@
 
 **WaxOn/WaxOff** solves a specific problem: you receive a guest recording that's quiet, uneven, or poorly leveled, and you need a consistent prep WAV before you open your session—or a finished mix normalized to your delivery spec. No import-normalize-export dance. No sending audio to a cloud service.
 
-WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, optional EBU R128 gain, true-peak control). It does **not** apply spectral noise reduction to the output file. When Loudness Norm is enabled, RNNoise runs only on an internal analysis pass so loudness measurement isn't skewed by room tone—not as a user-facing denoise stage. For plosives, clicks, and heavy noise, use a repair tool (e.g. iZotope RX) before WaxOn.
+WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, optional EBU R128 gain, true-peak control). For plosives, clicks, and heavy noise, use a repair tool (e.g. iZotope RX) before WaxOn.
 
 <p align="center">
   <img src="docs/images/waxon-waveform.png" width="49%" alt="WaxOn — waveform audit and signal conditioning" />
@@ -31,7 +31,7 @@ WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, o
 
 The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
 
-- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional EBU R128 normalization (dynamics fully preserved), and true-peak control to a fixed −1.0 dBTP ceiling — a 2× oversampled limiter when Loudness Norm is on, downward-only linear peak normalization when off. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder (e.g., `interview-44kwaxon.wav`).
+- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional EBU R128 normalization (dynamics fully preserved), and true-peak control to a fixed −1.0 dBTP ceiling — a standard peak limiter when Loudness Norm is on, downward-only linear peak normalization when off. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder (e.g., `interview-44kwaxon.wav`).
 - **WaxOff** runs after you bounce. It takes your finished mix to broadcast-compliant delivery — EBU R128 to target LUFS, true peak ceiling, WAV and/or MP3 output.
 
 **Local processing:** No upload, no subscription, no audio leaving your machine. Transparent, inspectable signal chain.
@@ -47,7 +47,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 
 * **High-Pass Filter:** On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.
 * **Dynamic Leveling:** Optional `dynaudnorm` with adjustable strength (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
-* **Loudness Normalization:** Optional two-pass EBU R128 linear gain (dynamics fully preserved; default off). RNNoise may run on an analysis-only temp when this is on—see [Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html)—not on the exported WAV.
+* **Loudness Normalization:** Optional two-pass EBU R128 linear gain (dynamics fully preserved; default off). See [Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html).
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** True peak held to a fixed −1.0 dBTP ceiling — 2× oversampled limiting when Loudness Norm is on; downward-only linear peak normalization (transparent when the source is already under ceiling) when off.
 * **Phase Rotation:** Optional 200 Hz allpass filter to reduce peak asymmetry and maximize headroom (default on).
@@ -107,7 +107,7 @@ open WaxOnWaxOff.xcodeproj
 Xcode runs `scripts/fetch-ffmpeg.sh` automatically before each build, so the very first build will pull pinned `ffmpeg` and `ffprobe` (~44 MB combined) from a [GitHub release asset](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/ffmpeg-deps-8.0-audio-arm64) and verify SHA-256s. You can also run the script standalone for CI or to re-verify checksums. Those binaries are built by `scripts/build-ffmpeg.sh` in this repository — audio-only, LGPL, no GPL components. See `Vendor/README.md` for the manifest, licenses, and update instructions.
 
 ## Technical Origin
-I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec, ITU-R BS.1770-compliant K-weighting, and internal per-channel RNNoise on the loudnorm analysis pass (WaxOn, when Loudness Norm is enabled) for measurement accuracy on noisy recordings — reflects deliberate choices, not defaults.
+I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec and ITU-R BS.1770-compliant K-weighting — reflects deliberate choices, not defaults.
 
 ---
 

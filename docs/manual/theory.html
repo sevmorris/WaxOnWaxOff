@@ -460,7 +460,7 @@
   <div class="hero" id="intro">
     <h1>Theory of Operation</h1>
     <p>WaxOn and WaxOff address opposite ends of the podcast production workflow.</p>
-    <p style="margin-top: 12px;"><strong>WaxOn</strong> is an ingest preprocessor. It takes raw recordings — directly from a microphone or recording interface — and prepares them for editing. The pipeline always applies a high-pass filter (20 Hz floor minimum; 80 Hz when enabled) and always enforces a fixed −1.0 dBTP true-peak ceiling — via a 2× oversampled limiter when Loudness Norm is on, or downward-only linear peak normalization when it is off. Phase rotation, dynamic leveling, and loudness normalization are optional — see <a href="#defaults">Defaults &amp; Parameters</a>. The goal is recordings that arrive in your DAW at consistent, manageable levels with their dynamic character intact. WaxOn is not a mastering tool; it is a staging tool.</p>
+    <p style="margin-top: 12px;"><strong>WaxOn</strong> is an ingest preprocessor. It takes raw recordings — directly from a microphone or recording interface — and prepares them for editing. The pipeline always applies a high-pass filter (20 Hz floor minimum; 80 Hz when enabled) and always enforces a fixed −1.0 dBTP true-peak ceiling — via a standard peak limiter when Loudness Norm is on, or downward-only linear peak normalization when it is off. Phase rotation, dynamic leveling, and loudness normalization are optional — see <a href="#defaults">Defaults &amp; Parameters</a>. The goal is recordings that arrive in your DAW at consistent, manageable levels with their dynamic character intact. WaxOn is not a mastering tool; it is a staging tool.</p>
     <p style="margin-top: 12px;"><strong>WaxOff</strong> is a broadcast delivery tool. It takes a finished, edited mix and prepares it for distribution: loudness normalization to a delivery target and true-peak ceiling enforcement for safe streaming ingest. The goal is a delivery file that passes platform normalization cleanly and sounds consistent across episodes.</p>
     <p style="margin-top: 12px;">Both modes are built on the same core DSP stages — EBU R128 loudness measurement, two-pass linear normalization, and oversampled true-peak limiting — combined with mode-specific tools: dynamic normalization (<code>dynaudnorm</code>, WaxOn only) and a dedicated pre-encode limiter for WaxOff's MP3 path. When WaxOn's Loudness Norm toggle is on, RNNoise runs internally during the loudnorm analysis pass only to improve measurement accuracy on noisy recordings — not as a user-facing stage, but as an implementation detail of the two-pass normalization. Every stage is deliberately ordered. The algorithms interact, and the ordering decisions are not arbitrary.</p>
     <p style="margin-top: 12px;">This document explains each stage: what it does, how it works, and why it is placed where it is. The Signal Chains section gives the processing order at a glance. The following sections cover each algorithm in depth — the shared normalization and limiting concepts first, then the WaxOn processing stages in signal-chain order, then the design rationale for each mode, output format decisions, and reference sections on <a href="#analysis-vs-processing">analysis vs processing</a>, <a href="#defaults">defaults</a>, and <a href="#edge-cases">edge cases</a>.</p>
@@ -489,7 +489,7 @@
         <div class="chain-node">2× Oversample<br><span style="font-size:0.75rem;font-weight:400;">→ Peak Control → Resample</span></div>
       </div>
     </div>
-    <p style="font-size:0.85rem;color:var(--muted);">Solid border = always runs. Dashed border = optional stage (Phase Rotation and Dynamic Leveling default on/off respectively; Loudnorm defaults off). RNNoise runs only when Loudnorm is enabled — on a temporary copy during pass 1 analysis, after all prior stages; it does not touch the output signal. The final stage always enforces the fixed −1.0 dBTP ceiling — a 2× oversampled limiter when Loudness Norm is on, downward-only linear peak normalization when off. Output: 24-bit WAV.</p>
+    <p style="font-size:0.85rem;color:var(--muted);">Solid border = always runs. Dashed border = optional stage (Phase Rotation and Dynamic Leveling default on/off respectively; Loudnorm defaults off). RNNoise runs only when Loudnorm is enabled — on a temporary copy during pass 1 analysis, after all prior stages; it does not touch the output signal. The final stage always enforces the fixed −1.0 dBTP ceiling — a standard peak limiter when Loudness Norm is on, downward-only linear peak normalization when off. Output: 24-bit WAV.</p>
 
     <h3>WaxOff</h3>
     <div class="chain">
@@ -683,70 +683,6 @@
     </details>
   </section>
 
-
-
-  <!-- RNNoise -->
-  <section id="rnnoise">
-    <h2>RNNoise: Internal Measurement Tool</h2>
-    <p>RNNoise is not a user-facing processing stage in WaxOn. It runs internally during the loudnorm analysis pass on a temporary copy of the audio to improve measurement accuracy on noisy recordings. The output signal is never touched by RNNoise. See <a href="#nr-measurement">NR-for-Measurement</a> for how and why this works.</p>
-    <p>The following covers the algorithm's design and behavior for readers who want to understand what is running under the hood.</p>
-
-    <details class="callout callout-history">
-      <summary><span class="callout-cat">History &amp; Context</span> Background and Origins</summary>
-      <p>RNNoise was developed by Jean-Marc Valin at Mozilla in 2017–2018 and released as open source under the BSD license. Valin is also a principal author of the <strong>Opus</strong> audio codec, the codec used by WebRTC, Discord, Zoom, and virtually every real-time web audio application. His work on Opus included extensive research into perceptual audio coding and voice intelligibility under compression, which directly informed the approach taken in RNNoise.</p>
-      <p>The project grew from a practical problem in WebRTC: browser-based voice communication was plagued by background noise (keyboard clicks, HVAC, crowd noise, fan hum) that conventional noise suppression handled poorly, either leaving too much noise or introducing the characteristic warbling, underwater artifacts of aggressive spectral subtraction. Valin's hypothesis was that a machine learning approach trained specifically on speech could do better.</p>
-      <p>The original paper, <em>A Hybrid DSP/Deep Learning Approach to Real-Time Full-Band Speech Enhancement</em> (arXiv:1709.08243), was presented at the IEEE Multimedia Signal Processing Workshop in 2018. It has since been widely cited in the speech enhancement literature and influenced subsequent neural audio processing work at companies including Google, Microsoft, and Amazon.</p>
-    </details>
-
-    <details class="callout callout-impl">
-      <summary><span class="callout-cat">Under the Hood</span> Architecture: Gated Recurrent Units</summary>
-      <p>RNNoise is a recurrent neural network using <strong>Gated Recurrent Units (GRUs)</strong>, a variant of LSTM that uses fewer parameters and trains faster while retaining the ability to model temporal dependencies across variable-length sequences. The key difference from LSTM is that GRU combines the forget and input gates into a single "update gate" and merges the cell state with the hidden state, reducing the parameter count by roughly 25% per layer. The architecture is deliberately small: the network has roughly 100,000 parameters total, making real-time inference feasible on hardware as constrained as embedded processors with no dedicated GPU.</p>
-      <p>The network processes audio in the frequency domain using the Opus codec's Bark-scale filterbank: 22 critical bands that approximate the frequency resolution of human hearing. This is a key design choice. Rather than learning to operate on raw waveforms (which requires modeling extremely long-range sample dependencies) or on fixed FFT bins (which don't match perceptual resolution), RNNoise works on the same perceptual frequency representation that the ear itself uses. The Bark scale groups frequencies into bands of roughly equal perceptual width: narrow bands at low frequencies (where pitch discrimination is fine) and progressively wider bands at high frequencies (where the ear integrates more broadly).</p>
-      <p>For each 10 ms frame of audio, the network computes a set of spectral gains (one per band) between 0 and 1. A gain of 1.0 means that band is passed through unmodified. A gain of 0 means it is fully suppressed. Intermediate values attenuate partially. The gains are applied multiplicatively to the band energies, and the modified spectrum is reconstructed back to a waveform. The network never synthesizes audio; it only decides how much of each perceptual band to suppress in each frame.</p>
-    </details>
-
-    <details class="callout callout-impl">
-      <summary><span class="callout-cat">Under the Hood</span> Training and the Model File</summary>
-      <p>The bundled model (resource name <code>rnnoise</code>, rnnoise-nu format) is derived from community-trained weights in the <a href="https://github.com/GregorR/rnnoise-models">rnnoise-models repository</a>. It was trained on a large corpus of speech (multiple speakers, multiple languages, multiple recording conditions) mixed with a wide variety of noise types: HVAC, traffic, crowd noise, fan hum, electrical interference, and broadband pink and white noise. The model learns to identify which spectral components correspond to voice and which correspond to noise, using temporal context (the GRU's hidden state) to distinguish steady-state noise from transient speech components.</p>
-      <p>Training required both clean speech recordings and noise-only recordings, which were artificially mixed at various signal-to-noise ratios. The network learned the difference between speech-shaped energy and noise-shaped energy across thousands of examples. Because the training data was multilingual and broad-spectrum, the resulting model generalizes well across different speakers, accents, and recording conditions without any per-speaker adaptation.</p>
-    </details>
-
-    <h3>What It Suppresses Well, and Poorly</h3>
-    <p>RNNoise excels at <strong>steady-state, spectrally diffuse noise</strong>: HVAC hum, room tone, computer fan noise, broadband electrical hiss, and low-level crowd ambience. These share a characteristic spectral profile that is relatively stable over time and distributes energy broadly, making them easy for the network to distinguish from voice. On clean recordings with consistent low-level background noise, suppression is typically very effective and inaudible.</p>
-    <p>It handles poorly, and can introduce artifacts with, the following:</p>
-    <ul>
-      <li><strong>Highly variable or impulsive noise</strong>: loud intermittent events (door slams, keyboard bursts, chair squeaks) are often only partially removed and sometimes produce brief processing artifacts at the onset</li>
-      <li><strong>Noise-dominated recordings</strong>: when SNR is very low (background noise significantly louder than the voice), the network sometimes misclassifies voice components as noise and attenuates them, producing a thin, slightly hollow quality</li>
-      <li><strong>Music or complex tonal content</strong>: the network is trained on speech and may suppress legitimate musical content that doesn't match speech energy patterns</li>
-      <li><strong>Narrowband tonal hum (mains hum at 50/60 Hz)</strong>: handled better by a dedicated notch filter. RNNoise can suppress it but is not specifically optimized for a single frequency</li>
-    </ul>
-    <p>The artifact profile when limits are exceeded is typically a subtle warbling or underwater quality, the same category of artifact produced by spectral subtraction noise gates, though usually less severe. On moderate-noise, clean-voice recordings, the algorithm is essentially transparent.</p>
-
-    <h3>Stereo Handling: Per-Channel Split</h3>
-    <p>RNNoise was designed and trained exclusively on <strong>mono 48 kHz speech</strong>. When FFmpeg's <code>arnndn</code> filter receives a stereo input, it creates separate denoiser instances per channel and processes them independently. In practice, this can produce unpredictable results: the per-channel recurrent states diverge, and one channel (typically the second) may be over-gated or heavily attenuated, even when both channels carry similar content and noise levels.</p>
-    <p>The root cause is that the model's internal gain computation is frame-by-frame and depends on its recurrent hidden state. With stereo input, slight differences between channels (different mic angles, room reflections, or even minor level offsets from recording) can cause the model to classify one channel as "more noisy" than the other and gate it more aggressively. The model has no concept of channel correlation or stereo coherence.</p>
-    <p>WaxOn solves this by <strong>splitting stereo audio into independent mono channels before applying RNNoise</strong>, then rejoining the denoised channels back into stereo.</p>
-    <details class="callout callout-impl">
-      <summary><span class="callout-cat">Under the Hood</span> filter_complex graph</summary>
-      <p>This uses FFmpeg's <code>filter_complex</code> graph:</p>
-      <pre><code>[0:a]channelsplit=channel_layout=stereo[L][R];
-[L]arnndn=m=/path/to/model[Lnr];
-[R]arnndn=m=/path/to/model[Rnr];
-[Lnr][Rnr]join=inputs=2:channel_layout=stereo</code></pre>
-    </details>
-    <p>Each channel receives its own fully independent denoiser instance with its own recurrent state, initialized cleanly. The model processes each as a standard mono stream — the format it was trained on — and the results are predictable and balanced. NR-for-measurement runs on the <strong>already-processed intermediate</strong> (after high-pass, channel handling, phase rotation, resample, and optional dynamic leveling) — not at ingest. Only the loudnorm pass-1 analysis reads that NR'd temp copy; pass 2 and all subsequent stages operate on the unmodified intermediate.</p>
-    <p>For <strong>mono output</strong>, the issue does not arise. The pipeline's first FFmpeg stage already extracts the selected channel via <code>pan</code> (or downmixes multichannel sources) alongside the high-pass and phase-rotation filters, so the audio reaching the NR-for-measurement step is already a single channel. The simple <code>-af "arnndn=m=…"</code> chain runs over that mono signal — one denoiser instance, one stream — with no per-channel state divergence to worry about.</p>
-    <p>The same per-channel split is applied in the <a href="#nr-measurement">NR-for-measurement</a> analysis paths.</p>
-
-    <details class="callout callout-impl">
-      <summary><span class="callout-cat">Under the Hood</span> FFmpeg Implementation</summary>
-      <p>The <code>arnndn</code> filter in FFmpeg wraps the RNNoise library. It requires an external model file provided via the <code>m=</code> parameter:</p>
-      <pre><code>arnndn=m=/path/to/model</code></pre>
-      <p>The model file is bundled in the app as a resource named <code>rnnoise</code> (no file extension). WaxOn locates it at runtime using <code>Bundle.main.url(forResource: "rnnoise", withExtension: nil)</code> and passes the resolved path to FFmpeg. In the analysis pass, for mono output the filter runs on the temp copy via a simple <code>-af</code> chain. For stereo output, a <code>-filter_complex</code> graph splits, denoises, and rejoins the channels as described above. If the model cannot be loaded, loudnorm proceeds without NR-for-measurement and a warning is logged.</p>
-      <p>Processing latency for <code>arnndn</code> is negligible for batch processing purposes. The network processes audio in 10 ms frames. For a 60-minute recording, the total added processing time is a few seconds on Apple Silicon.</p>
-    </details>
-  </section>
-
   <!-- Noise Floor Estimation -->
   <section id="noise-floor">
     <h2>Noise Floor Estimation</h2>
@@ -770,29 +706,11 @@
     <p>In WaxOn, the FLOOR stat is color-coded in the stats panel:</p>
     <ul>
       <li><strong>Normal (no color)</strong>: noise floor below −50 dBFS. Unlikely to affect loudness measurements meaningfully.</li>
-      <li><strong>Orange (above −50 dBFS)</strong>: the noise floor may be contributing to the integrated loudness measurement. Speech targets may be slightly undershot. When Loudness Norm is enabled, WaxOn's internal NR-for-measurement pass will help accuracy; the noise in the output itself is unaffected.</li>
+      <li><strong>Orange (above −50 dBFS)</strong>: the noise floor may be contributing to the integrated loudness measurement. Speech targets may be slightly undershot. </li>
       <li><strong>Red (above −40 dBFS)</strong>: the noise floor is high enough to significantly skew loudness measurements. At this level, the noise is almost certainly audible to listeners as well. Consider dedicated noise reduction in iZotope RX or similar before processing in WaxOn.</li>
     </ul>
     <p>In WaxOn, files with an orange or red noise floor also show a ⚠️ warning badge in the file list.</p>
     <p><strong>WaxOff suppresses both the color-coding and the badge.</strong> The thresholds above are calibrated for a raw, unedited speech floor — the gap between words where the mic captures only the room. A finished delivery mix legitimately carries continuous low-level content there: music beds, room tone deliberately left under the voice, sustained ambience. That content reads as a high floor without being a defect, so flagging it on a delivery file would be a false alarm. WaxOff still computes and displays the same FLOOR stat — measured with a fixed 80 Hz cutoff, matching WaxOn's default — and only withholds the warning/critical styling. WaxOn's thresholds (−50 / −40 dBFS) and behavior are unchanged.</p>
-  </section>
-
-  <!-- NR-for-Measurement -->
-  <section id="nr-measurement">
-    <h2>NR-for-Measurement</h2>
-
-    <p>When Loudness Norm is enabled, WaxOn runs RNNoise on a <em>temporary copy</em> of the post-filtering intermediate (after high-pass, channel handling, phase rotation, resample, and optional dynamic leveling) for the loudnorm analysis pass (pass 1) only. The normalization pass (pass 2) and all subsequent stages operate on the unmodified intermediate — not the NR'd copy. This ensures that loudness measurements reflect the speech content rather than the noise floor, without altering the output.</p>
-
-    <h3>Why This Works</h3>
-    <p>The two-pass loudnorm process measures the file's integrated loudness in pass 1, then applies a single linear gain offset in pass 2. The gain offset is determined entirely by the pass 1 measurement. If pass 1 measures a noise-inflated loudness (file appears louder than the speech actually is), the computed gain will be too small, and speech will land under target.</p>
-    <p>By measuring the NR'd copy instead, the analysis reflects the loudness of the speech content with the noise floor suppressed. The computed gain offset is then applied to the original file. Because RNNoise primarily removes energy between and underneath words (not the speech itself), the speech content in the original and NR'd versions has approximately the same loudness. The gain derived from the clean measurement lands the speech close to the target.</p>
-    <p>The noise floor in the original file does come along for the ride. It is amplified by the same gain as the speech. But the philosophy here is pragmatic: WaxOn is a prep tool for DAW editing. If the noise is bad enough to matter, it will be treated in the DAW (or in a dedicated NR tool like RX). Getting the speech to the right level for editing is the higher priority.</p>
-
-    <p>For stereo output, the NR-for-measurement paths use the same <a href="#rnnoise">per-channel split</a>: stereo is split into independent mono channels, each denoised separately, then rejoined before the loudnorm analysis. This ensures consistent, balanced noise removal for accurate measurement regardless of channel layout.</p>
-    <p>The NR temporary file is written at the <strong>output sample rate</strong> (44.1 or 48 kHz), not a fixed 48 kHz, so loudnorm pass-1 measurements match the rate of pass 2 — required for valid two-pass <code>measured_I</code> / <code>offset</code> values on 44.1 kHz exports.</p>
-
-    <h3>Cost</h3>
-    <p>NR-for-measurement adds one additional FFmpeg pass per loudnorm analysis (running RNNoise on the intermediate audio to a temporary file). For a typical podcast recording on Apple Silicon, this adds a few seconds. The temporary NR'd files are created in the working directory and deleted automatically after processing.</p>
   </section>
 
   <!-- Phase Rotation -->
@@ -1076,7 +994,7 @@
     <p>The RMS stat uses a <strong>mono fold-down</strong> before squaring: each stereo frame is summed to (L+R)/2 before the RMS accumulation. For correlated material (mono or near-mono sources) this closely tracks per-channel power, but for wide or decorrelated stereo the fold-down under-reads true RMS by up to 3 dB, and for out-of-phase material it collapses toward −∞. Because Peak is the per-channel maximum (not a fold-down), Crest (Peak − RMS) reads higher than expected on wide mixes and substantially higher on phase-problematic sources. This is a known characteristic of the stat, not a measurement error.</p>
 
     <h3>Processing: FFmpeg Loudnorm</h3>
-    <p>Actual normalization uses FFmpeg's <code>loudnorm</code> filter in a two-pass pipeline. Pass 1 may optionally run on an RNNoise-processed temp copy (WaxOn only, when Loudness Norm is enabled). The gain applied in pass 2 is derived from FFmpeg's measurements, not from the stats panel values.</p>
+    <p>Actual normalization uses FFmpeg's <code>loudnorm</code> filter in a two-pass pipeline. The gain applied in pass 2 is derived from FFmpeg's measurements, not from the stats panel values.</p>
 
     <h3>Why They Can Differ</h3>
     <ul>
@@ -1230,8 +1148,7 @@
     <h3>Multichannel Input (&gt;2 channels)</h3>
     <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output on sources with more than two channels downmixes to two channels via FFmpeg's default matrix; a mono source is duplicated into both channels. A warning is logged.</p>
 
-    <h3>Missing RNNoise Model</h3>
-    <p>If the bundled <code>rnnoise</code> resource cannot be loaded, WaxOn skips NR-for-measurement and runs loudnorm analysis on the unmodified intermediate. Processing continues; a warning notes that measurement may be noise-biased.</p>
+    
 
     <h3>Batch Output Collisions</h3>
     <p>WaxOn output names follow <code>{stem}-{rate}waxon.wav</code>. When multiple source files in one batch would collide, a short path-hash suffix is inserted before the rate tag. WaxOff delivery names get the same treatment — the tag lands before the <code>lev{target}LUFS</code> suffix. See the <a href="index.html#waxon-output">user manual</a> for output naming and directory fallbacks.</p>
@@ -1266,10 +1183,6 @@
           <td>Single-pass normalization is inaccurate; linear mode applies a clean gain offset with no dynamic processing</td>
         </tr>
         <tr>
-          <td>NR-for-measurement (WaxOn)</td>
-          <td>When Loudness Norm is enabled, pass 1 runs on a temporary RNNoise-processed copy (after all prior stages) to prevent broadband noise from inflating the measurement. Pass 2 and the output signal are unaffected.</td>
-        </tr>
-        <tr>
           <td>Noise floor estimation</td>
           <td>10th percentile of HPF'd mono block RMS (cutoff tracks the WaxOn High Pass toggle: 80 Hz on, 20 Hz off; fixed 80 Hz in WaxOff) identifies background noise level. Color-coded warnings alert users when noise may affect loudness accuracy.</td>
         </tr>
@@ -1279,15 +1192,11 @@
         </tr>
         <tr>
           <td>Fixed −1.0 dBTP true-peak ceiling (WaxOn)</td>
-          <td>Always-enforced true-peak ceiling at the EBU R128 standard level — a 2× oversampled limiter when Loudness Norm is on, downward-only linear peak normalization when off; not user-adjustable (contrast with WaxOff's configurable TP knob)</td>
+          <td>Always-enforced true-peak ceiling at the EBU R128 standard level — a standard peak limiter when Loudness Norm is on, downward-only linear peak normalization when off; not user-adjustable (contrast with WaxOff's configurable TP knob)</td>
         </tr>
         <tr>
           <td>Stats panel vs FFmpeg loudnorm</td>
           <td>Separate BS.1770 implementations; use stats for comparison, processing log for actual normalization measurements</td>
-        </tr>
-        <tr>
-          <td>2× oversampled alimiter (WaxOn)</td>
-          <td>Inter-sample peaks are invisible to a standard sample-rate limiter; oversampling makes them visible and catchable</td>
         </tr>
         <tr>
           <td>Brick-wall limiter on WAV path (WaxOff)</td>

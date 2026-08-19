@@ -233,48 +233,11 @@ actor AudioProcessor {
             let target = settings.loudnormTarget
             let tp = -1.0
 
-            // Run RNNoise on a temp copy for the analysis pass only.
-            // This prevents broadband noise from inflating the loudness measurement,
-            // ensuring speech hits the target LUFS more accurately.
-            let analysisInput: URL
-            if let modelURL = Bundle.main.url(forResource: "rnnoise", withExtension: nil) {
-                let nrTempURL = work.appendingPathComponent("\(stem)_nr_analysis.wav")
-                onLog?("  loudnorm: applying NR for measurement accuracy…", .verbose)
-                let escapedNrModel = FFmpegRunner.filterEscape(modelURL.path)
-                // arnndn runs at 48 kHz internally; write the NR temp at the output rate so
-                // loudnorm pass 1 measures the same sample rate as pass 2 (required for
-                // valid two-pass measured_I / offset values on 44.1 kHz exports).
-                let nrSampleRate = "\(sr)"
-                if isStereo {
-                    let nrFc = [
-                        "[0:a]channelsplit=channel_layout=stereo[L][R]",
-                        "[L]arnndn=m=\(escapedNrModel)[Lnr]",
-                        "[R]arnndn=m=\(escapedNrModel)[Rnr]",
-                        "[Lnr][Rnr]join=inputs=2:channel_layout=stereo"
-                    ].joined(separator: ";")
-                    try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
-                        "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postDynLevelURL.path, "-filter_complex", nrFc,
-                        "-c:a", "pcm_s24le", "-ar", nrSampleRate, "-ac", outputChannelCount, nrTempURL.path
-                    ], fileDuration: fileDuration)
-                } else {
-                    try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
-                        "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", postDynLevelURL.path, "-af", "arnndn=m=\(escapedNrModel)",
-                        "-c:a", "pcm_s24le", "-ar", nrSampleRate, "-ac", outputChannelCount, nrTempURL.path
-                    ], fileDuration: fileDuration)
-                }
-                analysisInput = nrTempURL
-            } else {
-                onLog?("⚠ RNNoise model not found in bundle — loudness measurement may be biased by noise floor.", .info)
-                analysisInput = postDynLevelURL
-            }
-
             let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
             onLog?("  loudnorm: analyzing…", .verbose)
             let analysisOutput = try await FFmpegRunner.capture(exe: tools.ffmpeg, args: [
                 "-nostdin", "-hide_banner",
-                "-i", analysisInput.path, "-af", analyzeAf,
+                "-i", postDynLevelURL.path, "-af", analyzeAf,
                 "-f", "null", "/dev/null"
             ], fileDuration: fileDuration)
 
@@ -337,16 +300,10 @@ actor AudioProcessor {
             // in one ffmpeg invocation — no intermediate normalize file. The limiter stays
             // as the inter-sample-peak backstop: loudnorm's linear pass measures true peak
             // but can still leave ISPs above the ceiling.
-            let oversampleSr = sr * 2
-
-            let limiterAf = [
-                FFmpegFilters.aresample(to: oversampleSr),
-                "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled",
-                FFmpegFilters.aresample(to: sr)
-            ].joined(separator: ",")
+            let limiterAf = "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled"
             let step2Af = loudnormFilter.map { "\($0),\(limiterAf)" } ?? limiterAf
 
-            onLog?("  limiter: 2× oversample (\(oversampleSr) Hz)  |  ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
+            onLog?("  limiter: ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
 
             try? fm.removeItem(at: tmpURL)
 
@@ -448,11 +405,11 @@ actor AudioProcessor {
     /// pass fails or the measured true peak is non-finite (e.g. a silent clip) —
     /// callers treat nil as "apply no gain". Cancellation is propagated.
     private func measureTruePeak(exe: String, url: URL, fileDuration: TimeInterval?) async throws -> Double? {
-        let analyzeAf = "loudnorm=I=-23:TP=-1.0:LRA=20:print_format=json"
+        let analyzeAf = "ebur128=peak=true:metadata=1,ametadata=mode=print:file=-"
         let output: String
         do {
-            output = try await FFmpegRunner.capture(exe: exe, args: [
-                "-nostdin", "-hide_banner",
+            output = try await FFmpegRunner.captureStdout(exe: exe, args: [
+                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
                 "-i", url.path, "-af", analyzeAf,
                 "-f", "null", "/dev/null"
             ], fileDuration: fileDuration)
@@ -461,12 +418,11 @@ actor AudioProcessor {
         } catch {
             return nil
         }
-        guard let dict = FFmpegRunner.parseLoudnormJSON(from: output),
-              let measurements = LoudnormMeasurements(json: dict.mapValues { $0 as Any }),
-              measurements.inputTP.isFinite else {
+        guard let reading = FFmpegRunner.parseEbur128FrameMetadata(from: output),
+              reading.truePeakDB.isFinite else {
             return nil
         }
-        return measurements.inputTP
+        return reading.truePeakDB
     }
 
     private func makeTemp(prefix: String) throws -> URL {

@@ -7,7 +7,8 @@ enum ProcessingConfig {
     /// at least 2 workers, up to half the active cores, leaving the
     /// remainder for the UI and OS.
     static var maxConcurrentJobs: Int {
-        max(2, ProcessInfo.processInfo.activeProcessorCount / 2)
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        return max(2, min(cores - 1, 2 * (cores / 2)))
     }
 
     /// Maximum number of concurrent WaxOff delivery jobs. Each delivery job

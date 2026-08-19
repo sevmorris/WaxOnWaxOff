@@ -46,7 +46,7 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         XCTAssertGreaterThan(size.intValue, 1000)
     }
 
-    func testLoudnormTwoPassAt44100WithNRPath() async throws {
+    func testLoudnormTwoPassAt44100() async throws {
         let tools = try XCTUnwrap(tools)
         let input = try IntegrationFFmpeg.makeSineWAV(
             ffmpeg: tools.ffmpeg,
