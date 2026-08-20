@@ -3,9 +3,8 @@ import Foundation
 /// Shared configuration constants for concurrent audio processing.
 enum ProcessingConfig {
     /// Maximum number of concurrent ffmpeg jobs for WaxOn batch processing,
-    /// scaled to available CPU. Formula: max(2, activeProcessorCount / 2) —
-    /// at least 2 workers, up to half the active cores, leaving the
-    /// remainder for the UI and OS.
+    /// scaled to available CPU. Same formula as `deliveryConcurrency` below —
+    /// at least 2 workers, up to cores − 1, leaving one core for the UI and OS.
     static var maxConcurrentJobs: Int {
         let cores = ProcessInfo.processInfo.activeProcessorCount
         return max(2, min(cores - 1, 2 * (cores / 2)))
