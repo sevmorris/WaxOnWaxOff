@@ -2,6 +2,18 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.11.0] — 2026-08-20
+
+**Fixed**
+- **A row now shows every file its job wrote.** Split L/R renders two files, and WaxOff's Both format renders a WAV and an MP3, but a row could only hold one of them — so the right channel and the MP3 existed on disk and in the console with no representation in the list. Both are now first-class: when a job writes more than one file, small tags above the waveform (**L** / **R**, or **WAV** / **MP3**) switch the panel between them, each with its own waveform, stats and file info. Reveal in Finder selects every output rather than just the first, and the row's status line names them all. Outputs after the first are measured the first time you look at them, so a split render costs no extra analysis unless you use it.
+
+**Interface**
+- **A styled installer window.** The disk image now opens to a laid-out window with the app, an arrow, and the Applications folder, instead of a bare list of two icons.
+
+**Developer**
+- The ffmpeg process machinery — watchdog, capture, cancellation, and telling a crash from a cancel — is now a single file shared verbatim with the sibling app repos rather than a copy in each. That code's drift had already cost something: hardening that landed here never reached ClipHack, leaving two latent crashes there for months. `release.sh` now refuses to publish when a shared file has diverged from its siblings.
+- The DMG tooling is likewise byte-identical across repos; everything that had made the copies differ was a comment or a default argument.
+
 ## [2.10.0] — 2026-08-20
 
 **Features**
