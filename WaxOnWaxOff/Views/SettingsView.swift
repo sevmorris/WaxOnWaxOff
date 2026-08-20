@@ -26,7 +26,7 @@ struct SettingsView: View {
                 }
 
                 row("Channels") {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 8) {
                         // Three modes, so a segmented Picker rather than the
                         // two-way LabeledToggleSwitch — matching how WaxOff
                         // renders its three-case Output setting.

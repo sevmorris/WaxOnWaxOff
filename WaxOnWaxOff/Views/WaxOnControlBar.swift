@@ -46,8 +46,8 @@ struct WaxOnControlBar: View {
 
             switchCell(
                 line1: "LOUDNESS", line2: "NORM",
-                caption: "EBU R128 — measure, then one gain",
-                help: "Two-pass EBU R128 normalization to a target loudness.",
+                caption: "EBU R128 — consistent levels across files",
+                help: "EBU R128 normalization to a target loudness — one measurement, one constant gain.",
                 isOn: $viewModel.settings.loudnormEnabled
             )
 
