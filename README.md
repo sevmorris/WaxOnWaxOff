@@ -118,4 +118,4 @@ If WaxOn/WaxOff saves you time, [buy me a coffee](https://ko-fi.com/sevmo). Free
 Copyright © 2026 Seven Morris.
 Distributed under the [GNU General Public License v3.0](LICENSE).
 
-Bundled FFmpeg binaries and RNNoise model: see [`Vendor/README.md`](Vendor/README.md) for versions, checksums, licenses, and LGPL source directions.
+Bundled FFmpeg binaries: see [`Vendor/README.md`](Vendor/README.md) for versions, checksums, licenses, and LGPL source directions.

@@ -272,7 +272,6 @@ ENTITLEMENTS="$PROJECT_DIR/WaxOnWaxOff/WaxOnWaxOff.entitlements"
 # Sign bundled binaries with Hardened Runtime
 codesign --force --options runtime --sign "$IDENTITY" "$APP_PATH/Contents/Resources/ffmpeg"
 codesign --force --options runtime --sign "$IDENTITY" "$APP_PATH/Contents/Resources/ffprobe"
-# Note: rnnoise is a model file (text), no signing needed.
 
 # Sign the app bundle
 codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_PATH"

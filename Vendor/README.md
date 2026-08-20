@@ -59,13 +59,11 @@ Because the binaries are conveyed by network download (bundled in the app DMG, a
 
 ---
 
-## RNNoise (measurement-only denoising)
+## RNNoise / `arnndn` (compiled into FFmpeg, not used by the app)
 
-WaxOn runs RNNoise during the loudnorm pass-1 analysis only — never on the exported audio — via FFmpeg's built-in `arnndn` filter, which reads a bundled weights file. Two distinct third-party components are involved; they have different licenses and sources.
+The bundled `ffmpeg` binary is built with FFmpeg's `arnndn` filter — an RNNoise implementation — compiled in. **The app no longer invokes it.** WaxOn previously ran it on a temporary copy during loudnorm pass-1 analysis only; that stage was removed in 2.8.0, along with the bundled model weights file. The attribution below is retained because the filter code still ships inside the binary, so its BSD-2-Clause notice obligation still applies.
 
-### `arnndn` filter code
-
-The RNNoise algorithm is implemented directly in FFmpeg (`libavfilter/af_arnndn.c`) and compiled into the bundled `ffmpeg` binary. The app does **not** ship or link Xiph's `librnnoise`.
+The RNNoise algorithm is implemented directly in FFmpeg (`libavfilter/af_arnndn.c`). The app does **not** ship or link Xiph's `librnnoise`, and no model weights file is bundled.
 
 | Field | Value |
 |-------|--------|
@@ -75,18 +73,6 @@ The RNNoise algorithm is implemented directly in FFmpeg (`libavfilter/af_arnndn.
 | Algorithm lineage | RNNoise — https://github.com/xiph/rnnoise (Jean-Marc Valin) |
 
 Because this code is compiled inside the FFmpeg binary, its source is covered by the FFmpeg source pointers above. The BSD-2-Clause attribution requirement is independent of that and is satisfied by naming the copyright holders here.
-
-### Model weights file (`WaxOnWaxOff/rnnoise`)
-
-A separate binary weights file (no extension) supplies the trained model to `arnndn`.
-
-| Field | Value |
-|-------|--------|
-| Source | https://github.com/GregorR/rnnoise-models |
-| Format | rnnoise-nu (`rnnoise-nu model file version 1`) — mono 48 kHz speech model |
-| Status | Upstream states the model files "are not creative and thus none of it is subject to copyright." Reproduced here as the upstream project's position, not as a legal determination by this project. |
-
-The app bundles a binary copy of the weights file, not the training codebase.
 
 ---
 
