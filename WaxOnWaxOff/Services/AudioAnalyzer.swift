@@ -81,8 +81,7 @@ enum AudioAnalyzer {
 
     /// - Parameter noiseFloorHighPassHz: HPF for noise-floor blocks — use 80 when WaxOn HPF is on, 20 when off.
     static func analyze(url: URL, noiseFloorHighPassHz: Double = 80) async throws -> AudioStats {
-        let perfStart = ContinuousClock.now
-        let stats = try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let stats = try performAnalysis(url: url, noiseFloorHighPassHz: noiseFloorHighPassHz)
@@ -92,8 +91,6 @@ enum AudioAnalyzer {
                 }
             }
         }
-        PerfLog.record("AudioAnalyzer.analyze \(url.lastPathComponent)", seconds: PerfLog.seconds(since: perfStart))
-        return stats
     }
 
     /// Combined single-decode pass: full stats analysis plus waveform bucketing
@@ -105,7 +102,6 @@ enum AudioAnalyzer {
         noiseFloorHighPassHz: Double = 80,
         targetSamples: Int = 500
     ) async throws -> (stats: AudioStats, waveform: WaveformData) {
-        let perfStart = ContinuousClock.now
         let result: (AudioStats, WaveformData) = try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
@@ -120,7 +116,6 @@ enum AudioAnalyzer {
                 }
             }
         }
-        PerfLog.record("AudioAnalyzer.analyzeWithWaveform \(url.lastPathComponent)", seconds: PerfLog.seconds(since: perfStart))
         return result
     }
 
@@ -152,53 +147,6 @@ enum AudioAnalyzer {
             }
 
             var analysis = VDSPAnalysisAccumulator(format: format, noiseFloorHighPassHz: noiseFloorHighPassHz, chunkCapacity: Int(chunkSize))
-
-            file.framePosition = 0
-            while file.framePosition < frameCount {
-                do {
-                    try file.read(into: buffer)
-                } catch {
-                    if analysis.totalFrames > 0 { break }
-                    throw ProcessingError.analysisError("Error reading audio: \(error.localizedDescription)")
-                }
-
-                if buffer.frameLength == 0 { break }
-                try analysis.consume(buffer)
-            }
-
-            return try analysis.finish()
-        }
-    }
-
-    /// Scalar reference implementation — test-only entry point. The vDSP path
-    /// in performAnalysis is the production engine; parity between the two is
-    /// asserted by AudioAnalyzerVDSPParityTests (≤0.01 dB per field).
-    internal static func analyzeScalarReference(url: URL, noiseFloorHighPassHz: Double = 80) throws -> AudioStats {
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            throw ProcessingError.analysisError("File does not exist")
-        }
-
-        return try autoreleasepool {
-            let file: AVAudioFile
-            do {
-                file = try AVAudioFile(forReading: url)
-            } catch {
-                throw ProcessingError.analysisError("Could not open audio file: \(error.localizedDescription)")
-            }
-
-            let format = file.processingFormat
-            let frameCount = Int64(file.length)
-
-            guard frameCount > 0 else {
-                throw ProcessingError.analysisError("Audio file is empty")
-            }
-
-            let chunkSize: AVAudioFrameCount = 32768
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunkSize) else {
-                throw ProcessingError.analysisError("Could not create audio buffer")
-            }
-
-            var analysis = AnalysisAccumulator(format: format, noiseFloorHighPassHz: noiseFloorHighPassHz)
 
             file.framePosition = 0
             while file.framePosition < frameCount {
@@ -274,7 +222,7 @@ enum AudioAnalyzer {
 
     /// Applies ITU-R BS.1770 absolute + relative gating to per-block loudness
     /// energies (Σ G_ch · z_ch values, one per 400 ms / 75%-overlap block).
-    /// fileprivate: also called from AnalysisAccumulator.finish() below.
+    /// fileprivate: also called from VDSPAnalysisAccumulator.finish() below.
     fileprivate static func computeGatedLUFS(blockEnergies: [Double]) -> Double {
         guard !blockEnergies.isEmpty else { return -144.0 }
 
@@ -296,227 +244,12 @@ enum AudioAnalyzer {
     }
 }
 
-/// Streaming accumulator for the per-sample stats analysis. Extracted verbatim
-/// from the previous single-pass implementation so the chunk stream can be
-/// shared with other consumers (waveform bucketing) over a single decode —
-/// the analysis math is unchanged.
-private struct AnalysisAccumulator {
-    private let channels: Int
-    private let sr: Double
-
-    // ITU-R BS.1770 K-weighting filter coefficients for this sample rate
-    private let kw: KWeightCoeffs
-
-    // Butterworth HPF for the noise-floor mono path. Matches WaxOn's HPF stage
-    // (80 Hz on, 20 Hz DC floor when off). Doesn't touch peak, RMS, or LUFS.
-    private let nfHp: NoiseFloorHPF
-    private var nfHpW1: Double = 0
-    private var nfHpW2: Double = 0
-
-    // Per-channel K-weighting biquad state (transposed direct form II)
-    private var preW1: [Double]
-    private var preW2: [Double]
-    private var hpW1: [Double]
-    private var hpW2: [Double]
-
-    // LUFS: 400 ms blocks at 75% overlap (one new block every 100 ms).
-    // Implemented as a 4-deep ring of 100 ms hop sums; each completed
-    // ring emits a block. Matches ITU-R BS.1770 / EBU R128.
-    //
-    // Each block's "loudness energy" is Σ G_ch · z_ch (channel-weighted
-    // sum of per-channel mean-squares). For the mono/stereo/LCR sources
-    // this app processes the channel weights are all 1.0; surround
-    // weights (1.41 for Ls/Rs) aren't applied because AVAudioFile
-    // doesn't reliably expose channel layout for arbitrary inputs.
-    private let hopFrames: Int
-    private let hopsPerBlock = 4
-    private var hopChannelSumSq: [Double]
-    private var hopFramesElapsed = 0
-    private var hopHistorySS: [[Double]]
-    private var hopHistoryFrames: [Int] = []
-    private var blockLoudnessEnergies = [Double]()
-
-    // Noise floor: non-overlapping 400 ms blocks of HP-filtered mono RMS.
-    private let nfBlockFrames: Int
-    private var nfBlockMonoSumSq: Double = 0
-    private var nfBlockFramesElapsed = 0
-    private var blockRmsValues = [Double]()
-
-    private var sumSquares: Double = 0
-    private var peak: Double = 0
-    private var truePeak: Double = 0
-    private var lastSample: [Double]
-    private var hasLastSample: [Bool]
-    private(set) var totalFrames: Int = 0
-
-    init(format: AVAudioFormat, noiseFloorHighPassHz: Double) {
-        channels = Int(format.channelCount)
-        sr = format.sampleRate
-        kw = KWeightCoeffs(sampleRate: sr)
-        nfHp = NoiseFloorHPF(sampleRate: sr, cutoffHz: noiseFloorHighPassHz)
-        preW1 = [Double](repeating: 0, count: channels)
-        preW2 = [Double](repeating: 0, count: channels)
-        hpW1 = [Double](repeating: 0, count: channels)
-        hpW2 = [Double](repeating: 0, count: channels)
-        hopFrames = max(1, Int((sr * 0.1).rounded()))
-        hopChannelSumSq = [Double](repeating: 0, count: channels)
-        hopHistorySS = Array(repeating: [], count: channels)
-        nfBlockFrames = max(1, Int((sr * 0.4).rounded()))
-        lastSample = [Double](repeating: 0, count: channels)
-        hasLastSample = [Bool](repeating: false, count: channels)
-    }
-
-    mutating func consume(_ buffer: AVAudioPCMBuffer) throws {
-        guard let channelData = buffer.floatChannelData else {
-            throw ProcessingError.analysisError("Could not access channel data")
-        }
-
-        let frames = Int(buffer.frameLength)
-        for frame in 0..<frames {
-            var monoSample: Float = 0
-            for ch in 0..<channels {
-                let x = Double(channelData[ch][frame])
-                let absX = abs(x)
-                peak = max(peak, absX)
-                // ISP estimate: 2× linear interpolation between adjacent same-channel
-                // samples. This catches the most common inter-sample peak case but will
-                // underestimate near-Nyquist content by up to ~1–2 dB. A fully
-                // ITU-R BS.1770-compliant ISP measurement requires 4× polyphase
-                // oversampling. The "est." label in the UI reflects this limitation.
-                if hasLastSample[ch] {
-                    let mid = abs((lastSample[ch] + x) / 2.0)
-                    truePeak = max(truePeak, mid)
-                }
-                truePeak = max(truePeak, absX)
-                lastSample[ch] = x
-                hasLastSample[ch] = true
-
-                // Stage 1: pre-filter (biquad, transposed direct form II)
-                let y1 = kw.pre_b0 * x + preW1[ch]
-                preW1[ch] = kw.pre_b1 * x - kw.pre_a1 * y1 + preW2[ch]
-                preW2[ch] = kw.pre_b2 * x - kw.pre_a2 * y1
-
-                // Stage 2: HP weighting filter
-                let y2 = kw.hp_b0 * y1 + hpW1[ch]
-                hpW1[ch] = kw.hp_b1 * y1 - kw.hp_a1 * y2 + hpW2[ch]
-                hpW2[ch] = kw.hp_b2 * y1 - kw.hp_a2 * y2
-
-                hopChannelSumSq[ch] += y2 * y2
-                monoSample += Float(x)
-            }
-
-            monoSample /= Float(channels)
-            let doubleMono = Double(monoSample)
-            sumSquares += doubleMono * doubleMono
-
-            // HPF on mono path before noise-floor accumulation
-            let nfFiltered = nfHp.process(doubleMono, w1: &nfHpW1, w2: &nfHpW2)
-            nfBlockMonoSumSq += nfFiltered * nfFiltered
-
-            hopFramesElapsed += 1
-            nfBlockFramesElapsed += 1
-
-            // 100 ms hop boundary: push hop into ring, possibly emit a block.
-            if hopFramesElapsed >= hopFrames {
-                for ch in 0..<channels {
-                    hopHistorySS[ch].append(hopChannelSumSq[ch])
-                    if hopHistorySS[ch].count > hopsPerBlock { hopHistorySS[ch].removeFirst() }
-                    hopChannelSumSq[ch] = 0
-                }
-                hopHistoryFrames.append(hopFramesElapsed)
-                if hopHistoryFrames.count > hopsPerBlock { hopHistoryFrames.removeFirst() }
-                hopFramesElapsed = 0
-
-                if hopHistoryFrames.count == hopsPerBlock {
-                    let totalHopFrames = hopHistoryFrames.reduce(0, +)
-                    // BS.1770: block loudness = Σ G_ch · z_ch. Channel
-                    // weights G are 1.0 for L/R/C; we don't have
-                    // layout info to apply 1.41 to Ls/Rs, so we sum
-                    // unweighted (correct for mono/stereo, slightly
-                    // low for true surround).
-                    var blockSumSq = 0.0
-                    for ch in 0..<channels {
-                        let sumSS = hopHistorySS[ch].reduce(0, +)
-                        blockSumSq += sumSS / Double(totalHopFrames)
-                    }
-                    blockLoudnessEnergies.append(blockSumSq)
-                }
-            }
-
-            // 400 ms noise-floor block boundary
-            if nfBlockFramesElapsed >= nfBlockFrames {
-                let nfRms = sqrt(nfBlockMonoSumSq / Double(nfBlockFramesElapsed))
-                blockRmsValues.append(nfRms)
-                nfBlockMonoSumSq = 0
-                nfBlockFramesElapsed = 0
-            }
-        }
-        totalFrames += frames
-    }
-
-    mutating func finish() throws -> AudioStats {
-        // BS.1770 integrated loudness is undefined for content shorter than
-        // 400 ms (one full gating block). If no complete block was produced,
-        // leave blockLoudnessEnergies empty so computeGatedLUFS returns −144.0
-        // — the honest "no valid measurement" sentinel — rather than emitting
-        // a biased value from a sub-400ms partial block weighted as a full block.
-        if nfBlockFramesElapsed > 0 {
-            let nfRms = sqrt(nfBlockMonoSumSq / Double(nfBlockFramesElapsed))
-            blockRmsValues.append(nfRms)
-            nfBlockFramesElapsed = 0
-        }
-
-        guard totalFrames > 0 else {
-            throw ProcessingError.analysisError("No frames to process")
-        }
-
-        let rms = sqrt(sumSquares / Double(totalFrames))
-        let rmsDb = 20 * log10(max(rms, 1e-12))
-        let peakDb = 20 * log10(max(peak, 1e-12))
-        let truePeakDb = 20 * log10(max(truePeak, 1e-12))
-        let crestDb = peakDb - rmsDb
-        let lufs = AudioAnalyzer.computeGatedLUFS(blockEnergies: blockLoudnessEnergies)
-
-        // Noise floor: 10th percentile of per-block RMS (quietest blocks ≈ room tone / noise).
-        // Uses linear-interpolation (Type 7) percentile so the result lines up with the
-        // common Excel/R/NumPy convention. The previous `Int(count * 0.1)` formula was
-        // biased one rank high on long files and degenerate (returned MIN) for counts
-        // around 5–10 where the bucket edge fell on index 0.
-        let noiseFloor: Double?
-        if blockRmsValues.count >= 5 {
-            let sorted = blockRmsValues.sorted()
-            let rank = Double(sorted.count - 1) * 0.1
-            let lo = Int(rank.rounded(.down))
-            let hi = min(sorted.count - 1, lo + 1)
-            let frac = rank - Double(lo)
-            let p10Rms = sorted[lo] * (1 - frac) + sorted[hi] * frac
-            noiseFloor = 20 * log10(max(p10Rms, 1e-12))
-        } else {
-            noiseFloor = nil
-        }
-
-        return AudioStats(
-            rms: rmsDb,
-            peak: peakDb,
-            crest: crestDb,
-            lufs: lufs,
-            noiseFloor: noiseFloor,
-            truePeak: truePeakDb
-        )
-    }
-}
-
-/// vDSP-accelerated production engine for the stats analysis. Implements the
-/// same measurement definition as AnalysisAccumulator — the scalar reference
-/// kept above for parity testing: BS.1770 K-weighting via two cascaded
-/// biquads, 400 ms / 75%-overlap gating blocks, sample + 2×-interpolated
-/// peak, mono RMS, and HP-filtered noise-floor blocks. Filters run through
-/// vDSP_deq22D with an explicit two-sample history carried across chunks
-/// (zero-initialized, matching the scalar engine's zero initial state);
-/// energy sums use vDSP_svesqD per hop/block segment so gating boundaries
-/// land on exactly the same frames as the scalar loop. Differences vs the
-/// scalar engine are rounding-order only (SIMD summation, filter
-/// realization) — bounded far below the 0.01 dB parity gate.
+/// vDSP-accelerated engine for the stats analysis: BS.1770 K-weighting via two
+/// cascaded biquads, 400 ms / 75%-overlap gating blocks, sample +
+/// 2×-interpolated peak, mono RMS, and HP-filtered noise-floor blocks. Filters
+/// run through vDSP_deq22D with an explicit two-sample history carried across
+/// chunks (zero-initialized); energy sums use vDSP_svesqD per hop/block segment
+/// so gating boundaries land on exact frame counts.
 private struct VDSPAnalysisAccumulator {
     private let channels: Int
     private let sr: Double
@@ -738,8 +471,8 @@ private struct VDSPAnalysisAccumulator {
     }
 
     mutating func finish() throws -> AudioStats {
-        // Identical tail semantics to the scalar engine — see
-        // AnalysisAccumulator.finish() for the rationale comments.
+        // BS.1770 integrated loudness is undefined below one full 400 ms
+        // gating block; an empty block list yields the −144.0 sentinel.
         if nfBlockFramesElapsed > 0 {
             let nfRms = sqrt(nfBlockMonoSumSq / Double(nfBlockFramesElapsed))
             blockRmsValues.append(nfRms)
