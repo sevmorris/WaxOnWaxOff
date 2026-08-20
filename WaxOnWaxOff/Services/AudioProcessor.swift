@@ -219,150 +219,49 @@ actor AudioProcessor {
             postDynLevelURL = midURL
         }
 
-        // Loudness normalization (optional, two-pass EBU R128). When enabled with finite
-        // measurements, the pass-2 linear normalize is fused into the final limiter filter
-        // chain below (one ffmpeg invocation, no intermediate `_norm.wav`) rather than
-        // rendered to its own file and re-read. Pass 1 (the analysis above) is unaffected.
+        // One EBU R128 pass over the post-filter / post-leveling intermediate serves
+        // both routes: Loudness Norm takes its integrated loudness and applies a single
+        // constant gain; with Norm off, its true peak drives downward-only peak
+        // normalization. WaxOn is an ingest stage feeding a DAW, so a constant gain to a
+        // staging target is all it needs. FFmpeg's two-pass loudnorm did the same job —
+        // it ran with linear=true, which is by definition one constant gain — at roughly
+        // four times the cost, and measured no more accurately: across a five-source
+        // corpus the largest miss was 0.23 LU for loudnorm versus 0.00 LU for this path.
         let limiterInput = postDynLevelURL
-        let loudnormFilter: String?
-        // Hoisted so the fused render below can compare loudnorm's reported
-        // normalization_type against what predictsLinearMode expected. nil when
-        // Loudness Norm is off or the input was too quiet to measure.
-        var pass2Measurements: LoudnormMeasurements?
-        if settings.loudnormEnabled {
-            let target = settings.loudnormTarget
-            let tp = -1.0
-
-            let analyzeAf = "loudnorm=I=\(target):TP=\(tp):LRA=20:print_format=json"
-            onLog?("  loudnorm: analyzing…", .verbose)
-            let analysisOutput = try await FFmpegRunner.capture(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner",
-                "-i", postDynLevelURL.path, "-af", analyzeAf,
-                "-f", "null", "/dev/null"
-            ], fileDuration: fileDuration)
-
-            guard let lnDict = FFmpegRunner.parseLoudnormJSON(from: analysisOutput),
-                  let measurements = LoudnormMeasurements(json: lnDict.mapValues { $0 as Any }) else {
-                // Include a stderr excerpt so future FFmpeg log-format changes are debuggable.
-                let excerpt = String(analysisOutput.prefix(500))
-                throw ProcessingError.ffmpegFailed(
-                    code: -1,
-                    message: excerpt.isEmpty
-                        ? "Could not parse loudnorm analysis output — ffmpeg produced no stderr."
-                        : "Could not parse loudnorm analysis output. FFmpeg stderr: \(excerpt)"
-                )
-            }
-
-            // Silent / near-silent inputs cause loudnorm to emit -inf or inf.
-            // Pass 2 rejects those values with "Result too large", so skip the
-            // normalization step and pass the audio through to the limiter as-is.
-            if !measurements.isFinite {
-                onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
-                loudnormFilter = nil
-            } else {
-                onLog?("  \(measurements.formattedSummary)", .info)
-                onLog?(String(format: "  target: %.0f LUFS  |  offset %.2f dB  |  thresh %.1f LUFS",
-                              target, measurements.targetOffset, measurements.inputThresh), .verbose)
-                if abs(measurements.targetOffset) > 12.0 {
-                    onLog?(String(format: "⚠ Large gain change (%+.1f dB) — verify the source level and output before delivery.",
-                                  measurements.targetOffset), .info)
-                }
-                onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
-                              measurements.targetOffset, measurements.inputI, target), .info)
-                // Detection only — does not alter the filter built below. WaxOn's
-                // LRA=20 makes the range condition unlikely, but the true-peak
-                // condition can still force dynamic normalization.
-                if let warning = measurements.dynamicFallbackWarning(targetLUFS: target, truePeakDB: tp, lra: 20) {
-                    onLog?(warning, .info)
-                }
-                onLog?("  loudnorm: normalizing…", .verbose)
-
-                // Fused into the final limiter chain below instead of rendered separately.
-                //
-                // print_format=json is appended here rather than inside
-                // linearPassFilter: that builder is shared with WaxOff, and its
-                // output there already carries the option from its own call
-                // site. loudnorm defaults print_format to NONE, so without this
-                // the pass-2 block is never emitted at all.
-                loudnormFilter = measurements.linearPassFilter(targetLUFS: target, truePeakDB: tp, lra: 20)
-                    + ":print_format=json"
-                pass2Measurements = measurements
-            }
-        } else {
-            loudnormFilter = nil
-        }
+        let ceiling = -1.0
+        onLog?("  measuring loudness and true peak…", .verbose)
+        let reading = try await measureLoudness(exe: tools.ffmpeg, url: limiterInput, fileDuration: fileDuration)
 
         try Task.checkCancellation()
 
+        let gainDB: Double
+        let renderAf: String
+
         if settings.loudnormEnabled {
-            // Loudness Norm ON: the pass-2 linear loudnorm (when measurements were finite)
-            // and the brick-wall limiter run as a single fused filter chain
-            // in one ffmpeg invocation — no intermediate normalize file. The limiter stays
-            // as the inter-sample-peak backstop: loudnorm's linear pass measures true peak
-            // but can still leave ISPs above the ceiling.
-            let limiterAf = "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled"
-            let step2Af = loudnormFilter.map { "\($0),\(limiterAf)" } ?? limiterAf
-
-            onLog?("  limiter: ceiling −1.0 dBTP  |  attack 5 ms  |  release 50 ms", .verbose)
-
-            try? fm.removeItem(at: tmpURL)
-
-            // -loglevel info because loudnorm prints its JSON block at
-            // AV_LOG_INFO, which `error` suppresses. -nostats suppresses the
-            // periodic progress updates, which otherwise grow with render
-            // length — the single final summary line still prints either way.
-            // Both options are output-only: renders at `error` and at `info`
-            // are byte-identical, verified against this exact argument list.
-            // .capture rather than .run for the same reason #9 needed it on
-            // WaxOff: both issue an identical launch with capture: .stderr, and
-            // run simply drops the result.
-            let renderStderr = try await FFmpegRunner.capture(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-nostats", "-loglevel", "info", "-y",
-                "-i", limiterInput.path, "-af", step2Af,
-                "-map_metadata", "0",
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
-            ], fileDuration: fileDuration)
-
-            // What pass 2 actually did, as loudnorm reports it. The warning
-            // above predicts this from the pass-1 measurements; this is the
-            // confirmation. Lowercase "linear"/"dynamic" per af_loudnorm.c:877 —
-            // the capitalised forms belong to print_format=summary, which this
-            // call never requests.
-            if let normalizationType = FFmpegRunner.parseLoudnormJSON(from: renderStderr)?["normalization_type"] {
-                onLog?("  loudnorm: applied \(normalizationType) normalization", .verbose)
-
-                // Cross-check the prediction against the ground truth. Log only —
-                // never assert, and never fail on a mismatch.
-                //
-                // Agreement is expected for sources of 3 seconds or more. Below
-                // that, af_loudnorm.c:446-461 forces linear mode from the
-                // short-first-frame path, bypassing the init() predicate that
-                // predictsLinearMode models — so a sub-3s file disagreeing is
-                // correct behaviour on both sides, not a defect to be fixed.
-                if let m = pass2Measurements {
-                    let predictedLinear = m.predictsLinearMode(
-                        targetLUFS: settings.loudnormTarget,
-                        truePeakDB: -1.0,
-                        lra: 20
-                    ) == nil
-                    let actualLinear = normalizationType == "linear"
-                    if predictedLinear != actualLinear {
-                        onLog?("  loudnorm: predicted \(predictedLinear ? "linear" : "dynamic"), applied \(normalizationType)", .verbose)
-                    }
+            let target = settings.loudnormTarget
+            // ebur128 floors at exactly −70 LUFS (the BS.1770 absolute gate) for silent
+            // and near-silent input, where loudnorm used to report -inf. Treat the floor
+            // as "nothing to measure" so silence is passed through rather than boosted.
+            if let r = reading, r.integrated > -70.0 {
+                gainDB = target - r.integrated
+                onLog?(String(format: "  measured: %.1f LUFS  |  TP %.1f dBTP", r.integrated, r.truePeakDB), .info)
+                if abs(gainDB) > 12.0 {
+                    onLog?(String(format: "⚠ Large gain change (%+.1f dB) — verify the source level and output before delivery.",
+                                  gainDB), .info)
                 }
+                onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
+                              gainDB, r.integrated, target), .info)
+            } else {
+                gainDB = 0.0
+                onLog?("⚠ Input is silent or near-silent — loudness normalization skipped.", .info)
             }
+            onLog?("  limiter: ceiling −1.0 dBFS  |  attack 5 ms  |  release 50 ms", .verbose)
+            renderAf = "volume=\(String(format: "%.6f", gainDB))dB,"
+                + "alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled"
         } else {
-            // Loudness Norm OFF: downward-only linear true-peak normalization instead of
-            // the limiter. Measure the post-filter/post-dynleveling true peak, then apply
-            // at most a single attenuation to the −1.0 dBTP ceiling. This preserves the
-            // ingest dynamics — when the source already sits within the ceiling the
-            // waveform passes through untouched (gain 0).
-            let ceiling = -1.0
-            onLog?("  loudnorm off: measuring true peak for linear normalization…", .verbose)
-            let measuredTP = try await measureTruePeak(exe: tools.ffmpeg, url: limiterInput, fileDuration: fileDuration)
-
-            let gainDB: Double
-            if let tp = measuredTP {
+            // Downward-only true-peak normalization: at most a single attenuation to the
+            // ceiling, so a source already inside it passes through untouched (gain 0).
+            if let tp = reading?.truePeakDB, tp.isFinite {
                 gainDB = min(0.0, ceiling - tp)
                 if gainDB < 0 {
                     onLog?(String(format: "  true peak %.1f dBTP → %.1f dB linear gain to %.1f dBTP (no limiting)", tp, gainDB, ceiling), .info)
@@ -371,19 +270,20 @@ actor AudioProcessor {
                 }
             } else {
                 gainDB = 0.0
-                onLog?("⚠ Could not measure true peak — passing through unmodified (no gain applied).", .info)
+                onLog?("⚠ Input is silent or its true peak could not be measured — passed through unmodified.", .info)
             }
-
-            try? fm.removeItem(at: tmpURL)
-
-            // Single linear gain. At 0 dB this is a transparent copy (no limiting).
-            try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
-                "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-i", limiterInput.path, "-af", "volume=\(String(format: "%.6f", gainDB))dB",
-                "-map_metadata", "0",
-                "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
-            ], fileDuration: fileDuration)
+            renderAf = "volume=\(String(format: "%.6f", gainDB))dB"
         }
+
+        try? fm.removeItem(at: tmpURL)
+
+        // Single render. At 0 dB gain with Norm off this is a transparent copy.
+        try await FFmpegRunner.run(exe: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", limiterInput.path, "-af", renderAf,
+            "-map_metadata", "0",
+            "-c:a", "pcm_s24le", "-ar", "\(sr)", "-ac", outputChannelCount, "-f", "wav", tmpURL.path
+        ], fileDuration: fileDuration)
 
         guard let attrs = try? fm.attributesOfItem(atPath: tmpURL.path),
               let size = attrs[.size] as? NSNumber,
@@ -399,12 +299,12 @@ actor AudioProcessor {
         return JobResult(id: id, input: input, output: finalURL)
     }
 
-    /// Measures the true peak (input_tp) of `url` via a loudnorm analysis pass,
-    /// reusing the same capture + JSON parsing path as the loudnorm-on route.
-    /// The target params don't affect the reported input_tp. Returns nil if the
-    /// pass fails or the measured true peak is non-finite (e.g. a silent clip) —
-    /// callers treat nil as "apply no gain". Cancellation is propagated.
-    private func measureTruePeak(exe: String, url: URL, fileDuration: TimeInterval?) async throws -> Double? {
+    /// Single EBU R128 pass over `url` with true-peak metering, read from the
+    /// filter's frame metadata at full precision (the stderr summary only carries
+    /// one decimal). One call serves both the integrated-loudness and true-peak
+    /// needs of the render. Returns nil if the pass or parse fails; callers treat
+    /// nil as "apply no gain". Cancellation is propagated.
+    private func measureLoudness(exe: String, url: URL, fileDuration: TimeInterval?) async throws -> FFmpegRunner.Ebur128Reading? {
         let analyzeAf = "ebur128=peak=true:metadata=1,ametadata=mode=print:file=-"
         let output: String
         do {
@@ -418,11 +318,7 @@ actor AudioProcessor {
         } catch {
             return nil
         }
-        guard let reading = FFmpegRunner.parseEbur128FrameMetadata(from: output),
-              reading.truePeakDB.isFinite else {
-            return nil
-        }
-        return reading.truePeakDB
+        return FFmpegRunner.parseEbur128FrameMetadata(from: output)
     }
 
     private func makeTemp(prefix: String) throws -> URL {
