@@ -14,7 +14,7 @@ struct FileInfoStatsView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     if showingOutput {
                         Text("OUTPUT")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(AppFont.sectionLabel)
                             .foregroundStyle(Color.brandAccent)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
@@ -107,11 +107,11 @@ struct FileInfoStatsView: View {
     private func statBlock(_ label: String, _ value: String, valueColor: Color = .primary, help: String = "") -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(AppFont.sectionLabel)
                 .foregroundStyle(.tertiary)
                 .kerning(0.4)
             Text(value)
-                .font(.system(size: 12.5, weight: .medium).monospaced())
+                .font(AppFont.statValue)
                 .foregroundStyle(valueColor)
         }
         .padding(.horizontal, 8)

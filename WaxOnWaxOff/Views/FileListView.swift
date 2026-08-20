@@ -123,7 +123,7 @@ struct FileRowView: View {
 
                 if let badge = channelBadge, !file.isProcessed {
                     Text(badge.label)
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(AppFont.sectionLabel)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)

@@ -8,7 +8,7 @@ struct SettingsView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("OUTPUT FORMAT")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppFont.sectionLabel)
                     .foregroundStyle(Color.brandAccent.opacity(0.8))
                     .kerning(0.4)
                     .padding(.top, 6)
@@ -40,8 +40,8 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity)
                         // The manual makes this case in Tips & Workflow, which
                         // is three screens from the control that needs it.
-                        Text("Use Mono for one microphone, Stereo to keep a stereo recording intact, and Split L/R when one file holds two microphones — each channel is prepped on its own and written as a separate mono file.")
-                            .font(.caption)
+                        Text(channelsCaption)
+                            .font(AppFont.help)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -52,19 +52,19 @@ struct SettingsView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text("OUTPUT DIR")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(AppFont.sectionLabel)
                         .foregroundStyle(Color.brandAccent.opacity(0.8))
                         .kerning(0.4)
                     if let path = viewModel.settings.outputDirectoryPath {
                         Text(URL(fileURLWithPath: path).lastPathComponent)
-                            .font(.system(size: 11))
+                            .font(AppFont.value)
                             .lineLimit(2)
                             .truncationMode(.middle)
                             .foregroundStyle(.secondary)
                             .help(path)
                     } else {
                         Text("Same as source")
-                            .font(.system(size: 11))
+                            .font(AppFont.value)
                             .foregroundStyle(.secondary)
                     }
                     HStack(spacing: 6) {
@@ -94,11 +94,25 @@ struct SettingsView: View {
         .background(.thinMaterial)
     }
 
+    /// One sentence for the mode in effect rather than all three at once. The
+    /// three-way control already names the options; the caption only has to say
+    /// what the selected one does, which keeps a dense corner of the panel calm.
+    private var channelsCaption: String {
+        switch viewModel.settings.outputChannels {
+        case .mono:
+            return "Extracts a single channel — use it for one microphone."
+        case .stereo:
+            return "Passes both channels through unchanged — use it to keep a stereo recording intact."
+        case .splitLR:
+            return "For one file holding two microphones: each channel is prepped on its own and written as a separate mono file."
+        }
+    }
+
     private var channelRow: some View {
         let channelEnabled = viewModel.settings.outputChannels == .mono
         return VStack(alignment: .leading, spacing: 5) {
             Text("SOURCE CHANNEL")
-                .font(.system(size: 9, weight: .semibold))
+                .font(AppFont.sectionLabel)
                 .foregroundStyle(.tertiary)
                 .kerning(0.4)
                 .opacity(channelEnabled ? 1 : 0.4)
@@ -126,7 +140,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 5) {
             if let label {
                 Text(label.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppFont.sectionLabel)
                     .foregroundStyle(.tertiary)
                     .kerning(0.4)
             }

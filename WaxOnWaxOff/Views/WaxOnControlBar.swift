@@ -92,7 +92,7 @@ struct WaxOnControlBar: View {
             Spacer().frame(height: 10)
 
             Text(caption)
-                .font(.system(size: 11))
+                .font(AppFont.value)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
@@ -108,7 +108,7 @@ struct WaxOnControlBar: View {
             Spacer()
 
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(AppFont.sectionLabel)
                 .foregroundStyle(.secondary)
                 .kerning(0.4)
                 .frame(height: 22)
@@ -127,14 +127,14 @@ struct WaxOnControlBar: View {
             Spacer().frame(height: 6)
 
             Text(valueLabel)
-                .font(.system(size: 11).monospaced())
+                .font(AppFont.valueMono)
                 .foregroundStyle(.secondary)
                 .opacity(enabled ? 1 : 0.35)
 
             Spacer().frame(height: 4)
 
             Text(caption)
-                .font(.system(size: 11))
+                .font(AppFont.value)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
@@ -149,11 +149,11 @@ struct WaxOnControlBar: View {
     private func twoLineLabel(line1: String, line2: String) -> some View {
         VStack(spacing: 1) {
             Text(line1)
-                .font(.system(size: 9, weight: .semibold))
+                .font(AppFont.sectionLabel)
                 .foregroundStyle(.secondary)
                 .kerning(0.4)
             Text(line2)
-                .font(.system(size: 9, weight: .semibold))
+                .font(AppFont.sectionLabel)
                 .foregroundStyle(.secondary)
                 .kerning(0.4)
         }

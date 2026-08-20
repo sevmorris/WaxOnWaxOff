@@ -8,7 +8,7 @@ struct WaxOffSettingsView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("OUTPUT FORMAT")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppFont.sectionLabel)
                     .foregroundStyle(Color.brandAccent.opacity(0.8))
                     .kerning(0.4)
                     .padding(.top, 6)
@@ -26,7 +26,7 @@ struct WaxOffSettingsView: View {
                         .frame(maxWidth: .infinity)
                         if viewModel.settings.outputMode != .wav {
                             Text("MP3 always outputs at 44.1 kHz")
-                                .font(.caption)
+                                .font(AppFont.help)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -48,7 +48,7 @@ struct WaxOffSettingsView: View {
                         // down — and Channels already states it correctly, so
                         // the caption was both misplaced and duplicated.
                         Text("Both writes a WAV file and an MP3 file.")
-                            .font(.caption)
+                            .font(AppFont.help)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -64,7 +64,7 @@ struct WaxOffSettingsView: View {
                         )
                         .frame(maxWidth: .infinity)
                         Text("Deliver a mono source as a single channel instead of dual-mono stereo")
-                            .font(.caption)
+                            .font(AppFont.help)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -87,12 +87,12 @@ struct WaxOffSettingsView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text("OUTPUT DIR")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(AppFont.sectionLabel)
                         .foregroundStyle(Color.brandAccent.opacity(0.8))
                         .kerning(0.4)
                     if let path = viewModel.settings.outputDirectoryPath {
                         Text(URL(fileURLWithPath: path).lastPathComponent)
-                            .font(.system(size: 11))
+                            .font(AppFont.value)
                             .lineLimit(2)
                             .truncationMode(.middle)
                             .foregroundStyle(.secondary)
@@ -101,7 +101,7 @@ struct WaxOffSettingsView: View {
                             .help(path)
                     } else {
                         Text("Same as source")
-                            .font(.system(size: 11))
+                            .font(AppFont.value)
                             .foregroundStyle(.secondary)
                     }
                     HStack(spacing: 6) {
@@ -136,7 +136,7 @@ struct WaxOffSettingsView: View {
         VStack(alignment: .leading, spacing: 5) {
             if let label {
                 Text(label.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppFont.sectionLabel)
                     .foregroundStyle(.tertiary)
                     .kerning(0.4)
             }

@@ -46,7 +46,7 @@ struct WaxOffControlBar: View {
     private func knobCell(label: String, valueLabel: String, value: Binding<Double>, step: Double, help: String) -> some View {
         VStack(spacing: 8) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(AppFont.sectionLabel)
                 .foregroundStyle(.secondary)
                 .kerning(0.4)
             RotaryKnobView(
@@ -57,7 +57,7 @@ struct WaxOffControlBar: View {
                 accessibilityValueText: valueLabel
             )
             Text(valueLabel)
-                .font(.system(size: 11).monospaced())
+                .font(AppFont.valueMono)
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 80, alignment: .center)
         }
