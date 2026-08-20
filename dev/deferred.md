@@ -58,14 +58,33 @@ they sit here because nothing is scheduled and this file is the record of that.
   than render order. Treat the remaining seven as unverified rather than
   false.
 
-- **Splitting a stereo file into two mono files** — considered and declined.
-  The documented workflow (manual, *WaxOn: Mono vs. Stereo for Podcasts*) is
-  to process the file as stereo and split in the DAW, which fits a tool that
-  runs *before* the session is open. It would also force the one-output-per-row
-  model open: `JobResult.output` and `FileStatus.processed(outputURL:)` are
-  both singular, and WaxOff already papers over the same limit by taking
-  `outputURLs.first` and silently dropping the MP3 from the row. Worth doing
-  properly, with that model fix, or not at all.
+- **Splitting a stereo file into two mono files** — declined here, then
+  **shipped in 2.10.0** as the Channels ▸ Split L/R mode. What changed the
+  calculus: the decline assumed the DAW could do the same job, but it cannot do
+  the part that matters — normalizing each speaker *independently*, so two
+  people who sat at different distances from their microphones both arrive at a
+  consistent level. The old workaround (run twice with Source Channel flipped)
+  also silently overwrote its own first output, because `OutputAllocator` only
+  de-duplicates within a batch.
+
+  The model concern in this entry was right, and only half-addressed — see
+  *One output per row* below.
+
+- **Dynamic Leveling's position in the control bar** — considered, and
+  addressed differently. It is default-off yet sits in the middle of the bar
+  with a Strength knob beside it, which read as prime space for a rarely-used
+  control. Moving it was rejected because the bar's left-to-right order matches
+  the real signal chain (dynaudnorm does run before loudnorm), so reordering
+  would make the bar imply a processing order the app does not use. The actual
+  problem was visual weight: the knob rendered at full colour while disabled,
+  and now dims with its label. If it still reads wrong, the remaining option is
+  moving Dynamic Leveling and Strength into the Settings panel.
+
+- **Panel type scale still has headroom.** Sizes grew in 2.10.0 (labels 9 → 11,
+  values 11 → 13, stat readouts 12.5 → 14) and now live in one `AppFont` enum,
+  so another step is a four-line change rather than twenty scattered edits.
+  The settings panel still has empty space below OUTPUT DIR. The most cramped
+  thing left is the control-bar captions, which wrap to three lines.
 
 ## Test gaps
 
@@ -87,6 +106,17 @@ they sit here because nothing is scheduled and this file is the record of that.
   fold-down (L+R summed before squaring). Intentional and pinned by
   testStereoDualMonoRMSMatchesMono; documented in the ToO. Revisit if
   a per-channel RMS option is ever added.
+
+- **One output per row.** `JobResult` now carries `outputs: [URL]`, but
+  `FileStatus.processed(outputURL:)` is still singular and the row still renders
+  one waveform and one stats panel. So a Split L/R job writes two files and the
+  row shows only the left one; both appear in the console and on disk, but the
+  right channel has no representation in the list. `JobResult.output` is a
+  computed `outputs[0]`, which is precisely the papering-over this file warned
+  about when it declined the split — WaxOff does the same thing with
+  `outputURLs.first`, dropping the MP3 from its row. Doing it properly means
+  either two rows per split job, or a row that can carry and switch between
+  several outputs. That would fix WaxOff's MP3 case at the same time.
 
 - **[perf-2026-07] Oversample-chain resamplers (Bucket B, unapproved)**
   — the 2× oversample limiter chains (WAV render + MP3 pre-encode)
