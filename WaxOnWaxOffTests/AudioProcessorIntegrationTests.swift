@@ -41,7 +41,7 @@ final class AudioProcessorIntegrationTests: XCTestCase {
 
         XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
         let result = try XCTUnwrap(batch.successes.first)
-        let attrs = try FileManager.default.attributesOfItem(atPath: result.output.path)
+        let attrs = try FileManager.default.attributesOfItem(atPath: result.outputs[0].path)
         let size = try XCTUnwrap(attrs[.size] as? NSNumber)
         XCTAssertGreaterThan(size.intValue, 1000)
     }
@@ -90,7 +90,7 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         let processor = AudioProcessor(settings: settings)
         let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
         XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
-        let output = try XCTUnwrap(batch.successes.first?.output)
+        let output = try XCTUnwrap(batch.successes.first?.outputs[0])
 
         let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: output)
         // Prep chain includes HPF + limiter; allow wider tolerance than WaxOff delivery.
@@ -197,7 +197,7 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         let processor = AudioProcessor(settings: settings, onLog: { collector.append($0, $1) })
         let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
         XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
-        let output = try XCTUnwrap(batch.successes.first?.output)
+        let output = try XCTUnwrap(batch.successes.first?.outputs[0])
 
         // The attenuate-only linear path ran — not the brick-wall limiter.
         XCTAssertTrue(collector.infoMessages.contains { $0.contains("linear gain") && $0.contains("no limiting") },
@@ -244,7 +244,7 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         let processor = AudioProcessor(settings: settings, onLog: { collector.append($0, $1) })
         let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
         XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
-        let output = try XCTUnwrap(batch.successes.first?.output)
+        let output = try XCTUnwrap(batch.successes.first?.outputs[0])
 
         // The within-ceiling pass-through branch ran (gain 0).
         XCTAssertTrue(collector.infoMessages.contains { $0.contains("passed through unmodified") },
@@ -290,7 +290,7 @@ final class AudioProcessorIntegrationTests: XCTestCase {
         XCTAssertTrue(collector.infoMessages.contains { $0.contains("6-channel input") && $0.contains("downmixing to stereo") },
                       "expected a downmix warning for a 6-channel source under Stereo output; got: \(collector.infoMessages)")
 
-        let output = try XCTUnwrap(batch.successes.first?.output)
+        let output = try XCTUnwrap(batch.successes.first?.outputs[0])
         let outputChannels = try await channelCount(ffprobe: tools.ffprobe, of: output)
         XCTAssertEqual(outputChannels, 2,
                        "stereo output should be 2-channel")

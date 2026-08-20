@@ -67,8 +67,14 @@ they sit here because nothing is scheduled and this file is the record of that.
   also silently overwrote its own first output, because `OutputAllocator` only
   de-duplicates within a batch.
 
-  The model concern in this entry was right, and only half-addressed — see
-  *One output per row* below.
+  The model concern in this entry was right, and was only half-addressed at
+  first: `JobResult` carried `outputs: [URL]` while the row still held a single
+  `processed(outputURL:)`, so a split job's right channel had no representation
+  in the list and `JobResult.output` — a computed `outputs[0]` — papered over
+  exactly what this file had warned about. Fixed after 2.10.0: the row carries
+  every output and switches between them, and the singular accessor is gone.
+  WaxOff's `outputURLs.first`, which dropped the MP3 from its row the same way,
+  went with it.
 
 - **Dynamic Leveling's position in the control bar** — considered, and
   addressed differently. It is default-off yet sits in the middle of the bar
@@ -106,17 +112,6 @@ they sit here because nothing is scheduled and this file is the record of that.
   fold-down (L+R summed before squaring). Intentional and pinned by
   testStereoDualMonoRMSMatchesMono; documented in the ToO. Revisit if
   a per-channel RMS option is ever added.
-
-- **One output per row.** `JobResult` now carries `outputs: [URL]`, but
-  `FileStatus.processed(outputURL:)` is still singular and the row still renders
-  one waveform and one stats panel. So a Split L/R job writes two files and the
-  row shows only the left one; both appear in the console and on disk, but the
-  right channel has no representation in the list. `JobResult.output` is a
-  computed `outputs[0]`, which is precisely the papering-over this file warned
-  about when it declined the split — WaxOff does the same thing with
-  `outputURLs.first`, dropping the MP3 from its row. Doing it properly means
-  either two rows per split job, or a row that can carry and switch between
-  several outputs. That would fix WaxOff's MP3 case at the same time.
 
 - **[perf-2026-07] Oversample-chain resamplers (Bucket B, unapproved)**
   — the 2× oversample limiter chains (WAV render + MP3 pre-encode)

@@ -41,7 +41,7 @@ final class DeliveryViewModelReentryTests: XCTestCase {
     /// rows — so a restart cannot pick up the previous batch's files. Pins that
     /// the two statuses are distinct and that `.processed` is not `.ready`.
     func testProcessedRowsAreNotReady() {
-        let processed = FileStatus.processed(outputURL: URL(fileURLWithPath: "/tmp/out.wav"))
+        let processed = FileStatus.processed(outputURLs: [URL(fileURLWithPath: "/tmp/out.wav")])
         if case .ready = processed {
             XCTFail("a delivered row must not read as .ready, or a restart would reprocess it")
         }

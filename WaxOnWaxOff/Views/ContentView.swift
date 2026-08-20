@@ -209,7 +209,13 @@ struct ContentView: View {
                         .truncationMode(.middle)
                         .help(file.url.path)
 
-                    WaveformView(waveformData: file.outputWaveform ?? file.waveform)
+                    if file.outputs.count > 1 {
+                        OutputSwitcher(outputs: file.outputs, selectedIndex: file.selectedOutputIndex) {
+                            viewModel.selectOutput(id: file.id, index: $0)
+                        }
+                    }
+
+                    WaveformView(waveformData: file.selectedOutput?.waveform ?? file.waveform)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(.black.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 8))

@@ -51,6 +51,11 @@ final class DeliveryViewModel {
     }
     var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
+    /// Shows a different one of a completed row's outputs in the detail pane.
+    func selectOutput(id: UUID, index: Int) {
+        fileQueue.selectOutput(id: id, index: index)
+    }
+
     /// True from the moment a restart is scheduled until the new batch starts.
     ///
     /// `cancelProcessing()` clears `isProcessing` synchronously, but the restart
@@ -330,13 +335,14 @@ final class DeliveryViewModel {
                             // leave a stale entry behind.
                             self.filePhases.removeValue(forKey: result.id)
                             guard let idx = self.files.firstIndex(where: { $0.id == result.id }),
-                                  let primaryURL = result.outputURLs.first else { return }
-                            self.files[idx].status = .processed(outputURL: primaryURL)
+                                  !result.outputURLs.isEmpty else { return }
+                            self.files[idx].status = .processed(outputURLs: result.outputURLs)
                             // Refresh the stats panel and output waveform against
-                            // the rendered file (single shared decode) so the user
-                            // can see what their WaxOff output landed at — mirrors
-                            // WaxOn's post-process behavior.
-                            self.fileQueue.analyzeOutputFile(id: result.id, url: primaryURL)
+                            // the rendered files (single shared decode each) so the
+                            // user can see what their WaxOff output landed at —
+                            // mirrors WaxOn's post-process behavior. Both format
+                            // keeps the MP3 reachable instead of dropping it here.
+                            self.fileQueue.attachOutputs(id: result.id, urls: result.outputURLs)
                         }
                     },
                     onFileFailed: { [weak self] failure in

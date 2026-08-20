@@ -149,9 +149,9 @@ struct FileRowView: View {
                             .foregroundStyle(.green)
                     }
 
-                    if let outputURL = file.outputURL {
+                    if !file.outputURLs.isEmpty {
                         Button {
-                            NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                            NSWorkspace.shared.activateFileViewerSelecting(file.outputURLs)
                         } label: {
                             Image(systemName: "folder")
                                 .font(.caption)
@@ -199,10 +199,12 @@ struct FileRowView: View {
             Text("RMS \(stats.rms, specifier: "%.1f") dBFS \u{2022} Peak \(stats.peak, specifier: "%.1f") dBFS")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-        case .processed(let outputURL):
-            Text("Output: \(outputURL.lastPathComponent)")
+        case .processed(let outputURLs):
+            Text("\(outputURLs.count > 1 ? "Outputs" : "Output"): \(outputURLs.map(\.lastPathComponent).joined(separator: " \u{2022} "))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
         case .error(let message):
             Text("Error: \(message)")
                 .font(.caption)

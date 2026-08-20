@@ -34,6 +34,11 @@ final class ContentViewModel {
     }
     var isAnyFileAnalyzing: Bool { fileQueue.isAnyFileAnalyzing }
 
+    /// Shows a different one of a completed row's outputs in the detail pane.
+    func selectOutput(id: UUID, index: Int) {
+        fileQueue.selectOutput(id: id, index: index)
+    }
+
     /// Whether the file list can be edited.
     ///
     /// A batch works from a snapshot taken at Process, so removing rows mid-run
@@ -184,9 +189,10 @@ final class ContentViewModel {
                         Task { @MainActor [self] in
                             guard let id = result.id,
                                   let index = self.files.firstIndex(where: { $0.id == id }) else { return }
-                            self.files[index].status = .processed(outputURL: result.output)
-                            // Stats + output waveform from a single shared decode.
-                            self.fileQueue.analyzeOutputFile(id: id, url: result.output)
+                            self.files[index].status = .processed(outputURLs: result.outputs)
+                            // Attaches every output the job wrote; stats and the
+                            // output waveform come from a single shared decode.
+                            self.fileQueue.attachOutputs(id: id, urls: result.outputs)
                         }
                     },
                     onFileFailed: { [weak self] failure in

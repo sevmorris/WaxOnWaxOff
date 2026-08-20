@@ -21,7 +21,11 @@ final class FileQueueCoordinator {
     private var analysisTasks: [UUID: Task<Void, Never>] = [:]
     private var analysisInfoTasks: [UUID: Task<Void, Never>] = [:]
     private var waveformTasks: [UUID: Task<Void, Never>] = [:]
-    private var outputWaveformTasks: [UUID: Task<Void, Never>] = [:]
+    /// Output analyses in flight, per row. A row can have one per output —
+    /// they're started lazily as the user switches between them and left in
+    /// place until the row is re-rendered or removed, so the array is bounded
+    /// by the job's output count (two at most today).
+    private var outputAnalysisTasks: [UUID: [Task<Void, Never>]] = [:]
 
     let validExtensions: Set<String>
     /// HPF cutoff (Hz) used when estimating noise floor — should match WaxOn processing (80 or 20).
@@ -128,11 +132,11 @@ final class FileQueueCoordinator {
             analysisTasks[id]?.cancel()
             analysisInfoTasks[id]?.cancel()
             waveformTasks[id]?.cancel()
-            outputWaveformTasks[id]?.cancel()
+            outputAnalysisTasks[id]?.forEach { $0.cancel() }
             analysisTasks.removeValue(forKey: id)
             analysisInfoTasks.removeValue(forKey: id)
             waveformTasks.removeValue(forKey: id)
-            outputWaveformTasks.removeValue(forKey: id)
+            outputAnalysisTasks.removeValue(forKey: id)
         }
     }
 
@@ -171,10 +175,37 @@ final class FileQueueCoordinator {
         }
     }
 
-    /// Post-render refresh: stats panel values, output waveform, and file info
-    /// for a rendered output. Stats and waveform share one decode of the file
-    /// (previously two separate full streams); file info is a header-only read.
-    func analyzeOutputFile(id: UUID, url: URL) {
+    /// Post-render refresh: attaches the job's outputs to the row and measures
+    /// the one the detail pane will show. Only that first output is analyzed
+    /// here — the others are measured on demand in `selectOutput` so a split
+    /// render doesn't pay for a decode the user may never look at.
+    func attachOutputs(id: UUID, urls: [URL]) {
+        guard let idx = files.firstIndex(where: { $0.id == id }) else { return }
+        outputAnalysisTasks[id]?.forEach { $0.cancel() }
+        outputAnalysisTasks.removeValue(forKey: id)
+        let labels = OutputFile.labels(for: urls)
+        files[idx].outputs = zip(urls, labels).map { OutputFile(url: $0, label: $1) }
+        files[idx].selectedOutputIndex = 0
+        analyzeOutput(id: id, index: 0)
+    }
+
+    /// Shows a different output of a completed row, measuring it first if this
+    /// is the first time it's been looked at.
+    func selectOutput(id: UUID, index: Int) {
+        guard let idx = files.firstIndex(where: { $0.id == id }),
+              files[idx].outputs.indices.contains(index) else { return }
+        files[idx].selectedOutputIndex = index
+        analyzeOutput(id: id, index: index)
+    }
+
+    /// Stats, waveform, and file info for one rendered output. Stats and
+    /// waveform share a single decode of the file (previously two separate
+    /// full streams); file info is a header-only read.
+    private func analyzeOutput(id: UUID, index: Int) {
+        guard let idx = files.firstIndex(where: { $0.id == id }),
+              files[idx].outputs.indices.contains(index),
+              files[idx].outputs[index].stats == nil else { return }
+        let url = files[idx].outputs[index].url
         let hpf = noiseFloorHighPassHz
         let task = Task {
             async let combined = try? AudioAnalyzer.analyzeWithWaveform(url: url, noiseFloorHighPassHz: hpf)
@@ -183,16 +214,17 @@ final class FileQueueCoordinator {
             if c == nil {
                 fileQueueLogger.debug("Output analysis failed: \(url.lastPathComponent, privacy: .public)")
             }
-            if let idx = files.firstIndex(where: { $0.id == id }) {
-                if let c {
-                    files[idx].outputStats = c.stats
-                    files[idx].outputWaveform = c.waveform
-                }
-                if let i { files[idx].outputFileInfo = i }
+            // Re-find the row and the output: the queue can be reordered, and
+            // the row re-rendered, while this decode is in flight.
+            guard let idx = files.firstIndex(where: { $0.id == id }),
+                  let out = files[idx].outputs.firstIndex(where: { $0.url == url }) else { return }
+            if let c {
+                files[idx].outputs[out].stats = c.stats
+                files[idx].outputs[out].waveform = c.waveform
             }
-            outputWaveformTasks.removeValue(forKey: id)
+            if let i { files[idx].outputs[out].fileInfo = i }
         }
-        outputWaveformTasks[id] = task
+        outputAnalysisTasks[id, default: []].append(task)
     }
 
     private func expandFolder(_ url: URL) -> [URL] {

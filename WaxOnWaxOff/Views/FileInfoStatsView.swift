@@ -6,11 +6,12 @@ struct FileInfoStatsView: View {
     /// colored — the high-noise-floor heuristic targets raw speech, not finished mixes.
     var applyFloorWarnings: Bool = true
 
-    private var showingOutput: Bool { file.outputStats != nil || file.outputFileInfo != nil }
+    private var output: OutputFile? { file.selectedOutput }
+    private var showingOutput: Bool { output?.stats != nil || output?.fileInfo != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let info = file.outputFileInfo ?? file.fileInfo {
+            if let info = output?.fileInfo ?? file.fileInfo {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     if showingOutput {
                         Text("OUTPUT")
@@ -25,7 +26,7 @@ struct FileInfoStatsView: View {
                 }
             }
             Divider().padding(.vertical, 8)
-            statsRow(file.outputStats ?? file.stats)
+            statsRow(output?.stats ?? file.stats)
         }
         .padding(.top, 6)
     }
