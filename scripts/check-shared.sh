@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
-# ClipHack). Keep the copies byte-identical: scripts/check-shared.sh compares
-# them and a release preflight fails when they drift. Anything app-specific
-# belongs in that repo's release.sh, not here.
+# ClipHack, FilmStrip). Keep the copies byte-identical: scripts/check-shared.sh
+# compares them and a release preflight fails when they drift. Anything
+# app-specific belongs in that repo's release.sh, not here.
 #
 # Reports files that are meant to be identical across the sibling repos but
 # are not. These projects are deliberately independent — there is no shared
@@ -27,7 +27,7 @@
 set -euo pipefail
 
 MARKER="Shared verbatim across the sibling app repos"
-SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack)
+SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack FilmStrip)
 
 ROOT=$(git rev-parse --show-toplevel)
 SELF=$(basename "$ROOT")
