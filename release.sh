@@ -45,7 +45,6 @@ PROJECT="$PROJECT_DIR/WaxOnWaxOff.xcodeproj"
 SCHEME="WaxOnWaxOff"
 DERIVED_DATA="/tmp/waxon_build_${VERSION}"
 APP_PATH="$DERIVED_DATA/Build/Products/Release/WaxOnWaxOff.app"
-STAGING="/tmp/waxon_dmg_${VERSION}"
 DMG="/tmp/WaxOnWaxOff-${TAG}.dmg"
 MOUNT="/tmp/waxon_verify_${VERSION}"
 MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
@@ -90,7 +89,6 @@ cleanup() {
         git -C "${PROJECT_DIR:-.}" checkout -- \
             "${MANUAL_IDX:-}" "${LANDING_IDX:-}" "${PROJECT_DIR:-.}/README.md" 2>/dev/null || true
     fi
-    [[ -d "${STAGING:-}" ]]      && rm -rf -- "$STAGING"      || true
     [[ -d "${MOUNT:-}" ]]        && rm -rf -- "$MOUNT"        || true
     [[ -d "${DERIVED_DATA:-}" ]] && rm -rf -- "$DERIVED_DATA" || true
     [[ -f "${DMG:-}" ]]          && rm -f  -- "$DMG"          || true
@@ -99,9 +97,11 @@ trap cleanup EXIT
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 step "Preflight checks"
-for cmd in xcodebuild hdiutil gh git codesign xcrun curl; do
+for cmd in xcodebuild hdiutil gh git codesign xcrun curl python3; do
     command -v $cmd &>/dev/null || fail "'$cmd' not found in PATH"
 done
+python3 -c "import dmgbuild" 2>/dev/null \
+    || fail "python3 module 'dmgbuild' not installed — run: python3 -m pip install dmgbuild"
 ok "Tools present"
 
 cd "$PROJECT_DIR"
@@ -286,24 +286,34 @@ BUILT_VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersi
 ok "App reports $BUILT_VERSION"
 
 # ── Stage DMG contents ────────────────────────────────────────────────────────
-step "Staging DMG contents"
-rm -rf "$STAGING"
-mkdir "$STAGING"
-cp -R "$APP_PATH" "$STAGING/"
-ln -s /Applications "$STAGING/Applications"
-ok "App and Applications alias staged"
-
 # ── Create DMG ────────────────────────────────────────────────────────────────
+# Built with dmgbuild rather than bare hdiutil so the installer window is laid
+# out: background art with an arrow, the app and the Applications alias pinned
+# to its endpoints, chrome hidden. dmgbuild writes the .DS_Store directly, so
+# this needs no Finder, no GUI session and no automation permission — styling a
+# mounted image with AppleScript would make releases fail for environment
+# reasons rather than code ones.
+#
+# Two PATH subtleties, both load-bearing:
+#   * python3 is resolved BEFORE the PATH override, so we keep the interpreter
+#     that actually has dmgbuild installed rather than Xcode's bundled one.
+#   * /bin is prepended for the child, because dmgbuild shells out to bare
+#     `sync` and a personal ~/bin/sync would otherwise shadow the system one
+#     and abort the build.
 step "Creating DMG"
 rm -f "$DMG"
-hdiutil create \
-    -volname "WaxOn/WaxOff $TAG" \
-    -srcfolder "$STAGING" \
-    -ov \
-    -format UDZO \
-    -o "$DMG" \
-    -quiet
-ok "Created $(du -sh $DMG | cut -f1) DMG"
+DMG_BACKGROUND="$PROJECT_DIR/tools/dmg/dmg-background-waxonwaxoff.png"
+[[ -f "$DMG_BACKGROUND" ]] \
+    || fail "Missing DMG background: ${DMG_BACKGROUND#$PROJECT_DIR/} — regenerate with tools/dmg/make-background.py"
+PY_BIN=$(command -v python3)
+PATH="/bin:/usr/bin:$PATH" "$PY_BIN" -m dmgbuild \
+    -s "$PROJECT_DIR/tools/dmg/dmg-settings.py" \
+    -D app="$APP_PATH" \
+    -D background="$DMG_BACKGROUND" \
+    "Install WaxOnWaxOff" \
+    "$DMG" >/dev/null
+[[ -f "$DMG" ]] || fail "dmgbuild did not produce $DMG"
+ok "Created $(du -sh $DMG | cut -f1) styled DMG"
 
 # ── Notarize ──────────────────────────────────────────────────────────────────
 step "Notarizing DMG"
@@ -551,7 +561,7 @@ fi
 
 # ── Clean up temp files ───────────────────────────────────────────────────────
 step "Cleaning up"
-rm -rf "$STAGING" "$MOUNT" "$DERIVED_DATA"
+rm -rf "$MOUNT" "$DERIVED_DATA"
 rm -f "$DMG"
 ok "Temp files removed"
 
