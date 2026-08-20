@@ -659,7 +659,7 @@
         <tr>
           <td>Loudness Norm</td>
           <td>On · Off · default Off</td>
-          <td>This setting turns on EBU R128 loudness normalization in two passes. When the setting is off, WaxOn applies only the filters and linear peak normalization to the −1.0 dBTP ceiling.</td>
+          <td>This setting turns on EBU R128 loudness normalization: WaxOn measures integrated loudness once, then applies one constant gain to reach the target. When the setting is off, WaxOn applies only the filters and downward-only true-peak normalization to the −1.0 dBTP ceiling.</td>
         </tr>
         <tr>
           <td>Target LUFS</td>
@@ -704,7 +704,7 @@
       <li>
         <div>
           <strong>True-Peak Control</strong>
-          <span>When Loudness Norm is on, WaxOn upsamples the signal to 2× the target rate. The signal then goes through the FFmpeg <code>alimiter</code> filter with a 5 ms attack and a 50 ms release. WaxOn then resamples the signal back. The 2× rate makes the inter-sample peaks visible to the limiter. Thus the limiter prevents true-peak violations. When Loudness Norm is off, WaxOn uses downward-only linear peak normalization instead of the limiter. WaxOn measures the true peak and applies one attenuating gain to bring it to the −1.0 dBTP ceiling. If the source is already below the ceiling, this stage makes no change to the audio. The dynamics of the source do not change. In both conditions the output stays below the −1.0 dBTP ceiling. WaxOn writes it as a 24-bit WAV file.</span>
+          <span>When Loudness Norm is on, the signal goes through the FFmpeg <code>alimiter</code> filter with a 5 ms attack and a 50 ms release, holding sample peaks at −1.0 dBFS. This is a brick-wall limiter at the native sample rate, not a true-peak limiter, so material with strong inter-sample peaks can land a few tenths above −1.0 dBTP; WaxOff enforces the strict true-peak ceiling at delivery. When Loudness Norm is off, WaxOn uses downward-only linear peak normalization instead of the limiter. WaxOn measures the true peak and applies one attenuating gain to bring it to the −1.0 dBTP ceiling. If the source is already below the ceiling, this stage makes no change to the audio. The dynamics of the source do not change. WaxOn writes the result as a 24-bit WAV file.</span>
         </div>
       </li>
     </ol>

@@ -60,8 +60,8 @@ struct HelpView: View {
                         "Phase rotation is optional. It is a 200 Hz allpass filter. The default is on.",
                         "WaxOn resamples the audio to the target sample rate.",
                         "Dynamic Leveling is optional. It uses dynaudnorm. Use it for panel recordings and multi-voice sources. Do not use it for a solo voice.",
-                        "Loudness normalization is optional. WaxOn does an EBU R128 analysis in two passes. WaxOn then applies a linear gain. If the true-peak headroom does not permit a constant gain, loudnorm applies dynamic normalization instead.",
-                        "True-peak control is always on. When Loudness Norm is on, WaxOn applies true-peak limiting at a fixed −1.0 dBTP. When Loudness Norm is off, WaxOn applies downward-only linear peak normalization."
+                        "Loudness normalization is optional. WaxOn measures integrated loudness once with EBU R128, then applies one constant gain to reach the target. Edit prep does not need a delivery-grade two-pass normalizer.",
+                        "Peak control is always on. When Loudness Norm is on, a brick-wall limiter holds samples at −1.0 dBFS. When Loudness Norm is off, WaxOn measures the true peak and applies downward-only normalization to −1.0 dBTP. WaxOff enforces the strict true-peak ceiling at delivery."
                     ])
                     text("Output: 24-bit WAV.")
                 }
