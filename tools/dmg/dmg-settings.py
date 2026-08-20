@@ -1,4 +1,9 @@
-# dmgbuild settings for the WaxOn/WaxOff installer window.
+# Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
+# ClipHack). Keep the copies byte-identical: scripts/check-shared.sh compares
+# them and a release preflight fails when they drift. Anything app-specific
+# belongs in that repo's release.sh, not here.
+#
+# dmgbuild settings for an app's installer window.
 #
 # Used instead of styling a mounted image with AppleScript: dmgbuild writes the
 # .DS_Store directly, so a release needs no Finder, no GUI session and no
@@ -6,7 +11,7 @@
 #
 #   dmgbuild -s tools/dmg/dmg-settings.py \
 #            -D app=<path/to/App.app> -D background=<path/to/bg.png> \
-#            "Install WaxOnWaxOff" out.dmg
+#            "Install <AppName>" out.dmg
 import os.path
 
 app = defines.get("app")

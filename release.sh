@@ -116,6 +116,21 @@ if git tag | grep -q "^${TAG}$"; then
 fi
 ok "Tag $TAG is available"
 
+# ── Shared-file gate ──────────────────────────────────────────────────────────
+# Several files here are vendored copies kept byte-identical with the sibling
+# app repos — these projects are deliberately independent, so there is no shared
+# package to depend on. The failure mode that costs something is silent drift: a
+# fix lands in one repo and the others keep the bug, which is exactly how the
+# FFmpeg process hardening reached WaxOnWaxOff and left two latent crashes in
+# ClipHack. Release day is when someone is looking, so it is when to say so.
+#
+# Absent siblings are not drift — a fresh clone or a CI checkout has none, and
+# the check passes quietly. Only a content mismatch stops the release.
+step "Checking shared files against sibling repos"
+"$PROJECT_DIR/scripts/check-shared.sh" \
+    || fail "Shared files have drifted from the sibling repos — reconcile them before releasing"
+ok "Shared files in sync"
+
 # ── Release-notes gate ────────────────────────────────────────────────────────
 # The notes are read much later, at the GitHub-release step — by which point the
 # branch and the tag have both been pushed. Failing there would strand a pushed

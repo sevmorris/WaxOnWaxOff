@@ -20,8 +20,12 @@ Layout constraints worth knowing before changing anything:
     centre (y=150). If you move the icons there, move the arrow here.
 
 Usage:
-    python3 tools/dmg/make-background.py --app-name "WaxOnWaxOff" --slug waxonwaxoff
+    python3 tools/dmg/make-background.py --app-name "MyApp" --slug myapp
 """
+# Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
+# ClipHack). Keep the copies byte-identical: scripts/check-shared.sh compares
+# them and a release preflight fails when they drift. Anything app-specific
+# belongs in that repo's release.sh, not here.
 import argparse
 import os
 from PIL import Image, ImageDraw, ImageFont
@@ -101,8 +105,11 @@ def build(scale: int, app_name: str) -> Image.Image:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--app-name", default="WaxOnWaxOff")
-    ap.add_argument("--slug", default="waxonwaxoff")
+    # Required rather than defaulted: this file is shared verbatim, so it
+    # cannot carry one app's name. The slug is the one in the committed
+    # background's filename, which release.sh names when it is missing.
+    ap.add_argument("--app-name", required=True)
+    ap.add_argument("--slug", required=True)
     ap.add_argument("--out", default="tools/dmg")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
