@@ -659,7 +659,7 @@
         <tr>
           <td>Loudness Norm</td>
           <td>On · Off · default Off</td>
-          <td>This setting turns on EBU R128 loudness normalization in two passes. The analysis pass applies RNNoise internally to a temporary copy. This prevents broadband noise from changing the loudness measurement. RNNoise has no effect on the output signal. When the setting is off, WaxOn applies only the filters and linear peak normalization to the −1.0 dBTP ceiling.</td>
+          <td>This setting turns on EBU R128 loudness normalization in two passes. When the setting is off, WaxOn applies only the filters and linear peak normalization to the −1.0 dBTP ceiling.</td>
         </tr>
         <tr>
           <td>Target LUFS</td>
@@ -698,7 +698,7 @@
       <li>
         <div>
           <strong>Loudness Normalization <span class="tag">Optional</span></strong>
-          <span>This stage is EBU R128 normalization in two passes. The first pass measures the integrated loudness, the true peak, the LRA, and the threshold. The second pass applies a linear gain to reach the configured target. Linear mode keeps the natural dynamic shape of the recording. There is no compression and no change to the transients. If the true-peak headroom does not permit a constant gain, loudnorm applies dynamic normalization for that file instead. The analysis pass runs RNNoise on a temporary copy. Thus broadband noise does not increase the LUFS reading. RNNoise has no effect on the output pipeline. Refer to the <a href="theory.html#nr-measurement">Theory of Operation</a>.</span>
+          <span>This stage is EBU R128 normalization in two passes. The first pass measures the integrated loudness, the true peak, the LRA, and the threshold. The second pass applies a linear gain to reach the configured target. Linear mode keeps the natural dynamic shape of the recording. There is no compression and no change to the transients. If the true-peak headroom does not permit a constant gain, loudnorm applies dynamic normalization for that file instead.</span>
         </div>
       </li>
       <li>
@@ -955,7 +955,7 @@
 
     <div class="callout">
       <strong>Noise Floor Warning</strong>
-      In WaxOn the FLOOR value has a colour code. The colour is orange above −50 dBFS, where the noise floor can decrease the loudness accuracy. The colour is red above −40 dBFS, where the noise floor very probably changes the measurements. A file with a high estimated noise floor also shows a ⚠️ badge next to the filename in the file list. A high noise floor can increase the integrated loudness measurement. Loudness normalization then applies less gain than the speech content needs. When Loudness Norm is on, WaxOn applies RNNoise to the measurement pass to prevent this. RNNoise has no effect on the output signal. If the badge shows, turn on Loudness Norm so that the analysis runs with RNNoise. In WaxOff the value has no colour code and the badge does not show. A finished delivery mix can correctly contain continuous low-level content, such as a music bed or room tone under a mix, so the thresholds for raw speech do not apply.
+      In WaxOn the FLOOR value has a colour code. The colour is orange above −50 dBFS, where the noise floor can decrease the loudness accuracy. The colour is red above −40 dBFS, where the noise floor very probably changes the measurements. A file with a high estimated noise floor also shows a ⚠️ badge next to the filename in the file list. A high noise floor can increase the integrated loudness measurement. Loudness normalization then applies less gain than the speech content needs. In WaxOff the value has no colour code and the badge does not show. A finished delivery mix can correctly contain continuous low-level content, such as a music bed or room tone under a mix, so the thresholds for raw speech do not apply.
     </div>
   </section>
 
@@ -984,7 +984,7 @@
     <p>Select a file. Read the stats strip before you click Process. The <strong>LUFS</strong> value shows the loudness of the file. In WaxOn, a LUFS value much below your target means that normalization applies a large gain. This is correct for ingest, but you must know about it. In WaxOff, compare the input LUFS value with your target. The difference is the gain that WaxOff applies.</p>
 
     <h3>Reading the Noise Floor</h3>
-    <p>The <strong>FLOOR</strong> stat estimates the background noise level. A value below −60 dBFS usually shows a clean recording. Between −60 and −50 dBFS you can possibly hear the noise, but it usually has no effect on the processing. Above −50 dBFS (orange) the noise floor can change the loudness measurements. Above −40 dBFS (red) it almost certainly changes the results. At these levels, turn Loudness Norm on. WaxOn then applies RNNoise to the measurement pass. For the best result, also use a dedicated noise-reduction tool such as iZotope RX on the source before WaxOn.</p>
+    <p>The <strong>FLOOR</strong> stat estimates the background noise level. A value below −60 dBFS usually shows a clean recording. Between −60 and −50 dBFS you can possibly hear the noise, but it usually has no effect on the processing. Above −50 dBFS (orange) the noise floor can change the loudness measurements. Above −40 dBFS (red) it almost certainly changes the results. For the best result, also use a dedicated noise-reduction tool such as iZotope RX on the source before WaxOn.</p>
 
     <h3>WaxOn: Loudnorm On or Off?</h3>
     <p>Turn Loudness Norm on for consistent batch ingest when you recorded the files at different gain levels. Loudness Norm makes sure that every file has the same integrated loudness before the limiter. Turn Loudness Norm off for a single file, or when you want to keep the original level relation between takes. Downward-only linear peak normalization then controls the ceiling only. There is no limiting.</p>
