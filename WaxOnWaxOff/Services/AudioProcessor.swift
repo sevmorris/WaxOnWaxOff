@@ -296,7 +296,7 @@ actor AudioProcessor {
 
         if settings.loudnormEnabled {
             // Loudness Norm ON: the pass-2 linear loudnorm (when measurements were finite)
-            // and the 2× oversampled brick-wall limiter run as a single fused filter chain
+            // and the brick-wall limiter run as a single fused filter chain
             // in one ffmpeg invocation — no intermediate normalize file. The limiter stays
             // as the inter-sample-peak backstop: loudnorm's linear pass measures true peak
             // but can still leave ISPs above the ceiling.
