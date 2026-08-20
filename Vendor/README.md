@@ -11,7 +11,11 @@ WaxOnWaxOff bundles a **static, audio-only FFmpeg 8.0** for macOS **arm64 (Apple
 | Download script | `scripts/fetch-ffmpeg.sh` |
 | GitHub release assets | Tag from manifest |
 
-Xcode runs `scripts/fetch-ffmpeg.sh` before each build; `release.sh` runs it before packaging.
+Xcode runs `scripts/fetch-ffmpeg.sh` as a build phase, and `release.sh` runs it again *before* invoking `xcodebuild`.
+
+That second call is what makes releases correct, not a belt-and-braces extra. `WaxOnWaxOff/` is a synchronized group, so Xcode decides what to bundle when it plans the build — before the phase that downloads the binaries has run. Verified on a clean tree: with the binaries absent, the first build fetches them and still ships an app with no `ffmpeg` inside; a second build picks them up. Fetching ahead of `xcodebuild` means the files already exist when planning starts.
+
+If you have just cloned and want a working app on the first build, run `./scripts/fetch-ffmpeg.sh` before opening Xcode. ClipHack and FilmStrip share this arrangement and this quirk.
 
 **Do not delete** the release named by `FFMPEG_DEPS_TAG` in `Vendor/ffmpeg-manifest.env` — currently `ffmpeg-deps-8.0-audio-arm64`. CI and fresh clones fetch the binaries from it, and `scripts/fetch-ffmpeg.sh` has no other source.
 
