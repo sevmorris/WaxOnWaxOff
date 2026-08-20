@@ -474,7 +474,7 @@
       <div class="chain-row">
         <div class="chain-node">High-Pass Filter<br><span style="font-size:0.75rem;font-weight:400;">20 Hz floor; 80 Hz when on</span></div>
         <div class="chain-arrow">→</div>
-        <div class="chain-node">Channel / Downmix<br><span style="font-size:0.75rem;font-weight:400;">mono: L/R or downmix · stereo: pass-through</span></div>
+        <div class="chain-node">Channel / Downmix<br><span style="font-size:0.75rem;font-weight:400;">mono: L/R or downmix · stereo: pass-through · split: one file per channel</span></div>
         <div class="chain-arrow">→</div>
         <div class="chain-node optional">Phase Rotation<br><span style="font-size:0.75rem;font-weight:400;">200 Hz allpass</span></div>
         <div class="chain-arrow">→</div>
@@ -823,6 +823,11 @@
     <h3>Factory Defaults</h3>
     <p>WaxOn's factory defaults bias toward a safe ingest path: High Pass and Phase Rotation on, Dynamic Leveling and Loudness Norm off. The built-in <strong>Edit Prep</strong> preset enables Loudness Norm at −30 LUFS for batch ingest. See <a href="#defaults">Defaults &amp; Parameters</a> for the full list of UI-exposed settings.</p>
 
+    <h3>Split L/R for Two-Microphone Recordings</h3>
+    <p>Field recorders and two-input interfaces routinely write one speaker to the left channel and another to the right. That file is not a stereo image; it is two mono takes sharing a container. Split L/R treats it as such: WaxOn runs the whole pipeline once per channel and writes two mono files, tagged <code>-L-</code> and <code>-R-</code>.</p>
+    <p>Each channel is measured and gained <em>independently</em>, and that is the point of the mode rather than an implementation detail. Two people rarely sit the same distance from their microphones, so a shared gain would carry that imbalance into the edit. Because there is no stereo image to preserve, decoupling the channels costs nothing.</p>
+    <p>The mode needs exactly two channels. A mono source, or one with more than two, falls back to a single mono file and says so in the console rather than guessing at what the user meant.</p>
+
     <h3>Constant Gain, No Dynamics</h3>
     <p>With Loudness Norm on, WaxOn measures integrated loudness once with <code>ebur128</code> and applies a single constant gain — no macro-dynamic compression, and no dependence on <code>loudnorm</code>'s two-pass machinery or its dynamic-mode fallback. A staging file only needs to arrive at a consistent level; measuring once and applying one gain does that, and measured no less accurately than the two-pass path it replaced.</p>
     <p>This is intentional for ingest. WaxOn is a pre-editing tool. You want your recordings to arrive at your DAW at consistent levels, but with their original dynamic character intact. Any dynamic processing at this stage would fight against the compression and automation you'll apply during editing.</p>
@@ -1056,7 +1061,7 @@
         </tr>
         <tr>
           <td>Channels</td>
-          <td>Mono · Stereo</td>
+          <td>Mono · Stereo · Split L/R</td>
           <td>Mono</td>
         </tr>
         <tr>

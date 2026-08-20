@@ -47,7 +47,8 @@ struct FileListView: View {
     private func channelBadge(for file: FileItem) -> ChannelBadge? {
         guard let info = file.fileInfo else { return nil }
 
-        guard viewModel.settings.outputChannels == .mono else {
+        switch viewModel.settings.outputChannels {
+        case .stereo:
             // Stereo output: only a >2-channel source loses anything. A mono
             // source is duplicated into both channels, which discards nothing.
             guard info.channelCount > 2 else { return nil }
@@ -55,6 +56,25 @@ struct FileListView: View {
                 label: "MULTI→STEREO",
                 help: "\(info.channelCount)-channel source — will be downmixed to stereo via FFmpeg's default matrix (center and surrounds folded in)."
             )
+
+        case .splitLR:
+            // Two channels is exactly what this mode is for and loses nothing,
+            // so it earns no badge. Anything else falls back to a single mono
+            // file, which is worth flagging before the batch runs.
+            if info.channelCount == 2 { return nil }
+            if info.channelCount == 1 {
+                return ChannelBadge(
+                    label: "1 FILE",
+                    help: "Single-channel source — Split L/R needs two channels, so one mono file will be written."
+                )
+            }
+            return ChannelBadge(
+                label: "MULTI→MONO",
+                help: "\(info.channelCount)-channel source — Split L/R needs exactly two channels, so this will be downmixed to a single mono file via FFmpeg's default matrix."
+            )
+
+        case .mono:
+            break
         }
 
         guard info.channelCount > 1 else { return nil }

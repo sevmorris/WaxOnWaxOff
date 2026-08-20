@@ -78,12 +78,20 @@ actor AudioProcessor {
         return WaxOnBatchRunResult(successes: successes, failures: failures)
     }
 
-    private func processOne(_ input: URL, id: UUID, tools: FFmpegManager.Paths, allocator: OutputAllocator) async throws -> JobResult? {
+    /// Renders exactly one output file. Called once for Mono and Stereo, and
+    /// twice for Split L/R — once per source channel, each with its own
+    /// measurement and gain.
+    private func renderOne(
+        _ input: URL,
+        tools: FFmpegManager.Paths,
+        allocator: OutputAllocator,
+        channel: WaxOnSettings.MonoChannel,
+        forceMono: Bool,
+        variant: String?,
+        inputChannelCount: Int,
+        fileDuration: TimeInterval?
+    ) async throws -> URL {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: input.path) else {
-            throw ProcessingError.invalidInput
-        }
-
         let sr = settings.sampleRate.rawValue
         let rateTag = sr == 44100 ? "44k" : "48k"
         let stem = input.deletingPathExtension().lastPathComponent
@@ -94,7 +102,7 @@ actor AudioProcessor {
         let outDir = OutputDirectory.waxOnOutputDirectory(for: input, settings: settings) { [self] message in
             self.onLog?("⚠ \(message)", .info)
         }
-        let finalURL = allocator.allocate(for: input, in: outDir)
+        let finalURL = allocator.allocate(for: input, in: outDir, variant: variant)
         let outName = finalURL.lastPathComponent
 
         let work = try makeTemp(prefix: "waxon_\(rateTag)_")
@@ -110,20 +118,15 @@ actor AudioProcessor {
         // TPDF dither between pipeline stages would add filter-graph complexity for zero
         // perceptible benefit. Dither is also not applied at the final export stage; see
         // FFmpegFilters.aresample and theory.html §Dithering for the full rationale.
-        let isStereo = settings.outputChannels == .stereo
+        let isStereo = !forceMono
         let channelSuffix = isStereo ? "stereo" : "mono"
         let midURL = work.appendingPathComponent("\(stem)_\(rateTag)24_\(channelSuffix).wav")
 
         let phaseFilter = settings.phaseRotationEnabled ? "allpass=f=200:t=q:w=0.707," : ""
         let outputChannelCount: String = isStereo ? "2" : "1"
 
-        onLog?("▶ \(filename)", .info)
-        let inputChannelCount = try await getChannelCount(exe: tools.ffprobe, url: input)
-        // Probe file duration once for all processing stages. Used for proportional ffmpeg
-        // timeouts (FFmpegRunner.effectiveTimeoutSeconds) and reused below for dynaudnorm
-        // boundary math, avoiding a second ffprobe round-trip when leveling is enabled.
-        let fileDuration: TimeInterval? = try? await getAudioDuration(exe: tools.ffprobe, url: input)
-        let channelDesc = isStereo ? "stereo" : "mono (\(settings.channel.rawValue))"
+        onLog?(variant.map { "▶ \(filename)  [\($0)]" } ?? "▶ \(filename)", .info)
+        let channelDesc = isStereo ? "stereo" : "mono (\(channel.rawValue))"
         let phaseDesc = settings.phaseRotationEnabled ? "  |  phase rotation: 200 Hz" : ""
         let hpFreq = settings.highPassEnabled ? 80 : 20
         onLog?("  filter: highpass=\(hpFreq) Hz\(phaseDesc)  |  \(channelDesc)  |  \(rateTag) kHz", .verbose)
@@ -153,9 +156,9 @@ actor AudioProcessor {
                 onLog?("⚠ Input is mono; channel selection ignored.", .info)
             } else if inputChannelCount > 2 {
                 pan = "aformat=channel_layouts=mono"
-                onLog?("⚠ \(inputChannelCount)-channel input — using mono downmix instead of \(settings.channel.rawValue) channel pick.", .info)
+                onLog?("⚠ \(inputChannelCount)-channel input — using mono downmix instead of \(channel.rawValue) channel pick.", .info)
             } else {
-                pan = settings.channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
+                pan = channel == .left ? "pan=1c|c0=c0" : "pan=1c|c0=c1"
             }
             step1Af = "highpass=f=\(hpFreq),\(pan),\(phaseFilter)\(FFmpegFilters.aresample(to: sr))"
         }
@@ -296,7 +299,60 @@ actor AudioProcessor {
 
         onLog?("✓ \(outName)", .info)
         onLog?("  → \(finalURL.path)", .verbose)
-        return JobResult(id: id, input: input, output: finalURL)
+        return finalURL
+    }
+
+    /// Probes the source once, then renders the one or two files this job owes.
+    private func processOne(_ input: URL, id: UUID, tools: FFmpegManager.Paths, allocator: OutputAllocator) async throws -> JobResult? {
+        guard FileManager.default.fileExists(atPath: input.path) else {
+            throw ProcessingError.invalidInput
+        }
+
+        // Probed once and shared by every render below: a split job runs the
+        // pipeline twice over the same source, and re-probing would be pure cost.
+        let inputChannelCount = try await getChannelCount(exe: tools.ffprobe, url: input)
+        // Used for proportional ffmpeg timeouts (FFmpegRunner.effectiveTimeoutSeconds)
+        // and for dynaudnorm boundary math when leveling is enabled.
+        let fileDuration: TimeInterval? = try? await getAudioDuration(exe: tools.ffprobe, url: input)
+
+        guard settings.outputChannels == .splitLR else {
+            let only = try await renderOne(
+                input, tools: tools, allocator: allocator,
+                channel: settings.channel,
+                forceMono: settings.outputChannels == .mono,
+                variant: nil,
+                inputChannelCount: inputChannelCount, fileDuration: fileDuration
+            )
+            return JobResult(id: id, input: input, outputs: [only])
+        }
+
+        guard inputChannelCount == 2 else {
+            onLog?("⚠ Split L/R needs a two-channel source — \(input.lastPathComponent) has \(inputChannelCount). Writing one mono file instead.", .info)
+            let only = try await renderOne(
+                input, tools: tools, allocator: allocator,
+                channel: settings.channel, forceMono: true, variant: nil,
+                inputChannelCount: inputChannelCount, fileDuration: fileDuration
+            )
+            return JobResult(id: id, input: input, outputs: [only])
+        }
+
+        // Each channel is measured and gained on its own. For a two-microphone
+        // recording the channels are separate mono takes sharing a container —
+        // there is no stereo image to preserve, and coupling them would defeat
+        // the point, which is that each speaker reaches the DAW at a consistent
+        // level regardless of how they sat relative to their microphone.
+        let left = try await renderOne(
+            input, tools: tools, allocator: allocator,
+            channel: .left, forceMono: true, variant: "L",
+            inputChannelCount: inputChannelCount, fileDuration: fileDuration
+        )
+        try Task.checkCancellation()
+        let right = try await renderOne(
+            input, tools: tools, allocator: allocator,
+            channel: .right, forceMono: true, variant: "R",
+            inputChannelCount: inputChannelCount, fileDuration: fileDuration
+        )
+        return JobResult(id: id, input: input, outputs: [left, right])
     }
 
     /// Single EBU R128 pass over `url` with true-peak metering, read from the

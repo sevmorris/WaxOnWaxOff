@@ -299,6 +299,85 @@ final class AudioProcessorIntegrationTests: XCTestCase {
     // MARK: -
 
     /// Channel count of audio stream a:0 via ffprobe.
+    // MARK: - Split L/R
+
+    /// A two-microphone recording with a different speaker per channel is
+    /// written as two independently prepped mono files. The channels are 20 dB
+    /// apart in the source, so a single shared gain would leave them 20 dB apart
+    /// in the outputs; both landing on target is what proves each channel was
+    /// measured and gained on its own.
+    func testSplitLRWritesTwoIndependentlyNormalizedMonoFiles() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = workDir.appendingPathComponent("interview.wav")
+        try IntegrationFFmpeg.run(ffmpeg: tools.ffmpeg, args: [
+            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-filter_complex",
+            "sine=frequency=300:duration=6,volume=-6dB[l];"
+            + "sine=frequency=800:duration=6,volume=-26dB[r];"
+            + "[l][r]join=inputs=2:channel_layout=stereo",
+            "-ar", "44100", "-c:a", "pcm_s16le", input.path
+        ])
+
+        var settings = WaxOnSettings()
+        settings.sampleRate = .s44100
+        settings.outputChannels = .splitLR
+        settings.loudnormEnabled = true
+        settings.loudnormTarget = -30.0
+        settings.phaseRotationEnabled = false
+        settings.outputDirectoryPath = workDir.path
+
+        let processor = AudioProcessor(settings: settings)
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
+
+        let outputs = try XCTUnwrap(batch.successes.first?.outputs)
+        XCTAssertEqual(outputs.count, 2, "Split L/R must write one file per source channel")
+
+        let names = outputs.map(\.lastPathComponent)
+        XCTAssertTrue(names[0].contains("-L-"), "left output should be tagged L, got \(names[0])")
+        XCTAssertTrue(names[1].contains("-R-"), "right output should be tagged R, got \(names[1])")
+        XCTAssertNotEqual(names[0], names[1], "the two outputs must not collide on one path")
+
+        for url in outputs {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "missing \(url.lastPathComponent)")
+            let channels = try await channelCount(ffprobe: tools.ffprobe, of: url)
+            XCTAssertEqual(channels, 1, "\(url.lastPathComponent) should be a mono file")
+        }
+
+        for url in outputs {
+            let measured = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: url)
+            XCTAssertEqual(measured, settings.loudnormTarget, accuracy: 2.0,
+                           "\(url.lastPathComponent) should reach the target on its own, got \(measured)")
+        }
+    }
+
+    /// Split L/R needs two channels. A mono source falls back to a single mono
+    /// file and says so, rather than failing or writing a duplicate pair.
+    func testSplitLRFallsBackToOneFileForMonoSource() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "single_mic.wav",
+            durationSeconds: 4.0, sampleRate: 44100, channels: 1
+        )
+
+        var settings = WaxOnSettings()
+        settings.sampleRate = .s44100
+        settings.outputChannels = .splitLR
+        settings.outputDirectoryPath = workDir.path
+
+        let collector = LogCollector()
+        let processor = AudioProcessor(settings: settings, onLog: { collector.append($0, $1) })
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
+
+        let outputs = try XCTUnwrap(batch.successes.first?.outputs)
+        XCTAssertEqual(outputs.count, 1, "a mono source cannot be split")
+        let monoChannels = try await channelCount(ffprobe: tools.ffprobe, of: outputs[0])
+        XCTAssertEqual(monoChannels, 1)
+        XCTAssertTrue(collector.infoMessages.contains { $0.contains("Split L/R needs a two-channel source") },
+                      "the fallback should be announced; got: \(collector.infoMessages)")
+    }
+
     private func channelCount(ffprobe: String, of url: URL) async throws -> Int {
         let out = try await FFmpegRunner.captureStdout(exe: ffprobe, args: [
             "-v", "error", "-select_streams", "a:0",

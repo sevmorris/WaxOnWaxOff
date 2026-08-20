@@ -56,7 +56,7 @@ struct HelpView: View {
                 section("WaxOn — Processing Pipeline") {
                     numberedList([
                         "High-pass filter. On uses 80 Hz. Off uses a 20 Hz DC floor. WaxOn always removes the DC offset.",
-                        "Channel handling. Mono extracts the left channel or the right channel. Mono downmixes a multichannel source. Stereo sends the two channels of a stereo source through with no change. For a different channel count, FFmpeg converts the source to two channels with its default matrix. The app writes a warning to the console.",
+                        "Channel handling. Mono extracts the left channel or the right channel. Mono downmixes a multichannel source. Stereo sends the two channels of a stereo source through with no change. Split L/R runs the pipeline once per channel and writes two mono files. For a different channel count, FFmpeg converts the source to two channels with its default matrix. The app writes a warning to the console.",
                         "Phase rotation is optional. It is a 200 Hz allpass filter. The default is on.",
                         "WaxOn resamples the audio to the target sample rate.",
                         "Dynamic Leveling is optional. It uses dynaudnorm. Use it for panel recordings and multi-voice sources. Do not use it for a solo voice.",
@@ -67,7 +67,7 @@ struct HelpView: View {
                 }
                 section("WaxOn — Settings") {
                     definition("Sample Rate", "Select 44.1 kHz or 48 kHz. Use the same value as your DAW project.")
-                    definition("Channels", "Select Mono or Stereo. Mono extracts one channel. Stereo sends the two channels of a stereo source through with no change. For a different channel count, FFmpeg converts the source to two channels with its default matrix. The app writes a warning to the console.")
+                    definition("Channels", "Select Mono, Stereo, or Split L/R. Mono extracts one channel. Stereo sends the two channels of a stereo source through with no change. Split L/R is for a file holding two microphones with a different speaker on each channel: WaxOn preps each channel separately and writes two mono files, tagged -L- and -R-, so each speaker lands at a consistent level. Split L/R needs a two-channel source; anything else is written as one mono file with a warning. For a different channel count in Mono or Stereo, FFmpeg converts the source with its default matrix and the app writes a warning to the console.")
                     definition("Source Channel", "Select Left or Right. This is the channel that WaxOn extracts in Mono mode.")
                     definition("High Pass", "On uses 80 Hz. It removes rumble and proximity-effect bass. Off uses a 20 Hz DC floor only. WaxOn always removes the DC offset.")
                     definition("Phase Rotation", "WaxOn applies a 200 Hz allpass filter before normalization. The filter reduces the crest factor on asymmetric voice recordings. This gives 1–4 dB more headroom before the limiter. You cannot hear an effect on the audio character. The default is on.")

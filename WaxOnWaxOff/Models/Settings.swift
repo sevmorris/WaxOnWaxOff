@@ -14,6 +14,11 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     enum OutputChannels: String, CaseIterable, Codable, Sendable {
         case mono
         case stereo
+        /// Two-microphone recordings with a different speaker on each channel:
+        /// each channel is prepped independently and written as its own mono
+        /// file. Requires a 2-channel source; anything else falls back to the
+        /// single-file mono path with a warning.
+        case splitLR
     }
 
     var sampleRate: SampleRate = .s44100

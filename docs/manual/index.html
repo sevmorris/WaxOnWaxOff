@@ -628,8 +628,8 @@
         </tr>
         <tr>
           <td>Channels</td>
-          <td>Mono · Stereo</td>
-          <td>Stereo sends the two channels of a stereo source through with no change. For a different channel count, FFmpeg converts the source to two channels with its default matrix. WaxOn writes a warning to the console. Mono extracts one channel from a stereo source.</td>
+          <td>Mono · Stereo · Split L/R</td>
+          <td>Mono extracts one channel from a stereo source. Stereo sends the two channels of a stereo source through with no change; for a different channel count, FFmpeg converts the source to two channels with its default matrix and WaxOn writes a warning to the console. Split L/R is for one file that holds two microphones with a different speaker on each channel: WaxOn preps each channel on its own and writes two mono files, tagged <code>-L-</code> and <code>-R-</code>, so each speaker arrives at a consistent level. Split L/R needs a two-channel source — anything else is written as a single mono file, with a warning.</td>
         </tr>
         <tr>
           <td>Source Channel</td>

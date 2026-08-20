@@ -37,8 +37,14 @@ final class OutputAllocator: @unchecked Sendable {
     /// Returns a unique output URL inside `directory` for the given `input`.
     /// The first call with a given base name claims it; subsequent calls for the
     /// same base name receive a tag-disambiguated variant.
-    nonisolated func allocate(for input: URL, in directory: URL) -> URL {
-        let baseName = computeBaseName(input)
+    /// - Parameter variant: inserted between the input stem and the type suffix
+    ///   (e.g. `"L"` yields `interview-L-44kwaxon.wav`), so one input can claim
+    ///   several distinct outputs. Collision tagging still applies afterwards.
+    nonisolated func allocate(for input: URL, in directory: URL, variant: String? = nil) -> URL {
+        var baseName = computeBaseName(input)
+        if let variant {
+            baseName = Self.insert(variant, into: baseName, stem: input.deletingPathExtension().lastPathComponent)
+        }
         let baseURL = directory.appendingPathComponent(baseName)
 
         if !reserved.contains(baseURL.path) {
@@ -68,5 +74,16 @@ final class OutputAllocator: @unchecked Sendable {
         }
         reserved.insert(taggedURL.path)
         return taggedURL
+    }
+
+    /// Splits `baseName` at the `stem-` prefix and puts `variant` between the
+    /// two halves, matching how the collision tag is inserted below.
+    private nonisolated static func insert(_ variant: String, into baseName: String, stem: String) -> String {
+        let noExt = (baseName as NSString).deletingPathExtension
+        let ext = (baseName as NSString).pathExtension
+        let extStr = ext.isEmpty ? "" : ".\(ext)"
+        let prefix = stem + "-"
+        let typeSuffix = noExt.hasPrefix(prefix) ? String(noExt.dropFirst(prefix.count)) : noExt
+        return "\(stem)-\(variant)-\(typeSuffix)\(extStr)"
     }
 }

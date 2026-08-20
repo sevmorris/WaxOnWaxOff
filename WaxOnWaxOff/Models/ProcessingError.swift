@@ -3,12 +3,19 @@ import Foundation
 struct JobResult: Sendable {
     let id: UUID?
     let input: URL
-    let output: URL
+    /// Every file this job wrote. One entry normally; two when Channels is set
+    /// to Split L/R, in source-channel order (left first).
+    let outputs: [URL]
 
-    nonisolated init(id: UUID? = nil, input: URL, output: URL) {
+    /// The file a single-output row displays. Split jobs surface the left
+    /// channel here and carry the right in `outputs`.
+    var output: URL { outputs[0] }
+
+    nonisolated init(id: UUID? = nil, input: URL, outputs: [URL]) {
+        precondition(!outputs.isEmpty, "a JobResult must carry at least one output")
         self.id = id
         self.input = input
-        self.output = output
+        self.outputs = outputs
     }
 }
 

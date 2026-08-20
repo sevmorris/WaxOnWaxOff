@@ -27,17 +27,20 @@ struct SettingsView: View {
 
                 row("Channels") {
                     VStack(alignment: .leading, spacing: 4) {
-                        LabeledToggleSwitch(
-                            selection: $viewModel.settings.outputChannels,
-                            leftLabel: "Mono",
-                            leftValue: WaxOnSettings.OutputChannels.mono,
-                            rightLabel: "Stereo",
-                            rightValue: WaxOnSettings.OutputChannels.stereo
-                        )
+                        // Three modes, so a segmented Picker rather than the
+                        // two-way LabeledToggleSwitch — matching how WaxOff
+                        // renders its three-case Output setting.
+                        Picker("", selection: $viewModel.settings.outputChannels) {
+                            Text("Mono").tag(WaxOnSettings.OutputChannels.mono)
+                            Text("Stereo").tag(WaxOnSettings.OutputChannels.stereo)
+                            Text("Split L/R").tag(WaxOnSettings.OutputChannels.splitLR)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
                         .frame(maxWidth: .infinity)
                         // The manual makes this case in Tips & Workflow, which
                         // is three screens from the control that needs it.
-                        Text("Use Mono for one microphone. Use Stereo if one file contains two microphones.")
+                        Text("Use Mono for one microphone, Stereo to keep a stereo recording intact, and Split L/R when one file holds two microphones — each channel is prepped on its own and written as a separate mono file.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
