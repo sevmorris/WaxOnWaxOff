@@ -38,8 +38,7 @@ struct HelpView: View {
                     Use WaxOn on your raw recordings before you edit them. WaxOn removes \
                     low-frequency rumble. WaxOn controls the peak level. WaxOn can also \
                     normalize the loudness. The output is a 24-bit WAV file for Logic Pro or a \
-                    different editor. WaxOn does not remove noise from the output file. When \
-                    Loudness Norm is on, WaxOn uses RNNoise only in the loudness analysis. For \
+                    different editor. WaxOn does not remove noise from the output file. For \
                     more data, refer to the online Theory of Operation.
                     """)
                 }
@@ -61,8 +60,8 @@ struct HelpView: View {
                         "Phase rotation is optional. It is a 200 Hz allpass filter. The default is on.",
                         "WaxOn resamples the audio to the target sample rate.",
                         "Dynamic Leveling is optional. It uses dynaudnorm. Use it for panel recordings and multi-voice sources. Do not use it for a solo voice.",
-                        "Loudness normalization is optional. WaxOn does an EBU R128 analysis in two passes. WaxOn then applies a linear gain. If the true-peak headroom does not permit a constant gain, loudnorm applies dynamic normalization instead. Pass 1 can use internal RNNoise. RNNoise improves the accuracy of the measurement only.",
-                        "True-peak control is always on. When Loudness Norm is on, WaxOn applies 2× oversampled limiting at a fixed −1.0 dBTP. When Loudness Norm is off, WaxOn applies downward-only linear peak normalization."
+                        "Loudness normalization is optional. WaxOn does an EBU R128 analysis in two passes. WaxOn then applies a linear gain. If the true-peak headroom does not permit a constant gain, loudnorm applies dynamic normalization instead.",
+                        "True-peak control is always on. When Loudness Norm is on, WaxOn applies true-peak limiting at a fixed −1.0 dBTP. When Loudness Norm is off, WaxOn applies downward-only linear peak normalization."
                     ])
                     text("Output: 24-bit WAV.")
                 }
