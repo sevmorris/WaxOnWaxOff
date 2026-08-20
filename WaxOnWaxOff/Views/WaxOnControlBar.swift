@@ -123,6 +123,11 @@ struct WaxOnControlBar: View {
                 accessibilityValueText: valueLabel
             )
             .disabled(!enabled)
+            // Dim the knob itself, not just its label and value below. A
+            // full-colour knob in a 150 pt slot reads as an active control
+            // even when its toggle is off, which is most of the time for
+            // Dynamic Leveling.
+            .opacity(enabled ? 1 : 0.35)
 
             Spacer().frame(height: 6)
 
