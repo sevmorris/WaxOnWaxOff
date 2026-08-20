@@ -8,6 +8,17 @@
 # Written to bash 3.2 (the /bin/bash macOS ships, frozen because Apple won't ship
 # GPLv3). No mapfile/readarray, no `declare -A`, no ${var,,}, no &>>.
 #
+# Reproducible: two runs on the same toolchain produce byte-identical binaries,
+# so anyone can rebuild and check the SHA-256 against the pin in
+# Vendor/ffmpeg-manifest.env. Three things make that true — the fixed working
+# directory below (configure bakes --prefix into the binary), -ffp-contract=off,
+# and -Wl,-no_uuid. Without the last one two runs differ in exactly 48 bytes:
+# the 16-byte linker-generated LC_UUID, plus the 32-byte ad-hoc code-signature
+# hash in __LINKEDIT that covers it. Dropping LC_UUID costs only crash
+# symbolication of the bundled binary, which we never do — it runs as a separate
+# process and release.sh re-signs it anyway.
+# To re-verify: run twice into different output dirs and compare SHA-256.
+#
 # Usage: scripts/build-ffmpeg.sh [output-dir]   (default: ./build/ffmpeg-audio)
 
 set -euo pipefail
@@ -36,7 +47,15 @@ if [ "$dt_count" -ne 1 ]; then
 fi
 DEPTARGET="$dt_values"
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/wow-ffmpeg-build.XXXXXX")"
+# FIXED path, deliberately not mktemp. configure bakes --prefix into the binary's
+# configuration string, so a randomized working directory makes every run produce
+# a different binary — and a Corresponding Source recipe that cannot reproduce its
+# own artifact is not much of a recipe. A literal /tmp path (not $TMPDIR, which is
+# per-user on macOS) keeps the embedded string identical across machines too.
+# Cleared at start; concurrent runs of this script are not supported.
+WORK="/tmp/waxonwaxoff-ffmpeg-build"
+rm -rf "$WORK"
+mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$OUT_DIR"
 
@@ -69,7 +88,7 @@ cd "ffmpeg-${FFMPEG_VERSION}"
     --prefix="$WORK/ffmpeg-install" \
     --cc=/usr/bin/clang --arch=arm64 \
     --extra-cflags="-mmacosx-version-min=${DEPTARGET} -fno-stack-check -ffp-contract=off -I$WORK/lame-install/include" \
-    --extra-ldflags="-mmacosx-version-min=${DEPTARGET} -L$WORK/lame-install/lib" \
+    --extra-ldflags="-mmacosx-version-min=${DEPTARGET} -L$WORK/lame-install/lib -Wl,-no_uuid" \
     --enable-static --disable-shared --pkg-config-flags=--static \
     --enable-libmp3lame \
     --disable-autodetect \

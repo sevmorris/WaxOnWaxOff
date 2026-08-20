@@ -25,6 +25,8 @@ That is a rule about the *current* deps release, not a blanket rule over everyth
 
 `scripts/build-ffmpeg.sh` builds FFmpeg 8.0 against LAME 3.100, both pinned and SHA-256 verified, with **no `--enable-gpl`**, **no `--enable-nonfree`**, **no `--enable-version3`**, and no video or image external libraries. The only external library is `libmp3lame`, for MP3 encoding. The script asserts, fail-closed, that the resulting binaries execute, carry none of those three flags, link `libmp3lame`, target the project's deployment target, and have **no non-system dynamic dependencies**. Execution is asserted *before* the flag checks — a binary that cannot run emits no configuration string, and every "flag absent" assertion would otherwise pass vacuously.
 
+The build is reproducible: two runs on the same toolchain produce byte-identical binaries, so the checksums in `Vendor/ffmpeg-manifest.env` can be independently verified rather than taken on trust. Three things make that true — the fixed working directory (`configure` bakes `--prefix` into the binary), `-ffp-contract=off`, and `-Wl,-no_uuid`.
+
 Two flags are load-bearing and documented inline in the script: `-fno-stack-check` (macOS clang codegen workaround) and `-ffp-contract=off` (FMA contraction varies by compiler version and accumulates through IIR biquad feedback paths; disabling it makes filter output depend on the source rather than on the toolchain).
 
 ### License
