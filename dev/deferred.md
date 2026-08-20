@@ -67,6 +67,37 @@ they sit here because nothing is scheduled and this file is the record of that.
   `outputURLs.first` and silently dropping the MP3 from the row. Worth doing
   properly, with that model fix, or not at all.
 
+## Feature ideas
+
+- **Split dual-mono interview recordings into per-speaker files (WaxOn).**
+  Two-mic recorders write speaker A to L and speaker B to R in one stereo file.
+  Today the only way to prep those separately is to run the file twice with
+  Source Channel set to Left, then Right — and because `OutputAllocator` only
+  de-duplicates within a single batch, the second run writes the same
+  `{stem}-{rate}waxon.wav` and silently overwrites the first, so it needs a
+  manual rename in between too.
+
+  Cheapest shape: fan out at the **job** level, not with a new DSP path. One
+  input becomes two internal jobs running the existing, tested mono pipeline
+  with `pan=1c|c0=c0` and `pan=1c|c0=c1`, written as `{stem}-L-…` / `{stem}-R-…`.
+  No new filter graphs, no new signal path to validate.
+
+  Decisions worth making before writing any of it:
+  - Process the channels **independently** — separate loudness measurement,
+    separate leveling. For dual-mono that is the correct default: the channels
+    are two unrelated mono recordings, not a stereo image, so every reason to
+    keep them coupled disappears. It is also the point of the feature, since
+    each speaker should reach the DAW at a consistent level.
+  - **No auto-detection.** Inter-channel correlation would separate dual-mono
+    from true stereo most of the time, but silently splitting a music bed is a
+    worse failure than asking. Explicit setting, inert for mono sources — the
+    same pattern as WaxOff's `monoDelivery`.
+  - Scope v1 to exactly two-channel sources; leave >2 on the existing downmix.
+  - The integration cost is in the row model, not the DSP: `JobResult.output`
+    is a single URL and a file row renders one output waveform. WaxOff already
+    carries `outputURLs: [URL]` per row for WAV+MP3 — follow that, or emit two
+    rows per input.
+
 ## Test gaps
 
 - **Duration parse-site validation** — the parse-site guard (T2-5) is
@@ -96,6 +127,13 @@ they sit here because nothing is scheduled and this file is the record of that.
   Bucket B analysis and verification protocol before touching.
 
 ## Record only, no action
+
+- **[perf-2026-07] `testFusedLoudnormLimiterEquivalentToTwoProcess` is orphaned.**
+  It passes, but it asserts an equivalence about a fused loudnorm + 2×-oversampled
+  limiter chain that WaxOn no longer has: 2.8.0 removed the oversampling and 2.9.0
+  removed loudnorm from WaxOn entirely. The property still holds for WaxOff's WAV
+  render, so the test is worth moving to the WaxOff suite or retiring deliberately
+  — not deleting quietly just because it is green.
 
 - **[perf-2026-07] Commit-narrative asymmetry** — `265ce4a` narrates
   removing the "verifying N output files" verbose marker; its addition
