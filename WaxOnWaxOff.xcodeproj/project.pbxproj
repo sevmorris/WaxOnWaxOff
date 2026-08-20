@@ -18,10 +18,12 @@
 
 /* Begin PBXFileReference section */
 		C6DEF1382EC98B05003A77C7 /* WaxOnWaxOff.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaxOnWaxOff.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1F2A3B42EC99000003A77C7 /* WaxOnWaxOffTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WaxOnWaxOffTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1F2A3A82EC99000003A77C7 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXBuildFile section */
+		E1F2A3A92EC99000003A77C7 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1F2A3A82EC99000003A77C7 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
