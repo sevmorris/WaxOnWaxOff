@@ -17,7 +17,9 @@ That second call is what makes releases correct, not a belt-and-braces extra. `W
 
 If you have just cloned and want a working app on the first build, run `./scripts/fetch-ffmpeg.sh` before opening Xcode. ClipHack and FilmStrip share this arrangement and this quirk.
 
-**Do not delete** the release named by `FFMPEG_DEPS_TAG` in `Vendor/ffmpeg-manifest.env` — currently `ffmpeg-deps-8.0-audio-arm64`. CI and fresh clones fetch the binaries from it, and `scripts/fetch-ffmpeg.sh` has no other source.
+**Do not delete** the release named by `FFMPEG_DEPS_TAG` in `Vendor/ffmpeg-manifest.env` — currently `ffmpeg-deps-8.0-audio-arm64-r2`. CI and fresh clones fetch the binaries from it, and `scripts/fetch-ffmpeg.sh` has no other source.
+
+The previous pin `ffmpeg-deps-8.0-audio-arm64` must also stay published: releases up to v2.11.0 verify against its checksums, so deleting it makes those tags unbuildable from a clean checkout. It is behaviourally identical to r2 — same recipe, before it pinned the build directory and dropped LC_UUID.
 
 That is a rule about the *current* deps release, not a blanket rule over everything matching `ffmpeg-deps-*`. The superseded `ffmpeg-deps-8.0-arm64` assets were removed deliberately and **must not be restored** — restoring them resumes distributing a GPL binary whose Corresponding Source this project cannot supply. See *Historical builds* below. Its git tag is kept; only the published assets are gone.
 
