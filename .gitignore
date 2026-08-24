@@ -4,6 +4,9 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 
+# Coverage counters (a built app run from a repo drops default.profraw there)
+*.profraw
+
 # macOS
 .DS_Store
 
