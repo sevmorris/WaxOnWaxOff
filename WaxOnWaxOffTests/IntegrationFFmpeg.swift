@@ -25,12 +25,18 @@ enum IntegrationFFmpeg {
         name: String,
         durationSeconds: Double,
         sampleRate: Int,
-        channels: Int = 1
+        channels: Int = 1,
+        amplitude: Double = 1.0
     ) throws -> URL {
         let out = directory.appendingPathComponent(name)
+        // Full-scale sine measures about -21.8 LUFS; scale it to model an
+        // under-recorded source. Omitted entirely at 1.0 so the filter graph
+        // existing callers get is byte-for-byte what it always was.
+        let gain = amplitude == 1.0 ? [] : ["-af", "volume=\(amplitude)"]
         try run(ffmpeg: ffmpeg, args: [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "lavfi", "-i", "sine=frequency=440:duration=\(durationSeconds)",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=\(durationSeconds)"
+        ] + gain + [
             "-ar", "\(sampleRate)", "-ac", "\(channels)",
             "-c:a", "pcm_s16le",
             out.path

@@ -255,12 +255,19 @@ actor DeliveryProcessor {
         if let m = measurements {
             onLog?("  \(m.formattedSummary)", .info)
             onLog?(String(format: "  offset: %.2f dB  |  thresh %.1f LUFS", m.targetOffset, m.inputThresh), .verbose)
-            if abs(m.targetOffset) > 12.0 {
+            // The gain the target implies. Not `targetOffset` — that is loudnorm's
+            // residual correction (forwarded as `offset=`, and printed on the line
+            // above), which stays near zero however far the source sits from the
+            // target. Using it here reported "Δ -0.0 dB applied" beside a 7 dB move
+            // and left the large-gain guard below unable to fire at all. WaxOn
+            // computes the same figure the same way in AudioProcessor.
+            let gainDB = settings.targetLUFS - m.inputI
+            if abs(gainDB) > 12.0 {
                 onLog?(String(format: "⚠ Large gain change (%+.1f dB) — verify the source level and output before delivery.",
-                              m.targetOffset), .info)
+                              gainDB), .info)
             }
             onLog?(String(format: "  Δ %+.1f dB applied  |  %.1f LUFS → %.0f LUFS",
-                          m.targetOffset, m.inputI, settings.targetLUFS), .info)
+                          gainDB, m.inputI, settings.targetLUFS), .info)
             // Detection only — changes nothing about the pass-2 filter built
             // below. loudnorm treats linear=true as a request it may refuse; the
             // pass-1 measurements are enough to predict the refusal, so say so

@@ -370,6 +370,48 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                        "the normalization-type line must not appear at .info")
     }
 
+    // MARK: - Gain reporting
+
+    /// The Delta line and the large-gain guard must both key off the gain the
+    /// target implies (target - measured), not loudnorm's `target_offset`.
+    ///
+    /// Regression: WaxOff used `target_offset` for both. It is a residual
+    /// correction that stays near zero however far the source sits from the
+    /// target, so the Delta line reported "-0.0 dB applied" beside multi-dB
+    /// moves and the guard below could never fire at any source level. This
+    /// source measures about -35 LUFS against an -18 target -- a ~17 dB move,
+    /// while its `target_offset` is about -0.05 dB.
+    func testLargeGainChangeIsReportedFromTheGainNotTheLoudnormOffset() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg,
+            directory: workDir,
+            name: "quiet_source.wav",
+            durationSeconds: 6.0,
+            sampleRate: 44100,
+            amplitude: 0.22
+        )
+
+        var settings = WaxOffSettings()
+        settings.targetLUFS = -18.0
+        settings.outputMode = .wav
+        settings.outputDirectoryPath = workDir.path
+
+        let (_, info) = try await runCapturingLog(input: input, settings: settings)
+
+        let warning = try XCTUnwrap(info.first(where: { $0.contains("Large gain change") }),
+                                    "a ~17 dB move must trip the large-gain guard; got: \(info)")
+        XCTAssertTrue(warning.contains("+1"),
+                      "the guard must quote the gain, not the near-zero offset: \(warning)")
+
+        let delta = try XCTUnwrap(info.first(where: { $0.contains("dB applied") }),
+                                  "expected a Delta line; got: \(info)")
+        XCTAssertTrue(delta.contains("+1"),
+                      "Delta must report the gain the target implies, not target_offset: \(delta)")
+        XCTAssertFalse(delta.contains("-0.0 dB applied"),
+                       "Delta reported the loudnorm residual again: \(delta)")
+    }
+
     // MARK: - Deferred verification (A1b, verification pool)
 
     /// Batch path: a file's completion callback fires at file-written and
