@@ -8,6 +8,9 @@ All notable changes to WaxOn/WaxOff are documented here. Every version below has
 - **WaxOff's console reported the wrong gain figure.** The delivery log's Δ line read loudnorm's `target_offset` — a residual correction that stays near zero however far the source sits from the target — so it printed nonsense like "Δ -0.0 dB applied  |  -23.1 LUFS → -16 LUFS" on a real 7.1 dB move. It now reports the gain the target implies, which is what WaxOn has always shown. The verbose `offset:` line still prints `target_offset`, where that is the right number.
 - **The large-gain warning could never appear.** "Large gain change — verify the source level and output before delivery" is meant to flag a source more than 12 dB from target, but it tested the same near-zero residual, so no file could trip it. A badly mis-leveled recording now raises it as intended.
 
+**Developer**
+- **The bundled FFmpeg is now reproducible, and repinned.** `scripts/build-ffmpeg.sh` pinned its working directory and passed `-Wl,-no_uuid`, so two runs on the same toolchain produce byte-identical binaries and the checksums in `Vendor/ffmpeg-manifest.env` can be verified rather than taken on trust — previously the published recipe produced a binary that did not match its own published checksums. Repinned to `ffmpeg-deps-8.0-audio-arm64-r2`. No change to delivered audio: parity against the old binaries over the full corpus was 221 gates passed, 0 failed, with null residuals at `-inf` and every LUFS and true-peak delta 0.0000.
+
 ## [2.11.0] — 2026-08-20
 
 **Fixed**
