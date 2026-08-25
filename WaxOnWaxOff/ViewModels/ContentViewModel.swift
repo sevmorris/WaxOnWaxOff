@@ -69,7 +69,7 @@ final class ContentViewModel {
     }
 
     func addFiles(_ urls: [URL]) {
-        alertMessage = fileQueue.addFiles(
+        reportSkips(fileQueue.addFiles(
             urls,
             skippedFormatMessage: { count in
                 "\(count) file\(count == 1 ? "" : "s") skipped — unsupported format. Supported: wav, aif, aiff, aifc, mp3, flac, m4a, caf, aac, mp4, mov."
@@ -82,7 +82,27 @@ final class ContentViewModel {
                 }
                 return true
             }
-        )
+        ))
+    }
+
+    /// Where a skip is told: an alert when nothing loaded, the Console when
+    /// something did. Keeping notices out of `alertMessage` is what lets that
+    /// alert stay titled "Error" — everything it carries now is one.
+    ///
+    /// `alertMessage` is still written on every add rather than only when there
+    /// is an alert to raise, so a fresh add replaces what the last one left on
+    /// screen instead of stranding it there. That is the behavior the three
+    /// call sites guard a cancelled panel's empty array against.
+    private func reportSkips(_ report: FileQueueCoordinator.SkipReport?) {
+        switch report {
+        case .alert(let message):
+            alertMessage = message
+        case .notice(let message):
+            log.append("⚠ \(message)")
+            alertMessage = nil
+        case nil:
+            alertMessage = nil
+        }
     }
 
     func confirmWaxonWarning() {

@@ -34,7 +34,7 @@ enum AddFilesPanel {
     /// `addFiles`.
     ///
     /// Deliberately the same entry point drag-and-drop uses. Folder expansion,
-    /// extension filtering and the "N files skipped" alert all live in
+    /// extension filtering and the "N files skipped" report all live in
     /// `FileQueueCoordinator.addFiles`, so routing through it means the menu
     /// and the drop cannot drift apart — and a folder dropped on the window
     /// behaves the same as a folder chosen here.
@@ -48,9 +48,9 @@ enum AddFilesPanel {
     /// rather than "Open…" — the queue coordinator walks a folder and its
     /// subfolders.
     ///
-    /// The empty guard matches the button's: `addFiles` assigns its result to
-    /// `alertMessage`, so handing it a cancelled panel's empty array would
-    /// clear a message the user has not read yet.
+    /// The empty guard matches the button's: `addFiles` clears `alertMessage`
+    /// when it has nothing to report, so handing it a cancelled panel's empty
+    /// array would clear a message the user has not read yet.
     @MainActor
     static func present(_ action: AddFilesAction) {
         let urls = AudioFilePicker.chooseFiles()
