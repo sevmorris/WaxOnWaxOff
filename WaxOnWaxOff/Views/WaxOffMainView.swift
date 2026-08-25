@@ -293,9 +293,10 @@ struct WaxOffMainView: View {
             }
 
             FileListActionBar(
-                // The empty guard is not cosmetic: `addFiles` assigns its result
-                // to `alertMessage`, so handing it a cancelled panel's empty
-                // array would clear a message the user has not read yet.
+                // The empty guard is not cosmetic: `addFiles` clears
+                // `alertMessage` when it has nothing to report, so handing it a
+                // cancelled panel's empty array would clear a message the user
+                // has not read yet.
                 add: {
                     let urls = AudioFilePicker.chooseFiles(
                         validExtensions: viewModel.fileQueue.validExtensions

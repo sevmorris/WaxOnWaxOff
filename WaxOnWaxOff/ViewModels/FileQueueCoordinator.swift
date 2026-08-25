@@ -47,30 +47,50 @@ final class FileQueueCoordinator {
         files.contains { if case .analyzing = $0.status { return true }; return false }
     }
 
+    /// What `addFiles` has to say about the files it did not take, and how
+    /// much of the user's attention that is worth.
+    ///
+    /// The two cases differ in whether the add did anything. Dropping a folder
+    /// that happens to hold a `readme.txt` is the ordinary case rather than a
+    /// mistake — the audio all loaded, and a modal in front of that interrupts
+    /// a success. Skipping *every* file is the other story: the list looks
+    /// exactly as it did before, so without an alert the add appears to have
+    /// silently done nothing.
+    enum SkipReport {
+        /// Nothing loaded. Worth interrupting for.
+        case alert(String)
+        /// Some files loaded, some were skipped. Belongs on the Console.
+        case notice(String)
+    }
+
     func addFiles(
         _ urls: [URL],
         skippedFormatMessage: (Int) -> String,
         beforeCommit: (([URL]) -> Bool)? = nil,
         onCommitted: (() -> Void)? = nil
-    ) -> String? {
+    ) -> SkipReport? {
         let expanded = urls.flatMap { expandFolder($0) }
         let valid = expanded.filter { validExtensions.contains($0.pathExtension.lowercased()) }
         let rejected = expanded.count - valid.count
 
-        var alert: String?
+        var report: SkipReport?
         if rejected > 0 {
-            alert = skippedFormatMessage(rejected)
+            // `expandFolder` enumerates with `.skipsHiddenFiles`, so `.DS_Store`
+            // and its kind never reach this count — everything reported here is
+            // a file the user can actually see in the folder they added.
+            let message = skippedFormatMessage(rejected)
+            report = valid.isEmpty ? .alert(message) : .notice(message)
         }
 
-        guard !valid.isEmpty else { return alert }
+        guard !valid.isEmpty else { return report }
 
         if let beforeCommit, !beforeCommit(valid) {
-            return alert
+            return report
         }
 
         commitFiles(valid)
         onCommitted?()
-        return alert
+        return report
     }
 
     func commitFiles(_ urls: [URL]) {
