@@ -2,7 +2,7 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
-## [Unreleased]
+## [2.12.0] — 2026-08-25
 
 **Fixed**
 - **Adding a folder no longer reports an error over a file nobody meant to add.** A folder holding anything besides audio — a `readme.txt`, a session file, a cover image — raised a modal titled "Error" reading "1 file skipped — unsupported format", even when every audio file in it had loaded. Skipping the stray file is the correct outcome rather than a failure, and a modal in front of it interrupts a success, so the count now goes to the console. The alert is kept for the add that genuinely needs one: when nothing loaded at all, the file list simply looks unchanged, and without an alert the add appears to have silently done nothing. The same in both WaxOn and WaxOff, and on every route in — a drop, the File menu, and the `+` button — because all three arrive at the one entry point.
@@ -22,6 +22,9 @@ All notable changes to WaxOn/WaxOff are documented here. Every version below has
 
 **Documentation**
 - The manual and the in-app Help document the metadata sheet: the procedure for tagging an episode, the four fields and the ID3 frame each one writes, the chapter format and its rules, the Apple Podcasts artwork sizes as guidance, what happens when part of the metadata cannot be written, and why there is no description field
+
+**Developer**
+- The File menu and the file list's `+` button had each built their own open panel. They now share one, so the two routes into the same queue cannot offer different filters or different wording — the menu's panel picks up the `UTType.isDeclared` guard, without which an extension the system has no declaration for would be invisible in the picker while drag-and-drop still accepted it.
 
 ## [2.11.1] — 2026-08-23
 
