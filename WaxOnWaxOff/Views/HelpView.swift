@@ -31,6 +31,23 @@ struct HelpView: View {
                     """)
                 }
 
+                section("The File List Bar") {
+                    text("""
+                    A bar is below the file list. It holds the controls for the list and for \
+                    the selected rows. The toolbar at the top of the window holds only the \
+                    controls that apply to all the files.
+                    """)
+                    definition("+", "A dialog opens. Select one file, more than one file, or a folder. Click Add. The dialog accepts the same files as a drag. WaxOn/WaxOff scans a folder and its subfolders for supported audio files. This button stays available while a batch runs.")
+                    definition("−", "This button removes the selected rows from the list. It is available only when you select one row or more. It is not available while a batch runs. You can also press Delete.")
+                    definition("Metadata", "WaxOff only. A sheet opens for the selected file. Refer to WaxOff — Episode Metadata below.")
+                    definition("Clear All", "This button removes all the rows from the list. It is not available while a batch runs. You can also press Command-Option-Delete.")
+                    text("""
+                    The buttons show their names when the file list is wide. If you make the \
+                    list narrow, the buttons show only their icons. Put the pointer on a \
+                    button to see its name.
+                    """)
+                }
+
                 dividerRow
 
                 section("WaxOn — Raw Recording Prep") {
@@ -45,7 +62,7 @@ struct HelpView: View {
                 section("WaxOn — Quick Start") {
                     steps([
                         "Set the sample rate and the output channels in Settings. The toggles and the knobs are in the control bar.",
-                        "Drag your audio files onto the window or onto the file list.",
+                        "Drag your audio files onto the window or onto the file list. As an alternative, click the plus button in the bar below the file list.",
                         "Click Process. WaxOn writes the output files to the folder of the source files."
                     ])
                 }
@@ -90,7 +107,7 @@ struct HelpView: View {
                 section("WaxOff — Quick Start") {
                     steps([
                         "Select a preset from the menu in the header. As an alternative, set your own values.",
-                        "Drag your finished mix file onto the window.",
+                        "Drag your finished mix file onto the window. As an alternative, click the plus button in the bar below the file list.",
                         "Click Process. WaxOff writes the output files to the folder of the source file."
                     ])
                 }
@@ -123,6 +140,41 @@ struct HelpView: View {
                     definition("Podcast Loud", "−16 LUFS, −1.0 dBTP, WAV and MP3 at 160 kbps, 44.1 kHz. The perceived volume is louder. The result stays in the platform limits.")
                     definition("WAV Only (Mastering)", "−18 LUFS, −1.0 dBTP, WAV only at 48 kHz. Use this preset to deliver to a mastering engineer or a video platform.")
                     text("To save your own preset, use the Preset menu › Save Current Settings…. Custom presets stay available after you restart the app. To delete a custom preset, use Manage Presets… in the same menu.")
+                }
+                section("WaxOff — Episode Metadata") {
+                    text("""
+                    WaxOff can write podcast metadata into a delivered MP3 file. Select one \
+                    file in the list. Click Metadata in the bar below the file list. A sheet \
+                    opens for that file. The Metadata button is available only when exactly \
+                    one file is selected. The button is not available while a batch delivers. \
+                    The button stays available during the verification.
+                    """)
+                    text("""
+                    Metadata applies to MP3 output only. WaxOff writes the episode metadata \
+                    into the MP3 file. The WAV file keeps only the metadata of the source \
+                    file. The sheet shows a notice when the output mode writes no MP3. \
+                    Metadata belongs to one file. A preset does not keep metadata. Settings \
+                    does not keep metadata. WaxOff writes the tags as ID3v2.3.
+                    """)
+                    definition("Podcast Name", "This is the name of the show. WaxOff writes it as the ID3 album tag.")
+                    definition("Episode Title", "This is the title of the episode. WaxOff writes it as the ID3 title tag. Leave the field empty to use the name of the delivered file without the file extension. The placeholder in the field shows that name. The name includes the loudness suffix. Thus it is not the same as the name of the source file. All the earlier versions do the same.")
+                    definition("Artwork", "Use a PNG or JPEG image for the front cover. Drag one image onto the artwork area, or click Choose…. If you drag a different type of file, WaxOff refuses it and shows the reason. Apple Podcasts asks for a square image from 1400 to 3000 pixels. The sheet shows a note for a different shape or size. The note is advice only. WaxOff delivers the file in all conditions.")
+                    definition("Chapters", "The chapter table is first. Each row is one chapter. Edit the time in the first field. Edit the title in the second field. Click the minus button to remove that chapter. Click Add Chapter to add a chapter. The paste box is below the table. Paste one chapter on each line. Use MM:SS Title or HH:MM:SS Title. The table and the box always show the same chapters.")
+                    text("""
+                    Each chapter time must be later than the time before it. No chapter time \
+                    can be at or after the end of the audio. Each chapter must have a title. \
+                    An error message names the line that is not correct. The Save button is \
+                    not available while an error message shows.
+                    """)
+                    text("""
+                    A tag badge shows on the row of a file that has metadata. Put the pointer \
+                    on the badge to see what the file has. The badge stays after the \
+                    delivery.
+                    """)
+                    text("""
+                    WaxOff does not write an episode description. The RSS feed of your podcast \
+                    supplies the description to the podcast apps.
+                    """)
                 }
 
                 dividerRow

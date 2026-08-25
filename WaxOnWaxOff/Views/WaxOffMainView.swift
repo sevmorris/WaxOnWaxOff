@@ -6,6 +6,49 @@ struct WaxOffMainView: View {
     @State private var fileListWidth: CGFloat = 250
     @State private var showConsole = false
     @State private var showSettings = true
+    @State private var metadataTarget: MetadataTarget?
+
+    /// What the metadata sheet is editing, snapshotted when the button is
+    /// pressed.
+    ///
+    /// `.sheet(item:)` over a snapshot rather than `.sheet(isPresented:)` over
+    /// `selectedFile`, because the presented closure is re-evaluated whenever
+    /// the view model changes. Reading the live selection in there gives two
+    /// failure modes: a selection change behind the sheet would leave the
+    /// already-seeded editor showing one file's values while Save wrote them to
+    /// another, and a `selectedFile` that went nil (the row removed, the
+    /// selection cleared) would render an empty sheet — with no Cancel button
+    /// inside it, and no way to close it. A snapshot has neither: the sheet
+    /// edits what it was opened on, and `updateMetadata` already no-ops if that
+    /// row is gone by the time Save lands.
+    ///
+    /// It copies five fields rather than holding the `FileItem` itself, even
+    /// though `FileItem` is already `Identifiable` and would bind to
+    /// `.sheet(item:)` directly. Doing that would pin `waveform`,
+    /// `analysisStats` and the whole `outputs` array — every rendered file's
+    /// waveform and stats — alive for as long as the sheet is open, none of
+    /// which the sheet reads.
+    private struct MetadataTarget: Identifiable {
+        let id: UUID
+        let fileName: String
+        /// The source file itself, not just its name: the Episode Title
+        /// placeholder is the stem `DeliveryProcessor` will deliver this file
+        /// under, and that is computed from the whole URL.
+        let sourceURL: URL
+        let duration: TimeInterval?
+        let metadata: EpisodeMetadata
+
+        init(file: FileItem) {
+            self.id = file.id
+            self.fileName = file.url.lastPathComponent
+            self.sourceURL = file.url
+            // The optional passes straight through. Coalescing to 0 would make
+            // `ChapterParser`'s `start < duration` check reject every line the
+            // user pastes into a file that is still analyzing.
+            self.duration = file.fileInfo?.duration
+            self.metadata = file.metadata
+        }
+    }
 
     private var selectedFile: FileItem? {
         guard viewModel.selectedFileIDs.count == 1,
@@ -78,6 +121,30 @@ struct WaxOffMainView: View {
             Button("Cancel", role: .cancel) { viewModel.dismissWaxoffWarning() }
         } message: {
             Text("One or more files appear to have already been processed by WaxOff. Running delivery again may over-limit or drift from your target loudness.")
+        }
+        // `.sheet(item:)` clears `metadataTarget` itself on dismiss, so both
+        // Save and Cancel leave no presentation state behind.
+        .sheet(item: $metadataTarget) { target in
+            MetadataSheet(
+                fileName: target.fileName,
+                duration: target.duration,
+                // Read live rather than snapshotted: the output mode is the one
+                // input here that is not per-file, and the notice should be
+                // right even if something changed it while the sheet is up.
+                appliesToOutput: viewModel.settings.outputMode != .wav,
+                // Same reason for the target loudness: it is a settings value,
+                // and it is part of the delivered name. Reading it live keeps
+                // the placeholder honest if the target changes with the sheet
+                // open. The stem itself comes from `DeliveryProcessor`, which
+                // is what actually names the file.
+                deliveredStem: DeliveryProcessor.deliveredStem(
+                    forSource: target.sourceURL,
+                    targetLUFS: viewModel.settings.targetLUFS
+                ),
+                metadata: target.metadata
+            ) { updated in
+                viewModel.updateMetadata(updated, for: target.id)
+            }
         }
     }
 
@@ -184,26 +251,11 @@ struct WaxOffMainView: View {
                 .help(viewModel.isAnyFileAnalyzing ? "Waiting for analysis to complete…" : "")
             }
 
-            // Editing the list is refused while renders are in flight. The
-            // batch works from a snapshot taken at Process, so removing rows
-            // does not stop anything — the completion callbacks just stop
-            // finding their rows, and files keep landing on disk with nothing
-            // in the UI to show for them. Still allowed during the tail, where
-            // the files are already written.
-            Button {
-                viewModel.removeSelected()
-            } label: {
-                Label("Remove", systemImage: "minus.circle")
-            }
-            .disabled(viewModel.selectedFileIDs.isEmpty || !viewModel.canEditFileList)
-
-            Button {
-                viewModel.clearAll()
-            } label: {
-                Label("Clear", systemImage: "trash")
-            }
-            .disabled(viewModel.files.isEmpty || !viewModel.canEditFileList)
-            .keyboardShortcut(.delete, modifiers: [.command, .option])
+            // Remove, Clear and Metadata used to sit here. All three manage a
+            // row of the list rather than the document, so they now live in
+            // `FileListActionBar` under the list itself. The top bar keeps what
+            // acts on the whole document: mode, preset, Process/Cancel, the
+            // verification readout, the settings toggle.
 
             Divider()
                 .frame(height: 20)
@@ -229,12 +281,50 @@ struct WaxOffMainView: View {
         }
     }
 
-    @ViewBuilder
     private var fileListSection: some View {
-        if viewModel.files.isEmpty {
-            EmptyStateView(mode: .waxOff)
-        } else {
-            DeliveryFileListView(viewModel: viewModel)
+        // The bar is outside the empty/populated branch on purpose: Add is the
+        // only keyboard-reachable way into an empty list, so hiding it with the
+        // list would hide it at exactly the moment it is needed.
+        VStack(spacing: 0) {
+            if viewModel.files.isEmpty {
+                EmptyStateView(mode: .waxOff)
+            } else {
+                DeliveryFileListView(viewModel: viewModel)
+            }
+
+            FileListActionBar(
+                // The empty guard is not cosmetic: `addFiles` assigns its result
+                // to `alertMessage`, so handing it a cancelled panel's empty
+                // array would clear a message the user has not read yet.
+                add: {
+                    let urls = AudioFilePicker.chooseFiles(
+                        validExtensions: viewModel.fileQueue.validExtensions
+                    )
+                    guard !urls.isEmpty else { return }
+                    viewModel.addFiles(urls)
+                },
+                removeSelected: { viewModel.removeSelected() },
+                // Editing the list is refused while renders are in flight. The
+                // batch works from a snapshot taken at Process, so removing rows
+                // does not stop anything — the completion callbacks just stop
+                // finding their rows, and files keep landing on disk with
+                // nothing in the UI to show for them. Still allowed during the
+                // tail, where the files are already written.
+                canRemove: !viewModel.selectedFileIDs.isEmpty && viewModel.canEditFileList,
+                clearAll: { viewModel.clearAll() },
+                canClear: !viewModel.files.isEmpty && viewModel.canEditFileList,
+                editMetadata: {
+                    guard let file = selectedFile else { return }
+                    metadataTarget = MetadataTarget(file: file)
+                },
+                // Single selection only: every field the sheet edits is
+                // per-episode, so there is no sensible batch meaning for it.
+                // Gated on `canEditFileList` for the same reason Remove and
+                // Clear are — the run works from a snapshot taken at Process, so
+                // an edit made mid-batch would never reach the file being
+                // delivered.
+                canEditMetadata: viewModel.selectedFileIDs.count == 1 && viewModel.canEditFileList
+            )
         }
     }
 
@@ -319,7 +409,8 @@ private struct DeliveryFileListView: View {
                     isProcessing: viewModel.isProcessing,
                     channelBadge: Self.upmixBadge(for: file),
                     applyFloorWarnings: false,
-                    phase: viewModel.filePhases[file.id]
+                    phase: viewModel.filePhases[file.id],
+                    showsMetadataBadge: true
                 )
                     .tag(file.id)
             }

@@ -130,6 +130,7 @@ struct FileItem: Identifiable, Equatable {
     var outputs: [OutputFile] = []
     /// Which of `outputs` the detail pane is showing.
     var selectedOutputIndex: Int = 0
+    var metadata = EpisodeMetadata()
 
     init(url: URL) {
         self.id = UUID()
@@ -162,6 +163,6 @@ struct FileItem: Identifiable, Equatable {
     }
 
     static func == (lhs: FileItem, rhs: FileItem) -> Bool {
-        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform == rhs.waveform && lhs.fileInfo == rhs.fileInfo && lhs.outputs == rhs.outputs && lhs.selectedOutputIndex == rhs.selectedOutputIndex
+        lhs.id == rhs.id && lhs.status == rhs.status && lhs.analysisStats == rhs.analysisStats && lhs.waveform == rhs.waveform && lhs.fileInfo == rhs.fileInfo && lhs.outputs == rhs.outputs && lhs.selectedOutputIndex == rhs.selectedOutputIndex && lhs.metadata == rhs.metadata
     }
 }
