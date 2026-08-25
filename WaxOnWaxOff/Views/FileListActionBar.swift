@@ -4,9 +4,10 @@ import UniformTypeIdentifiers
 
 /// The open panel behind the file list's Add button.
 ///
-/// Until this button existed the only way to get a file into the app was to
-/// drag one onto the window, so there was no keyboard- or VoiceOver-reachable
-/// path to a populated file list at all. The panel's job is therefore to accept
+/// 2.7.0 put adding files on the menu bar, which closed the hole where a
+/// keyboard-only user could not load anything at all; this button puts the same
+/// capability against the list, where someone is already looking. Both routes
+/// run this panel. The panel's job is therefore to accept
 /// exactly what a drop accepts: several files at once, any of the supported
 /// extensions, and folders — which `FileQueueCoordinator.addFiles` expands
 /// before it filters.

@@ -1,6 +1,4 @@
-import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// The active mode's file-adding entry point, published to the menu bar.
 ///
@@ -40,28 +38,23 @@ enum AddFilesPanel {
     /// `FileQueueCoordinator.addFiles`, so routing through it means the menu
     /// and the drop cannot drift apart — and a folder dropped on the window
     /// behaves the same as a folder chosen here.
+    ///
+    /// The panel is `AudioFilePicker`'s, shared with the file list's `+`
+    /// button. This built its own until the button arrived, which left the two
+    /// routes into the same queue offering subtly different panels: only one
+    /// guarded `UTType.isDeclared`, so only one was safe against an extension
+    /// the system has no declaration for, and their messages were worded
+    /// differently. Folders remain the reason this reads "Add Files or Folder…"
+    /// rather than "Open…" — the queue coordinator walks a folder and its
+    /// subfolders.
+    ///
+    /// The empty guard matches the button's: `addFiles` assigns its result to
+    /// `alertMessage`, so handing it a cancelled panel's empty array would
+    /// clear a message the user has not read yet.
     @MainActor
     static func present(_ action: AddFilesAction) {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseFiles = true
-        // Folders are the reason this is "Add Files or Folder…" rather than
-        // "Open…": the queue coordinator walks a folder and its subfolders.
-        panel.canChooseDirectories = true
-        panel.prompt = "Add"
-        panel.message = "Choose audio files, or a folder to scan."
-
-        // Filter to what the queue will actually accept. Anything without a
-        // recognized type is left off rather than guessed at — the filter is a
-        // convenience, and `addFiles` still rejects and reports whatever slips
-        // through, exactly as it does for a drop.
-        let types = FileQueueCoordinator.defaultValidExtensions
-            .compactMap { UTType(filenameExtension: $0) }
-        if !types.isEmpty {
-            panel.allowedContentTypes = types
-        }
-
-        guard panel.runModal() == .OK else { return }
-        action.perform(panel.urls)
+        let urls = AudioFilePicker.chooseFiles()
+        guard !urls.isEmpty else { return }
+        action.perform(urls)
     }
 }
