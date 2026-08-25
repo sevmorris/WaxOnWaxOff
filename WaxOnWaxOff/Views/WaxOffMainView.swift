@@ -25,8 +25,9 @@ struct WaxOffMainView: View {
     /// It copies five fields rather than holding the `FileItem` itself, even
     /// though `FileItem` is already `Identifiable` and would bind to
     /// `.sheet(item:)` directly. Doing that would pin `waveform`,
-    /// `outputWaveform`, `analysisStats`, `outputStats` and `outputFileInfo`
-    /// alive for as long as the sheet is open, none of which the sheet reads.
+    /// `analysisStats` and the whole `outputs` array — every rendered file's
+    /// waveform and stats — alive for as long as the sheet is open, none of
+    /// which the sheet reads.
     private struct MetadataTarget: Identifiable {
         let id: UUID
         let fileName: String
