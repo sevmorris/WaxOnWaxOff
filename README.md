@@ -31,7 +31,7 @@ WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, o
 
 The app runs in two stages that map onto the two moments in podcast production where repetitive manual work otherwise lives:
 
-- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional EBU R128 normalization (dynamics fully preserved), and true-peak control to a fixed −1.0 dBTP ceiling — a standard peak limiter when Loudness Norm is on, downward-only linear peak normalization when off. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder (e.g., `interview-44kwaxon.wav`).
+- **WaxOn** runs before you edit. It conditions the raw file — high-pass filter, optional EBU R128 normalization (dynamics fully preserved), and peak control to a fixed −1.0 ceiling — a brick-wall limiter holding samples at −1.0 dBFS when Loudness Norm is on, downward-only true-peak normalization to −1.0 dBTP when off. Output is a prep-ready 24-bit WAV named to stay sortable alongside the source in Finder (e.g., `interview-44kwaxon.wav`).
 - **WaxOff** runs after you bounce. It takes your finished mix to broadcast-compliant delivery — EBU R128 to target LUFS, true peak ceiling, WAV and/or MP3 output.
 
 **Local processing:** No upload, no subscription, no audio leaving your machine. Transparent, inspectable signal chain.
@@ -47,9 +47,9 @@ The app runs in two stages that map onto the two moments in podcast production w
 
 * **High-Pass Filter:** On (80 Hz) or Off (20 Hz DC floor). DC offset always removed.
 * **Dynamic Leveling:** Optional `dynaudnorm` with adjustable strength (Gentle → Aggressive) for panel/multi-voice sources with inconsistent levels.
-* **Loudness Normalization:** Optional two-pass EBU R128 linear gain (dynamics fully preserved; default off). See [Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html).
+* **Loudness Normalization:** Optional EBU R128 linear gain — integrated loudness measured once with `ebur128`, then one constant gain (dynamics fully preserved; default off). See [Theory of Operation](https://sevmorris.github.io/WaxOnWaxOff/manual/theory.html).
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
-* **Peak Control:** True peak held to a fixed −1.0 dBTP ceiling — 2× oversampled limiting when Loudness Norm is on; downward-only linear peak normalization (transparent when the source is already under ceiling) when off.
+* **Peak Control:** Fixed −1.0 ceiling, applied two ways. With Loudness Norm on, a brick-wall limiter holds sample peaks at −1.0 dBFS. With it off, a single downward gain brings true peak to −1.0 dBTP and nothing is limited (transparent when the source is already under ceiling).
 * **Phase Rotation:** Optional 200 Hz allpass filter to reduce peak asymmetry and maximize headroom (default on).
 
 **Output Logic:** `{name}-{44k|48k}waxon.wav` (24-bit)
@@ -61,6 +61,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **True Peak Management:** Configurable ceiling (−3.0 to −0.5 dBTP).
 * **Multi-Format Delivery:** 24-bit WAV, CBR MP3 (up to 192 kbps), or simultaneous output.
 * **Mono Delivery:** Optional true single-channel output for mono sources (defaults to dual-mono stereo); never downmixes a stereo source.
+* **Episode Metadata:** Per-file podcast name, episode title, cover art and chapter marks, written into the delivered MP3 as ID3v2.3 `TALB`, `TIT2`, `APIC` and `CHAP`/`CTOC`. Chapters take a pasted `MM:SS Title` list or an editable table. Leave it untouched and the file delivers exactly as before.
 
 **Output Logic:** `{name}-lev{target}LUFS.[wav/mp3]` (target is e.g. `-18LUFS`)
 

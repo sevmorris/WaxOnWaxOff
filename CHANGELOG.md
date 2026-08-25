@@ -2,6 +2,12 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [Unreleased]
+
+**Documentation**
+- The README and the landing page described a WaxOn that stopped existing in 2.9.0. Both called its loudness normalization two-pass — it has measured once with `ebur128` since that release — and both quoted a single −1.0 dBTP true-peak ceiling for a stage that holds sample peaks at −1.0 dBFS when Loudness Norm is on and only reaches a true-peak target, by attenuation and without limiting, when it is off. The README also credited WaxOn with 2× oversampled limiting, which is WaxOff's. The 2.9.0 correction reached the manual, the theory page and the in-app Help and never these two files; the wording now follows the theory page, which was right all along. One sentence in the theory page that still called both modes two-pass is corrected with them.
+- The README and the landing page now list episode metadata among WaxOff's features. It shipped in 2.12.0 as the release's headline and was documented only in the manual and Help, so the two documents a new reader sees first did not mention it.
+
 ## [2.12.0] — 2026-08-25
 
 **Fixed**

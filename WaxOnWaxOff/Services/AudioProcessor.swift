@@ -96,8 +96,11 @@ actor AudioProcessor {
         let rateTag = sr == 44100 ? "44k" : "48k"
         let stem = input.deletingPathExtension().lastPathComponent
         let filename = input.lastPathComponent
-        // WaxOn ceiling is fixed at -1.0 dBTP (not user-adjustable); matches the
-        // theory.html "Under the Hood" value of ~0.891251.
+        // WaxOn's ceiling is fixed at -1.0 (not user-adjustable); matches the
+        // theory.html "Under the Hood" value of ~0.891251. Units differ by path:
+        // this amplitude is the alimiter's dBFS sample-peak ceiling on the
+        // loudnorm-on path, while the off path below reuses the same -1.0 figure
+        // as a dBTP true-peak target reached by attenuation alone.
         let limitAmp = FFmpegFilters.limiterCeilingAmplitude(dBFS: -1.0)
         let outDir = OutputDirectory.waxOnOutputDirectory(for: input, settings: settings) { [self] message in
             self.onLog?("⚠ \(message)", .info)
