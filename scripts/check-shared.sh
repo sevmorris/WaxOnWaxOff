@@ -27,7 +27,7 @@
 set -euo pipefail
 
 MARKER="Shared verbatim across the sibling app repos"
-SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack FilmStrip)
+SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack FilmStrip KeyVault)
 
 ROOT=$(git rev-parse --show-toplevel)
 SELF=$(basename "$ROOT")
