@@ -22,3 +22,9 @@ WaxOnWaxOff/ffprobe
 
 # Parity corpus (must live OUTSIDE the tree; backstop only)
 /parity-corpus/
+
+# Python bytecode from the dmg tooling. Running tools/dmg/*.py leaves a
+# __pycache__ behind, and untracked-but-unignored is enough to fail the
+# dirty-tree check in release.sh's preflight.
+__pycache__/
+*.pyc
