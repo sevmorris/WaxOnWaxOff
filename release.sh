@@ -67,6 +67,7 @@ DOCS_ACTIVE=0
 step()  { echo "\n▶ $*"; }
 ok()    { echo "  ✓ $*"; }
 fail()  { echo "\n  ✗ $*" >&2; exit 1; }
+warn()  { echo "  ! $*" >&2; }
 
 cleanup() {
     # Uses ${VAR:-} so the trap fires cleanly even if the script exits before
@@ -115,6 +116,37 @@ if git tag | grep -q "^${TAG}$"; then
     fail "Tag $TAG already exists — has this version been released?"
 fi
 ok "Tag $TAG is available"
+
+# ── Version ordering ────────────────────────────────────────────────────────────────────────
+# Nothing here stopped a release going backwards. On 2026-09-03 Magic Backup
+# Machine published v1.3.9 on top of v1.4.2 — two sessions releasing from one
+# clone, neither aware of the other. GitHub served the older build as "latest"
+# from that moment, and because the update checker compares numerically, every
+# client already on 1.4.2 read 1.3.9 as older and reported itself up to date.
+# The release could not reach anyone.
+#
+# Tags are the record of what is actually published, and what "latest" keys on,
+# so they are what this compares against. Set ALLOW_DOWNGRADE=1 to override.
+step "Checking version ordering"
+version_core() { printf '%s' "${1%%[-+]*}"; }
+HIGHEST_TAG=$(git tag --sort=-v:refname | head -1 | sed 's/^v//')
+if [[ -n "$HIGHEST_TAG" ]]; then
+    NEW_CORE=$(version_core "$VERSION")
+    REF_CORE=$(version_core "$HIGHEST_TAG")
+    # Numeric cores only: `sort -V` places 1.7.0 ahead of 1.7.0-rc.1, backwards
+    # from semver, and comparing raw strings would block any release that
+    # follows its own release candidate.
+    if [[ "$NEW_CORE" != "$REF_CORE" ]] \
+       && [[ "$(printf '%s\n%s\n' "$NEW_CORE" "$REF_CORE" | sort -V | head -1)" == "$NEW_CORE" ]]; then
+        if [[ "${ALLOW_DOWNGRADE:-0}" != "0" ]]; then
+            warn "$VERSION sorts below tag v$HIGHEST_TAG — continuing, ALLOW_DOWNGRADE is set"
+        else
+            fail "$VERSION sorts below the highest tag v$HIGHEST_TAG. Publishing it would leave GitHub serving an older build as 'latest', and clients on $HIGHEST_TAG would be told they are up to date. Set ALLOW_DOWNGRADE=1 to override."
+        fi
+    fi
+fi
+ok "Version $VERSION does not go backwards"
+
 
 # ── Shared-file gate ──────────────────────────────────────────────────────────
 # Several files here are vendored copies kept byte-identical with the sibling
