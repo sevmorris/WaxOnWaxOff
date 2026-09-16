@@ -27,16 +27,16 @@ actor FFmpegManager {
 
         if let ffmpegURL = Bundle.main.url(forResource: "ffmpeg", withExtension: nil),
            let ffprobeURL = Bundle.main.url(forResource: "ffprobe", withExtension: nil),
-           fm.fileExists(atPath: ffmpegURL.path),
-           fm.fileExists(atPath: ffprobeURL.path) {
+           fm.isExecutableFile(atPath: ffmpegURL.path),
+           fm.isExecutableFile(atPath: ffprobeURL.path) {
             return Paths(ffmpeg: ffmpegURL.path, ffprobe: ffprobeURL.path)
         }
 
         if let resourceURL = Bundle.main.resourceURL {
             let ffmpegURL = resourceURL.appendingPathComponent("ffmpeg")
             let ffprobeURL = resourceURL.appendingPathComponent("ffprobe")
-            if fm.fileExists(atPath: ffmpegURL.path),
-               fm.fileExists(atPath: ffprobeURL.path) {
+            if fm.isExecutableFile(atPath: ffmpegURL.path),
+               fm.isExecutableFile(atPath: ffprobeURL.path) {
                 return Paths(ffmpeg: ffmpegURL.path, ffprobe: ffprobeURL.path)
             }
         }
