@@ -372,7 +372,7 @@ step "Notarizing DMG"
 # Setup: xcrun notarytool store-credentials WoWoNotary --apple-id <email> --team-id T9RLNAXPWU
 # The version-number changes are reverted by the EXIT trap, which owns that job
 # for every failure in the window, not just this one.
-if ! xcrun notarytool submit "$DMG" --wait --keychain-profile "WoWoNotary"; then
+if ! xcrun notarytool submit "$DMG" --wait --keychain-profile "notarytool"; then
     fail "Notarization failed — version changes in project.pbxproj have been reverted"
 fi
 xcrun stapler staple "$DMG"
