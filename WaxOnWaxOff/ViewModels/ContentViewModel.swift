@@ -193,7 +193,9 @@ final class ContentViewModel {
 
         let currentSettings = settings
 
-        processingTask = Task {
+        // `[self]` states what the Task already did implicitly: it holds the view
+        // model for the whole run. The callbacks below still capture it weakly.
+        processingTask = Task { [self] in
             do {
                 let processor = AudioProcessor(settings: currentSettings,
                     onFileStarted: { [weak self] id in

@@ -4,7 +4,11 @@ import Foundation
 /// requires a start and an end, but ends are derivable — chapter *i* ends where
 /// *i+1* begins, and the last ends at the file duration. Storing ends would let
 /// the two drift apart.
-struct Chapter: Identifiable, Equatable, Sendable {
+///
+/// `nonisolated`: a plain value, built by the parser and the delivery actor as
+/// well as the UI. Under main-actor default isolation its explicit init would
+/// otherwise be main-actor only.
+nonisolated struct Chapter: Identifiable, Equatable, Sendable {
     let id: UUID
     var start: TimeInterval
     var title: String

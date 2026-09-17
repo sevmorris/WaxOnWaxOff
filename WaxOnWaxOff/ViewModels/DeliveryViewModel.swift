@@ -341,7 +341,9 @@ final class DeliveryViewModel {
         let currentSettings = settings
         let inputs = readyFiles.map { DeliveryJobInput(id: $0.id, url: $0.url, metadata: $0.metadata) }
 
-        processingTask = Task {
+        // `[self]` states what the Task already did implicitly: it holds the view
+        // model for the whole run. The callbacks below still capture it weakly.
+        processingTask = Task { [self] in
             do {
                 let processor = DeliveryProcessor()
                 let batch = try await processor.run(

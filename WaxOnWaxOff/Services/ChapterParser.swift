@@ -25,8 +25,9 @@ enum ChapterParseError: Error, Equatable, LocalizedError {
     }
 }
 
-/// Parses pasted chapter text into `[Chapter]`. Pure: no I/O, no FFmpeg, no UI.
-enum ChapterParser {
+/// Parses pasted chapter text into `[Chapter]`. Pure: no I/O, no FFmpeg, no UI —
+/// so `nonisolated`, and callable from the table's nonisolated helpers.
+nonisolated enum ChapterParser {
 
     static func parse(_ text: String, duration: TimeInterval) -> Result<[Chapter], ChapterParseError> {
         var chapters: [Chapter] = []

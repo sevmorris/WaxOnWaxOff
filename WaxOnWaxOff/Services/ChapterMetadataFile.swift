@@ -4,7 +4,9 @@ import Foundation
 /// `-map_chapters`. Contains only `[CHAPTER]` blocks — title and album travel
 /// as `-metadata` arguments so there is never a precedence question between
 /// this file's global section and `-map_metadata 0`.
-enum ChapterMetadataFile {
+///
+/// `nonisolated`: DeliveryProcessor, an actor, writes it.
+nonisolated enum ChapterMetadataFile {
 
     /// Escapes a value for the ffmetadata format. The backslash substitution
     /// must run first, otherwise the backslashes introduced by the later
