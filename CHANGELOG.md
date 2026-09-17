@@ -2,7 +2,7 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
-## [Unreleased]
+## [2.12.4] — 2026-09-17
 
 **Fixed**
 - **A broken FFmpeg no longer passes itself off as a file with no audio.** Whenever the bundled ffprobe could not run — missing, unlaunchable, crashed or timed out — the file was reported as "No audio stream found — file may be misnamed or unsupported." That is how 2.11.1 through 2.12.1 described every file on macOS 26.7, where the fault was ffprobe being refused at launch; only the debug log said otherwise, and the first diagnosis went after the files. Those cases now say the bundled ffprobe failed to run, give the reason, and say the file was not checked. A file ffprobe reads and finds no audio in is reported exactly as before.
