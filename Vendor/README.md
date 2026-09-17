@@ -17,17 +17,27 @@ That second call is what makes releases correct, not a belt-and-braces extra. `W
 
 If you have just cloned and want a working app on the first build, run `./scripts/fetch-ffmpeg.sh` before opening Xcode. ClipHack and FilmStrip share this arrangement and this quirk.
 
-**Do not delete** the release named by `FFMPEG_DEPS_TAG` in `Vendor/ffmpeg-manifest.env` — currently `ffmpeg-deps-8.0-audio-arm64-r2`. CI and fresh clones fetch the binaries from it, and `scripts/fetch-ffmpeg.sh` has no other source.
+**Do not delete** the release named by `FFMPEG_DEPS_TAG` in `Vendor/ffmpeg-manifest.env` — currently `ffmpeg-deps-8.0-audio-arm64-r4`. CI and fresh clones fetch the binaries from it, and `scripts/fetch-ffmpeg.sh` has no other source.
 
-The previous pin `ffmpeg-deps-8.0-audio-arm64` must also stay published: releases up to v2.11.0 verify against its checksums, so deleting it makes those tags unbuildable from a clean checkout. It is behaviourally identical to r2 — same recipe, before it pinned the build directory and dropped LC_UUID.
+The previous pins must also stay published, because older tags verify against their checksums and deleting one makes those tags unbuildable from a clean checkout:
+
+| Pin | Hosted in | Tags |
+|-----|-----------|------|
+| `ffmpeg-deps-8.0-audio-arm64` | this repo | v2.4.0 – v2.11.0 |
+| `ffmpeg-deps-8.0-audio-arm64-r2` | this repo | v2.11.1 – v2.12.1 |
+| `ffmpeg-deps-8.0-audio-arm64-r3` | `sevmorris/ClipHack-releases` | v2.12.2 |
+
+The first is behaviourally identical to r2 — same recipe, before it pinned the build directory and dropped LC_UUID. r2's binaries do not launch on macOS 26.7 (see *The build*). v2.12.2 borrowed ClipHack's r3 during the 2026-09-16 migration, before this repo had a build with LC_UUID of its own; r4 is that build, and there is no r3 here.
 
 That is a rule about the *current* deps release, not a blanket rule over everything matching `ffmpeg-deps-*`. The superseded `ffmpeg-deps-8.0-arm64` assets were removed deliberately and **must not be restored** — restoring them resumes distributing a GPL binary whose Corresponding Source this project cannot supply. See *Historical builds* below. Its git tag is kept; only the published assets are gone.
 
 ### The build
 
-`scripts/build-ffmpeg.sh` builds FFmpeg 8.0 against LAME 3.100, both pinned and SHA-256 verified, with **no `--enable-gpl`**, **no `--enable-nonfree`**, **no `--enable-version3`**, and no video or image external libraries. The only external library is `libmp3lame`, for MP3 encoding. The script asserts, fail-closed, that the resulting binaries execute, carry none of those three flags, link `libmp3lame`, target the project's deployment target, and have **no non-system dynamic dependencies**. Execution is asserted *before* the flag checks — a binary that cannot run emits no configuration string, and every "flag absent" assertion would otherwise pass vacuously.
+`scripts/build-ffmpeg.sh` builds FFmpeg 8.0 against LAME 3.100, both pinned and SHA-256 verified, with **no `--enable-gpl`**, **no `--enable-nonfree`**, **no `--enable-version3`**, and no video or image external libraries. The only external library is `libmp3lame`, for MP3 encoding. The script asserts, fail-closed, that the resulting binaries execute, carry none of those three flags, link `libmp3lame`, target the project's deployment target, carry an `LC_UUID`, and have **no non-system dynamic dependencies**. Execution is asserted *before* the flag checks — a binary that cannot run emits no configuration string, and every "flag absent" assertion would otherwise pass vacuously.
 
-The build is reproducible: two runs on the same toolchain produce byte-identical binaries, so the checksums in `Vendor/ffmpeg-manifest.env` can be independently verified rather than taken on trust. Three things make that true — the fixed working directory (`configure` bakes `--prefix` into the binary), `-ffp-contract=off`, and `-Wl,-no_uuid`.
+The build is reproducible: two runs on the same toolchain produce byte-identical binaries, so the checksums in `Vendor/ffmpeg-manifest.env` can be independently verified rather than taken on trust. Three things make that true — the fixed working directory (`configure` bakes `--prefix` into the binary), `-ffp-contract=off`, and `ZERO_AR_DATE=1`, which keeps object-file timestamps out of the linker's `LC_UUID`.
+
+Up to r2 the recipe got the same result by dropping `LC_UUID` altogether (`-Wl,-no_uuid`). That stopped working: dyld on macOS 26.7 refuses to load an executable without one ("missing LC_UUID load command"), so the r2 binaries abort on launch there. The script now asserts the load command is present.
 
 Two flags are load-bearing and documented inline in the script: `-fno-stack-check` (macOS clang codegen workaround) and `-ffp-contract=off` (FMA contraction varies by compiler version and accumulates through IIR biquad feedback paths; disabling it makes filter output depend on the source rather than on the toolchain).
 

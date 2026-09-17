@@ -12,11 +12,19 @@
 # so anyone can rebuild and check the SHA-256 against the pin in
 # Vendor/ffmpeg-manifest.env. Three things make that true — the fixed working
 # directory below (configure bakes --prefix into the binary), -ffp-contract=off,
-# and -Wl,-no_uuid. Without the last one two runs differ in exactly 48 bytes:
-# the 16-byte linker-generated LC_UUID, plus the 32-byte ad-hoc code-signature
-# hash in __LINKEDIT that covers it. Dropping LC_UUID costs only crash
-# symbolication of the bundled binary, which we never do — it runs as a separate
-# process and release.sh re-signs it anyway.
+# and ZERO_AR_DATE=1.
+#
+# The last one is about LC_UUID. The linker derives the UUID from a hash of its
+# output, and that output includes each object file's modification time in the
+# debug map, so two otherwise identical runs differ in exactly 48 bytes: the
+# 16-byte LC_UUID plus the 32-byte ad-hoc code-signature hash in __LINKEDIT that
+# covers it. Nothing else in 21.9 MB varies. ZERO_AR_DATE=1 makes the linker
+# record those times as zero, so the UUID depends on the content alone.
+#
+# Recipes up to r2 removed LC_UUID instead, with -Wl,-no_uuid. Do not go back to
+# that: dyld refuses to load an executable without one ("missing LC_UUID load
+# command") and aborts, which is what every r2 binary does on macOS 26.7. The
+# verification gates below assert the load command is present.
 # To re-verify: run twice into different output dirs and compare SHA-256.
 #
 # Usage: scripts/build-ffmpeg.sh [output-dir]   (default: ./build/ffmpeg-audio)
@@ -59,6 +67,10 @@ mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$OUT_DIR"
 
+# Zero the object-file timestamps the linker hashes into LC_UUID (see the
+# header). Exported so every link and archive step below inherits it.
+export ZERO_AR_DATE=1
+
 echo "▶ audio-only FFmpeg ${FFMPEG_VERSION} + LAME ${LAME_VERSION}, arm64, min macOS ${DEPTARGET}"
 
 # dl <dest> <url> <sha256>: download and verify, fail-closed on mismatch.
@@ -88,7 +100,7 @@ cd "ffmpeg-${FFMPEG_VERSION}"
     --prefix="$WORK/ffmpeg-install" \
     --cc=/usr/bin/clang --arch=arm64 \
     --extra-cflags="-mmacosx-version-min=${DEPTARGET} -fno-stack-check -ffp-contract=off -I$WORK/lame-install/include" \
-    --extra-ldflags="-mmacosx-version-min=${DEPTARGET} -L$WORK/lame-install/lib -Wl,-no_uuid" \
+    --extra-ldflags="-mmacosx-version-min=${DEPTARGET} -L$WORK/lame-install/lib" \
     --enable-static --disable-shared --pkg-config-flags=--static \
     --enable-libmp3lame \
     --disable-autodetect \
@@ -138,6 +150,11 @@ done
 printf '%s' "$cfg" | grep -q -- '--enable-libmp3lame' || { echo "FAIL: libmp3lame missing" >&2; exit 1; }
 minos="$(otool -l "$BIN/ffmpeg" | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{print $2; exit}')"
 [ "$minos" = "$DEPTARGET" ] || { echo "FAIL: minos $minos != $DEPTARGET" >&2; exit 1; }
+# Asserted separately from the execution gate above: a dyld that still accepts
+# a binary without LC_UUID would let one through there.
+for b in ffmpeg ffprobe; do
+    otool -l "$BIN/$b" | grep -q 'cmd LC_UUID' || { echo "FAIL: $b has no LC_UUID" >&2; exit 1; }
+done
 
 cp "$BIN/ffmpeg" "$BIN/ffprobe" "$OUT_DIR/"
 echo "✓ $(du -h "$OUT_DIR/ffmpeg" | cut -f1) ffmpeg, $(du -h "$OUT_DIR/ffprobe" | cut -f1) ffprobe → $OUT_DIR"
