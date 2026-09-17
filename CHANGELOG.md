@@ -4,7 +4,27 @@ All notable changes to WaxOn/WaxOff are documented here. Every version below has
 
 ## [Unreleased]
 
+**Changed**
+- **The bundled FFmpeg is this repo's own build again, and reproducible.** 2.12.2 borrowed ClipHack's r3 build to get the `LC_UUID` load command back, along with a copy of ClipHack's manifest that named the wrong app and dropped this repo's provenance records. `ffmpeg-deps-8.0-audio-arm64-r4`, built here by `scripts/build-ffmpeg.sh`, replaces it: the recipe keeps `LC_UUID`, stays reproducible through `ZERO_AR_DATE=1`, and refuses a binary without the load command. Parity against r3 over the WaxOn and WaxOff chains: 221 gates pass, every null residual at −inf. `Vendor/ffmpeg-manifest.env` has its own text back and lists every earlier pin that older tags still need.
+
+**Fixed**
+- **The installer window is back.** The 2.12.1 and 2.12.2 disk images open as a plain folder holding only the app — no background, no layout, and no Applications shortcut to drag it onto. On the Mac they were built on, the Python that runs dmgbuild crashed on its first subprocess (it had been compiled against Xcode 27's macOS 27 SDK, on macOS 26.7), and a fallback added that day built a bare image instead while still reporting a styled one. The fallback is gone. `release.sh` now tests the interpreter before building anything, fails rather than ships an image without its layout, and checks the mounted image for it.
+- **`release.sh` can no longer publish half a release.** It checked only this clone's tags, so a version already tagged on GitHub passed, was built, notarized and pushed to `main`, and only then had its tag refused — which is how a second "Bump version to 2.12.1" reached `main` with nothing tagging it. It now fetches the remote's tags first, stops when a local tag disagrees with one or the remote branch has commits this one lacks, and pushes the branch and the tag in one atomic push. It also checks the notarytool profile up front (`notarytool`, or `NOTARY_PROFILE`), and builds for `generic/platform=macOS`.
+- Builds with Xcode 27 without warnings. Swift 6.4 flags main-actor code reached from `DeliveryProcessor` and from the chapter table's nonisolated helpers, and `Chapter`, `ChapterParser` and `ChapterMetadataFile` are now `nonisolated`.
+
+## [2.12.2] — 2026-09-16
+
+**Fixed**
+- **FFmpeg runs on macOS 26.7 again.** 2.11.1 through 2.12.1 bundled `ffmpeg` and `ffprobe` built without an `LC_UUID` load command — that is what made the r2 build reproducible — and dyld on macOS 26.7 refuses to load an executable without one, so neither WaxOn nor WaxOff could process anything there. This release bundles binaries with the load command, borrowed from ClipHack's `ffmpeg-deps-8.0-audio-arm64-r3`.
+
+## [2.12.1] — 2026-09-16
+
+**Changed**
+- **A bundled tool that is not executable is no longer run in place.** WaxOn/WaxOff checked only that `ffmpeg` and `ffprobe` existed inside the app. It now requires them to be executable too, and otherwise runs a copy from its temporary folder with the permission set.
+- `release.sh` refuses a version that sorts below the highest tag, which would leave GitHub serving an older build as "latest". `ALLOW_DOWNGRADE=1` overrides it.
+
 **Documentation**
+- Both screenshots are reshot for the 2.12.0 interface.
 - The README and the landing page described a WaxOn that stopped existing in 2.9.0. Both called its loudness normalization two-pass — it has measured once with `ebur128` since that release — and both quoted a single −1.0 dBTP true-peak ceiling for a stage that holds sample peaks at −1.0 dBFS when Loudness Norm is on and only reaches a true-peak target, by attenuation and without limiting, when it is off. The README also credited WaxOn with 2× oversampled limiting, which is WaxOff's. The 2.9.0 correction reached the manual, the theory page and the in-app Help and never these two files; the wording now follows the theory page, which was right all along. One sentence in the theory page that still called both modes two-pass is corrected with them.
 - The README and the landing page now list episode metadata among WaxOff's features. It shipped in 2.12.0 as the release's headline and was documented only in the manual and Help, so the two documents a new reader sees first did not mention it.
 
