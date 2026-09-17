@@ -33,6 +33,10 @@ enum ProcessingError: LocalizedError {
     case ffmpegFailed(code: Int32, message: String)
     case outputMissing
     case analysisError(String)
+    /// ffprobe ran and the file has no audio stream it can read.
+    case noAudioStream
+    /// ffprobe itself could not run, so the file was never checked.
+    case probeFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -48,6 +52,10 @@ enum ProcessingError: LocalizedError {
             return "Processing produced no output file."
         case .analysisError(let message):
             return "The audio analysis failed. \(message)"
+        case .noAudioStream:
+            return "No audio stream found — file may be misnamed or unsupported."
+        case .probeFailed(let detail):
+            return "The bundled ffprobe failed to run: \(detail). The file was not checked. Update or reinstall WaxOn/WaxOff."
         }
     }
 }

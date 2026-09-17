@@ -312,15 +312,13 @@ final class FileQueueCoordinator {
         let task = Task {
             do {
                 let tools = try await FFmpegManager.shared.ensureTools()
-                guard await AudioStreamProbe.hasAudioStream(
-                    ffprobe: tools.ffprobe,
-                    url: file.url,
-                    onLog: { detail in
-                        fileQueueLogger.debug("\(detail, privacy: .public)")
-                    }
-                ) else {
+                let outcome = try await AudioStreamProbe.probe(ffprobe: tools.ffprobe, url: file.url)
+                if case .probeFailed(let detail) = outcome {
+                    fileQueueLogger.debug("ffprobe process error for \(file.url.lastPathComponent, privacy: .public): \(detail, privacy: .public)")
+                }
+                if let failure = outcome.failure {
                     if let idx = files.firstIndex(where: { $0.id == file.id }) {
-                        files[idx].status = .error("No audio stream found — file may be misnamed or unsupported.")
+                        files[idx].status = .error(failure.localizedDescription)
                     }
                     analysisTasks.removeValue(forKey: file.id)
                     return
