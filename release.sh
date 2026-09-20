@@ -50,6 +50,7 @@ SCHEME="WaxOnWaxOff"
 DERIVED_DATA="/tmp/waxon_build_${VERSION}"
 APP_PATH="$DERIVED_DATA/Build/Products/Release/WaxOnWaxOff.app"
 DMG="/tmp/WaxOnWaxOff-${TAG}.dmg"
+APP_ZIP="/tmp/WaxOnWaxOff-${TAG}-app.zip"
 MOUNT="/tmp/waxon_verify_${VERSION}"
 MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
 LANDING_IDX="$PROJECT_DIR/docs/index.html"
@@ -101,6 +102,7 @@ cleanup() {
     fi
     [[ -d "${DERIVED_DATA:-}" ]] && rm -rf -- "$DERIVED_DATA" || true
     [[ -f "${DMG:-}" ]]          && rm -f  -- "$DMG"          || true
+    [[ -f "${APP_ZIP:-}" ]]      && rm -f  -- "$APP_ZIP"      || true
 }
 # A zsh EXIT trap does not fire on a signal, so Ctrl-C or a closed terminal
 # during the long notarization wait used to leave the version bump sitting in
@@ -393,6 +395,25 @@ BUILT_VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersi
     fail "App version mismatch: expected $VERSION, got $BUILT_VERSION"
 ok "App reports $BUILT_VERSION"
 
+# ── Notarize app ──────────────────────────────────────────────────────────────
+step "Notarizing app"
+# Stapling the DMG alone leaves the app unstapled once it is dragged out, which
+# is the only form anyone actually runs. Gatekeeper still passes it — it falls
+# back to asking Apple — but that needs a working network on first launch. So
+# the app gets its own notarization round trip and its own ticket here, before
+# the DMG is built around it; the DMG is then stapled separately below.
+#
+# The ticket covers this exact cdhash, so this has to run after codesigning and
+# before the app is copied into the DMG.
+rm -f "$APP_ZIP"
+ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
+xcrun notarytool submit "$APP_ZIP" --wait --keychain-profile "$NOTARY_PROFILE" \
+    || fail "App notarization failed"
+xcrun stapler staple "$APP_PATH" || fail "Stapling the app failed"
+xcrun stapler validate "$APP_PATH" >/dev/null || fail "App has no valid stapled ticket"
+rm -f "$APP_ZIP"
+ok "App notarized and stapled"
+
 # ── Stage DMG contents ────────────────────────────────────────────────────────
 # ── Create DMG ────────────────────────────────────────────────────────────────
 # Built with dmgbuild rather than bare hdiutil so the installer window is laid
@@ -456,11 +477,21 @@ rm -rf "$MOUNT"
 mkdir "$MOUNT"
 hdiutil attach "$DMG" -mountpoint "$MOUNT" -quiet -nobrowse
 DMG_VERSION=$(defaults read "$MOUNT/WaxOnWaxOff.app/Contents/Info.plist" CFBundleShortVersionString)
+# Check the ticket on the copy that actually ships, not on the build product
+# we stapled — those are the two that can drift apart. Captured before the
+# detach so the volume is never left mounted on a failure.
+if xcrun stapler validate "$MOUNT/WaxOnWaxOff.app" >/dev/null 2>&1; then
+    DMG_APP_STAPLED=1
+else
+    DMG_APP_STAPLED=0
+fi
 # The installer window is these two files: the .DS_Store carrying the layout and
 # the background art it points at. Without them the image opens as a plain folder.
 DMG_DSSTORE=( "$MOUNT"/.DS_Store(N) )
 DMG_BGART=( "$MOUNT"/.background.*(N) )
 hdiutil detach "$MOUNT" -quiet
+[[ "$DMG_APP_STAPLED" == 1 ]] || \
+    fail "App inside the DMG carries no notarization ticket"
 [[ "$DMG_VERSION" == "$VERSION" ]] || \
     fail "DMG version mismatch: expected $VERSION, got $DMG_VERSION"
 (( ${#DMG_DSSTORE} && ${#DMG_BGART} )) || \
