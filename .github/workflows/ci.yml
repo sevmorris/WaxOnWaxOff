@@ -36,7 +36,16 @@ jobs:
     # macos-15 carries Xcode 26.x. macos-14 tops out at Xcode 15.4, which can
     # neither open this pbxproj (objectVersion 77) nor supply the Swift 6.2 the
     # project requires — see the pin below for the real floor.
-    runs-on: macos-15
+    #
+    # macos-26 because a build that passes on 15 can still fail on 26: the r2
+    # FFmpeg binaries aborted at launch under macOS 26.7's dyld (no LC_UUID)
+    # while this job stayed green. The integration tests exec the bundled
+    # binaries, so that class of failure turns this leg red.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
@@ -57,3 +66,29 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS,arch=arm64' \
             test
+
+  ffmpeg-deployment-floor:
+    # The app cannot be built or tested on macOS 14 (Xcode 26 needs 15.6+), but
+    # the bundled FFmpeg can be run there, and it is the part not covered by
+    # Swift's availability checking. Exercises the same pieces the app relies
+    # on: the libmp3lame encoder, the oversampling resampler, loudnorm, ffprobe.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch FFmpeg
+        run: ./scripts/fetch-ffmpeg.sh
+
+      - name: Run bundled binaries at the deployment target
+        run: |
+          set -euo pipefail
+          sw_vers
+          cd WaxOnWaxOff
+          ./ffmpeg -hide_banner -version
+          ./ffprobe -hide_banner -version
+          ./ffmpeg -nostdin -hide_banner -loglevel error -y \
+            -f lavfi -i "sine=frequency=440:duration=5:sample_rate=44100" \
+            -af "aresample=88200:filter_size=512:cutoff=0.97:phase_shift=10,loudnorm=I=-16:TP=-1:LRA=11,aresample=44100:filter_size=512:cutoff=0.97:phase_shift=10" \
+            -ac 2 -c:a libmp3lame -b:a 128k "$RUNNER_TEMP/floor.mp3"
+          ./ffprobe -v error -show_entries stream=codec_name,sample_rate,channels \
+            -of default=nw=1 "$RUNNER_TEMP/floor.mp3"
