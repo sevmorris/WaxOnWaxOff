@@ -52,7 +52,7 @@ struct LoudnormMeasurements: Sendable {
     /// fall back to dynamic normalization. Returns nil when linear mode is
     /// predicted; otherwise the reason it is not.
     ///
-    /// This mirrors `af_loudnorm.c` init() at FFmpeg 8.0 exactly, and models
+    /// This mirrors `af_loudnorm.c` init() at FFmpeg 8.0.3 (unchanged since 8.0) exactly, and models
     /// **both** of its gates, not only the documented inequality:
     ///
     ///   1. the sentinel guard — linear mode is considered only when every
