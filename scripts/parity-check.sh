@@ -19,8 +19,10 @@ LUFS_TOL="0.1"
 TP_TOL="0.1"
 #
 # Pre-registered divergences:
-#   MP3 — old links LAME 3.99.5, new links LAME 3.100. The bitstream changes by
-#   design: MP3 gets LUFS/TP + format gates, never a null gate.
+#   MP3 — a LAME version change alters the bitstream by design: 3.99.5 -> 3.100
+#   at the first LGPL build, 3.100 -> 4.0 at recipe r5 (declared 2026-09-24,
+#   before that run). MP3 gets LUFS/TP + format gates, never a null gate. When
+#   LAME is unchanged, compare the decoded MP3s by hand as well.
 #
 # bash 3.2-safe. Env: WOW_PARITY_CORPUS, WOW_OLD_FFMPEG, WOW_NEW_FFMPEG.
 
@@ -106,7 +108,8 @@ run_mp3() { "$1" -y -hide_banner -loglevel error -i "$2" \
 
 lamever() { "$1" -y -loglevel error -f lavfi -i "sine=d=0.3" -c:a libmp3lame "$TMP/_lv.mp3" 2>/dev/null; strings "$TMP/_lv.mp3" | grep -om1 "LAME[0-9.]*"; rm -f "$TMP/_lv.mp3"; }
 echo "=== PARITY  old=$("$OLD" -version|awk 'NR==1{print $3}')  new=$("$NEW" -version|awk 'NR==1{print $3}') ==="
-echo "=== LAME    old=$(lamever "$OLD")  new=$(lamever "$NEW")  (MP3 divergence pre-registered) ==="
+LAME_OLD="$(lamever "$OLD")"; LAME_NEW="$(lamever "$NEW")"
+echo "=== LAME    old=${LAME_OLD}  new=${LAME_NEW}  (MP3 divergence pre-registered) ==="
 
 # EVERY fixture in the corpus — no hand-picked subset.
 for f in "$CORPUS"/*; do
@@ -135,7 +138,7 @@ for f in "$CORPUS"/*; do
     if run_mp3 "$OLD" "$f" "$TMP/o.mp3" 2>/dev/null && run_mp3 "$NEW" "$f" "$TMP/n.mp3" 2>/dev/null; then
         compare   "MP3 format" "$(fmt "$TMP/o.mp3")" "$(fmt "$TMP/n.mp3")"
         gate_loud "MP3" "$TMP/o.mp3" "$TMP/n.mp3"
-        state PREREG "MP3 null skipped — LAME 3.99.5 vs 3.100 (declared before the run)"
+        state PREREG "MP3 null skipped — ${LAME_OLD:-LAME?} vs ${LAME_NEW:-LAME?} (declared before the run)"
     else state INCOMPLETE "MP3 encode failed"; fi
 done
 
