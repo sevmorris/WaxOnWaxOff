@@ -4,9 +4,9 @@
 <p align="center">
   <strong>Podcast Audio Prep Utility</strong>
   <br />
-  <strong>Version:</strong> 2.12.4
+  <strong>Version:</strong> 2.12.5
   <br />
-  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.12.4.dmg"><strong>Download Latest (DMG)</strong></a>
+  <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.12.5.dmg"><strong>Download Latest (DMG)</strong></a>
   <br />
   or <code>brew install --cask sevmorris/tap/waxonwaxoff</code>
   <br />
