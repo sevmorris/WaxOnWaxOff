@@ -61,16 +61,20 @@ final class DeliveryViewModelReentryTests: XCTestCase {
 final class DeliveryViewModelRestartWindowTests: XCTestCase {
 
     private var workDir: URL!
+    private var scratch: ScratchDefaults!
 
     override func setUpWithError() throws {
         try super.setUpWithError()
         workDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("waxoff-restart-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
+        scratch = try ScratchDefaults()
     }
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: workDir)
+        scratch?.remove()
+        scratch = nil
         try super.tearDownWithError()
     }
 
@@ -134,9 +138,11 @@ final class DeliveryViewModelRestartWindowTests: XCTestCase {
     /// genuine batch without waiting on the analyser. The custom output
     /// directory matters beyond tidiness: it keeps the resolver off ~/Desktop,
     /// and `confirmDesktopFallback` puts up a modal `NSAlert` when more than one
-    /// output lands there, which would hang the run.
+    /// output lands there, which would hang the run. Changing the settings saves
+    /// them, so the view model gets a store of its own. Without one, this saved
+    /// a temp folder as the output folder in the developer's real settings.
     private func makeViewModel(named names: [String]) throws -> DeliveryViewModel {
-        let vm = DeliveryViewModel()
+        let vm = DeliveryViewModel(defaults: scratch.defaults)
         vm.settings.outputDirectoryPath = workDir.path
         vm.settings.outputMode = .wav
         vm.files = try names.map { try makeReadyItem(named: $0) }

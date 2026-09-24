@@ -18,27 +18,27 @@ protocol PresetCodable: Identifiable, Codable, Equatable where ID == UUID {
 // MARK: - Persistence helpers
 
 private enum PresetPersistence {
-    static func load<P: PresetCodable>(key: String) -> [P] {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+    static func load<P: PresetCodable>(key: String, from defaults: UserDefaults) -> [P] {
+        guard let data = defaults.data(forKey: key) else { return [] }
         return (try? JSONDecoder().decode([P].self, from: data)) ?? []
     }
 
-    static func save<P: PresetCodable>(_ presets: [P], key: String) {
+    static func save<P: PresetCodable>(_ presets: [P], key: String, to defaults: UserDefaults) {
         guard let data = try? JSONEncoder().encode(presets) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        defaults.set(data, forKey: key)
     }
 
-    static func loadSelectedID(key: String) -> UUID? {
-        guard let idString = UserDefaults.standard.string(forKey: key),
+    static func loadSelectedID(key: String, from defaults: UserDefaults) -> UUID? {
+        guard let idString = defaults.string(forKey: key),
               let id = UUID(uuidString: idString) else { return nil }
         return id
     }
 
-    static func saveSelectedID(_ id: UUID?, key: String) {
+    static func saveSelectedID(_ id: UUID?, key: String, to defaults: UserDefaults) {
         if let id {
-            UserDefaults.standard.set(id.uuidString, forKey: key)
+            defaults.set(id.uuidString, forKey: key)
         } else {
-            UserDefaults.standard.removeObject(forKey: key)
+            defaults.removeObject(forKey: key)
         }
     }
 }
@@ -54,10 +54,13 @@ final class WaxOnPresetStore {
     var selectedPresetID: UUID?
 
     private let builtIn = WaxOnPreset.builtIn
+    /// Where presets and the selection are loaded from and saved to.
+    private let defaults: UserDefaults
 
-    init() {
-        presets = PresetPersistence.load(key: "WaxOnUserPresets")
-        selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOnSelectedPresetID")
+    init(defaults: UserDefaults = .app) {
+        self.defaults = defaults
+        presets = PresetPersistence.load(key: "WaxOnUserPresets", from: defaults)
+        selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOnSelectedPresetID", from: defaults)
     }
 
     // nonisolated: with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
@@ -106,7 +109,7 @@ final class WaxOnPresetStore {
 
     func selectPreset(_ id: UUID?) {
         selectedPresetID = id
-        PresetPersistence.saveSelectedID(id, key: "WaxOnSelectedPresetID")
+        PresetPersistence.saveSelectedID(id, key: "WaxOnSelectedPresetID", to: defaults)
     }
 
     func isBuiltIn(_ preset: WaxOnPreset) -> Bool {
@@ -114,7 +117,7 @@ final class WaxOnPresetStore {
     }
 
     private func persist() {
-        PresetPersistence.save(presets, key: "WaxOnUserPresets")
+        PresetPersistence.save(presets, key: "WaxOnUserPresets", to: defaults)
     }
 }
 
@@ -127,10 +130,13 @@ final class WaxOffPresetStore {
     var selectedPresetID: UUID?
 
     private let builtIn = WaxOffPreset.builtIn
+    /// Where presets and the selection are loaded from and saved to.
+    private let defaults: UserDefaults
 
-    init() {
-        presets = PresetPersistence.load(key: "WaxOffUserPresets")
-        selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOffSelectedPresetID")
+    init(defaults: UserDefaults = .app) {
+        self.defaults = defaults
+        presets = PresetPersistence.load(key: "WaxOffUserPresets", from: defaults)
+        selectedPresetID = PresetPersistence.loadSelectedID(key: "WaxOffSelectedPresetID", from: defaults)
     }
 
     // nonisolated: with SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor the implicit
@@ -179,7 +185,7 @@ final class WaxOffPresetStore {
 
     func selectPreset(_ id: UUID?) {
         selectedPresetID = id
-        PresetPersistence.saveSelectedID(id, key: "WaxOffSelectedPresetID")
+        PresetPersistence.saveSelectedID(id, key: "WaxOffSelectedPresetID", to: defaults)
     }
 
     func isBuiltIn(_ preset: WaxOffPreset) -> Bool {
@@ -187,6 +193,6 @@ final class WaxOffPresetStore {
     }
 
     private func persist() {
-        PresetPersistence.save(presets, key: "WaxOffUserPresets")
+        PresetPersistence.save(presets, key: "WaxOffUserPresets", to: defaults)
     }
 }

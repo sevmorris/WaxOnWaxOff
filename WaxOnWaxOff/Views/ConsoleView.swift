@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ConsoleView: View {
     let log: ProcessingLog
-    @AppStorage("consoleVerbose") private var verbose = false
+    @AppStorage("consoleVerbose", store: .app) private var verbose = false
 
     private var entries: [LogEntry] {
         verbose ? log.entries : log.entries.filter { $0.level == .info }

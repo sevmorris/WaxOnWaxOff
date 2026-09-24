@@ -23,8 +23,8 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
 
     private static let storageKey = "WaxOffSettings"
 
-    static func load() -> WaxOffSettings {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
+    static func load(from defaults: UserDefaults = .app) -> WaxOffSettings {
+        guard let data = defaults.data(forKey: storageKey),
               var settings = try? JSONDecoder().decode(WaxOffSettings.self, from: data)
         else { return WaxOffSettings() }
         // LRA was never user-configurable; anyone with the prior 11.0 default
@@ -35,9 +35,9 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
         return settings
     }
 
-    func save() {
+    func save(to defaults: UserDefaults = .app) {
         guard let data = try? JSONEncoder().encode(self) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storageKey)
+        defaults.set(data, forKey: Self.storageKey)
     }
 
     var targetLUFSString: String {

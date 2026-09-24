@@ -23,8 +23,10 @@ enum NotificationService {
         // reach the real notification center. Since the call no longer blocks
         // its caller, this no longer prevents a hang — it stops a test run from
         // posting real notifications and from leaving an unanswerable prompt
-        // behind on whatever machine ran it.
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        // behind on whatever machine ran it. The launch makes the same check
+        // to keep the whole app out of a test run; this call is still reached
+        // from the view models the tests build.
+        guard !AppLauncher.isHostingTests else { return }
 
         Task { await deliver(mode: mode, fileCount: fileCount) }
     }
