@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # build-ffmpeg.sh — Build the pinned audio-only static ffmpeg/ffprobe for bundling.
 #
-# Produces LGPL-2.1-or-later binaries: FFmpeg 8.0.3 with libmp3lame (LAME 3.100),
+# Produces LGPL-2.1-or-later binaries: FFmpeg 9.0.2 with libmp3lame (LAME 4.0),
 # NO --enable-gpl / --enable-nonfree, no video/image external libraries. This is
 # the Corresponding Source recipe — provenance is ours, not a third-party build.
 #
@@ -37,12 +37,12 @@ PBXPROJ="$PROJECT_DIR/WaxOnWaxOff.xcodeproj/project.pbxproj"
 OUT_DIR="${1:-$PROJECT_DIR/build/ffmpeg-audio}"
 
 # --- Pinned sources (SHA-256 verified; see Vendor/README.md) --------------------
-FFMPEG_VERSION="8.0.3"
+FFMPEG_VERSION="9.0.2"
 FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-FFMPEG_SHA="6136812ea6d4e68bdba27e33c2a94382711cdf4f8602ffef056ff792bd6f9818"
-LAME_VERSION="3.100"
+FFMPEG_SHA="8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+LAME_VERSION="4.0"
 LAME_URL="https://downloads.sourceforge.net/project/lame/lame/${LAME_VERSION}/lame-${LAME_VERSION}.tar.gz"
-LAME_SHA="ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e"
+LAME_SHA="3df5124d5ad3a98312ffd7ba6a9b36230e4f8a3e66d3ce0f425e336c32d216eb"
 
 # --- Deployment target: read from the project, assert all configs agree ---------
 # grep -m1 would silently pick one of Debug/Release × project/target; instead
@@ -86,8 +86,13 @@ CFL="-mmacosx-version-min=${DEPTARGET} -arch arm64"
 echo "▶ LAME ${LAME_VERSION}"
 tar xzf lame.tar.gz
 cd "lame-${LAME_VERSION}"
+# --disable-decoder: FFmpeg only encodes with LAME. From 3.101, LAME's configure
+# links libmpg123 for decoding whenever it finds one, and a Mac with Homebrew's
+# ffmpeg or lame installed has it: the static libmp3lame then pulls in
+# /opt/homebrew/.../libmpg123, which the no-non-system-dylibs gate below refuses,
+# and the build would depend on what happens to be installed on the machine.
 CFLAGS="$CFL" LDFLAGS="$CFL" ./configure \
-    --prefix="$WORK/lame-install" --disable-shared --enable-static --disable-frontend >/dev/null
+    --prefix="$WORK/lame-install" --disable-shared --enable-static --disable-frontend --disable-decoder >/dev/null
 make -j"$(sysctl -n hw.ncpu)" >/dev/null
 make install >/dev/null
 cd "$WORK"
