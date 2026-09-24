@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # build-ffmpeg.sh — Build the pinned audio-only static ffmpeg/ffprobe for bundling.
 #
-# Produces LGPL-2.1-or-later binaries: FFmpeg 8.0 with libmp3lame (LAME 3.100),
+# Produces LGPL-2.1-or-later binaries: FFmpeg 8.0.3 with libmp3lame (LAME 3.100),
 # NO --enable-gpl / --enable-nonfree, no video/image external libraries. This is
 # the Corresponding Source recipe — provenance is ours, not a third-party build.
 #
@@ -37,9 +37,9 @@ PBXPROJ="$PROJECT_DIR/WaxOnWaxOff.xcodeproj/project.pbxproj"
 OUT_DIR="${1:-$PROJECT_DIR/build/ffmpeg-audio}"
 
 # --- Pinned sources (SHA-256 verified; see Vendor/README.md) --------------------
-FFMPEG_VERSION="8.0"
+FFMPEG_VERSION="8.0.3"
 FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-FFMPEG_SHA="b2751fccb6cc4c77708113cd78b561059b6fa904b24162fa0be2d60273d27b8e"
+FFMPEG_SHA="6136812ea6d4e68bdba27e33c2a94382711cdf4f8602ffef056ff792bd6f9818"
 LAME_VERSION="3.100"
 LAME_URL="https://downloads.sourceforge.net/project/lame/lame/${LAME_VERSION}/lame-${LAME_VERSION}.tar.gz"
 LAME_SHA="ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e"
