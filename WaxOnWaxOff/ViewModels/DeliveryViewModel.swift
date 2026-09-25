@@ -10,7 +10,7 @@ private let logger = Logger(subsystem: "io.github.sevmorris.WaxOnWaxOff", catego
 final class DeliveryViewModel {
     let fileQueue = FileQueueCoordinator()
     var settings: WaxOffSettings {
-        didSet { settings.save() }
+        didSet { settings.save(to: defaults) }
     }
     var isProcessing = false
     /// Live processing phase per file, keyed by `FileItem.id`. Delivery runs
@@ -35,7 +35,7 @@ final class DeliveryViewModel {
     var alertMessage: String?
     var showWaxoffWarning = false
     private var pendingWaxoffFiles: [URL] = []
-    var presetStore = WaxOffPresetStore()
+    var presetStore: WaxOffPresetStore
     var log = ProcessingLog()
 
     private var processingTask: Task<Void, Never>?
@@ -146,8 +146,13 @@ final class DeliveryViewModel {
     // window closes. Nothing in teardown needs the actor, so opt out.
     nonisolated deinit {}
 
-    init() {
-        self.settings = WaxOffSettings.load()
+    /// Where settings and presets are loaded from and saved to.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .app) {
+        self.defaults = defaults
+        self.presetStore = WaxOffPresetStore(defaults: defaults)
+        self.settings = WaxOffSettings.load(from: defaults)
         if let preset = presetStore.selectedPreset {
             settings = preset.settings
         }

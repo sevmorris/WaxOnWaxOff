@@ -11,13 +11,17 @@ final class AppState {
     var mode: AppMode? = nil {
         didSet {
             if let mode {
-                UserDefaults.standard.set(mode.rawValue, forKey: "lastMode")
+                defaults.set(mode.rawValue, forKey: "lastMode")
             }
         }
     }
 
-    init() {
-        if let saved = UserDefaults.standard.string(forKey: "lastMode"),
+    /// Where the last mode is read from and saved to.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .app) {
+        self.defaults = defaults
+        if let saved = defaults.string(forKey: "lastMode"),
            let restored = AppMode(rawValue: saved) {
             mode = restored
         }

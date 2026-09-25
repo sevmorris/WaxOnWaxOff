@@ -11,7 +11,7 @@ final class ContentViewModel {
     let fileQueue = FileQueueCoordinator()
     var settings: WaxOnSettings {
         didSet {
-            settings.save()
+            settings.save(to: defaults)
             syncNoiseFloorHPF()
         }
     }
@@ -19,7 +19,7 @@ final class ContentViewModel {
     var alertMessage: String?
     var showWaxonWarning = false
     private var pendingWaxonFiles: [URL] = []
-    var presetStore = WaxOnPresetStore()
+    var presetStore: WaxOnPresetStore
     var log = ProcessingLog()
     private var processingTask: Task<Void, Never>?
     private var processingCancelled = false
@@ -56,8 +56,13 @@ final class ContentViewModel {
     // window closes. Nothing in teardown needs the actor, so opt out.
     nonisolated deinit {}
 
-    init() {
-        self.settings = WaxOnSettings.load()
+    /// Where settings and presets are loaded from and saved to.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .app) {
+        self.defaults = defaults
+        self.presetStore = WaxOnPresetStore(defaults: defaults)
+        self.settings = WaxOnSettings.load(from: defaults)
         syncNoiseFloorHPF()
         if let preset = presetStore.selectedPreset {
             settings = preset.settings

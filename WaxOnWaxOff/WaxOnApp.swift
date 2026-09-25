@@ -8,7 +8,58 @@
 import AppKit
 import SwiftUI
 
+/// Decides, before anything else runs, whether this launch is the app or only
+/// the host for the unit tests.
+///
+/// Xcode runs the tests inside this app, so a test run used to launch all of
+/// it: AppState read and re-saved the last mode in the app's real defaults,
+/// the view models applied the selected preset and saved it over the
+/// developer's settings, the launch checked for updates, and SwiftUI recorded
+/// the window's frame. Hosting tests, the app now starts with no window, no
+/// view model and no update check.
 @main
+enum AppLauncher {
+    static func main() {
+        if isHostingTests {
+            TestHostApp.main()
+        } else {
+            WaxOnWaxOffApp.main()
+        }
+    }
+
+    /// XCTest is already loaded when main() runs in a test host, and is never
+    /// linked into the app itself. The session identifier is Xcode's own mark
+    /// of a test launch, checked as well in case XCTest ever loads later.
+    nonisolated static let isHostingTests =
+        NSClassFromString("XCTestCase") != nil
+        || ProcessInfo.processInfo.environment["XCTestSessionIdentifier"] != nil
+}
+
+/// A scene with no window: while the app hosts the tests, nothing of the real
+/// app is built.
+private struct TestHostApp: App {
+    var body: some Scene {
+        Settings { EmptyView() }
+    }
+}
+
+extension UserDefaults {
+    /// Where the app keeps what it stores in defaults. It is the app's own
+    /// domain — except in a test run, where `.standard` is that same domain,
+    /// the developer's real settings, because the tests run inside the app.
+    /// A test run gets a scratch suite in its place, so a test that forgets
+    /// to pass a store of its own still cannot reach the real one. Nothing in
+    /// the app names `.standard`; it goes through here.
+    ///
+    /// The scratch suite is named by a path in the temporary folder, which
+    /// keeps its file out of ~/Library/Preferences, where the App Preferences
+    /// source's io.github.sevmorris.* pattern would back it up.
+    nonisolated static let app: UserDefaults = AppLauncher.isHostingTests
+        ? UserDefaults(suiteName: FileManager.default.temporaryDirectory
+            .appendingPathComponent("io.github.sevmorris.WaxOnWaxOff.tests").path)!
+        : .standard
+}
+
 struct WaxOnWaxOffApp: App {
     @State private var appState = AppState()
     @Environment(\.openWindow) private var openWindow

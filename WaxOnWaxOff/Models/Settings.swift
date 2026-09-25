@@ -34,8 +34,8 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
 
     private static let storageKey = "WaxOnSettings"
 
-    static func load() -> WaxOnSettings {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
+    static func load(from defaults: UserDefaults = .app) -> WaxOnSettings {
+        guard let data = defaults.data(forKey: storageKey),
               let settings = try? JSONDecoder().decode(WaxOnSettings.self, from: data)
         else {
             return WaxOnSettings()
@@ -43,9 +43,9 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
         return settings
     }
 
-    func save() {
+    func save(to defaults: UserDefaults = .app) {
         guard let data = try? JSONEncoder().encode(self) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storageKey)
+        defaults.set(data, forKey: Self.storageKey)
     }
 }
 
