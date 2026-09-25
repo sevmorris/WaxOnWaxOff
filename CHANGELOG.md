@@ -2,6 +2,14 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.13.1] — 2026-09-24
+
+Nothing changes in how WaxOn/WaxOff works. This release is for anyone who builds it.
+
+**Developer**
+- **Running the tests no longer touches your settings.** The tests run inside the app, and a test run used to change the settings of whoever ran it. It saved a temporary folder as the WaxOff output folder and then deleted the WaxOff settings altogether. Every test that built a view model re-applied the selected preset and saved it back, and the launch re-saved the last mode. Now a test run starts the app with no window, and every setting a test saves goes to a scratch store in the temporary folder.
+- `scripts/check-shared.sh` looks for the sibling repos beside the main checkout, so a release made from a worktree compares the shared files. Before, it compared none and still reported them in sync.
+
 ## [2.13.0] — 2026-09-24
 
 **Changed**
