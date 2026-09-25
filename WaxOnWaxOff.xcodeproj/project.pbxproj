@@ -20,19 +20,32 @@
 		C6DEF1382EC98B05003A77C7 /* WaxOnWaxOff.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaxOnWaxOff.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1F2A3B42EC99000003A77C7 /* WaxOnWaxOffTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WaxOnWaxOffTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1F2A3A82EC99000003A77C7 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		E1F2A3B62EC99001003A77C7 /* ffmpeg */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = ffmpeg; path = WaxOnWaxOff/ffmpeg; sourceTree = SOURCE_ROOT; };
+		E1F2A3B72EC99001003A77C7 /* ffprobe */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = ffprobe; path = WaxOnWaxOff/ffprobe; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXBuildFile section */
 		E1F2A3A92EC99000003A77C7 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1F2A3A82EC99000003A77C7 /* XCTest.framework */; };
+		E1F2A3B82EC99001003A77C7 /* ffmpeg in Resources */ = {isa = PBXBuildFile; fileRef = E1F2A3B62EC99001003A77C7 /* ffmpeg */; };
+		E1F2A3B92EC99001003A77C7 /* ffprobe in Resources */ = {isa = PBXBuildFile; fileRef = E1F2A3B72EC99001003A77C7 /* ffprobe */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E1F2A3BB2EC99001003A77C7 /* Exceptions for "WaxOnWaxOff" folder in "WaxOnWaxOff" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ffmpeg,
+				ffprobe,
+			);
+			target = C6DEF1372EC98B05003A77C7 /* WaxOnWaxOff */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C6DEF13A2EC98B05003A77C7 /* WaxOnWaxOff */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				E1F2A3BB2EC99001003A77C7 /* Exceptions for "WaxOnWaxOff" folder in "WaxOnWaxOff" target */,
 			);
 			path = WaxOnWaxOff;
 			sourceTree = "<group>";
@@ -68,9 +81,19 @@
 			children = (
 				C6DEF13A2EC98B05003A77C7 /* WaxOnWaxOff */,
 				E1F2A3B32EC99000003A77C7 /* WaxOnWaxOffTests */,
+				E1F2A3BA2EC99001003A77C7 /* Vendored Binaries */,
 				C6DEF1392EC98B05003A77C7 /* Products */,
 				E1F2A3A72EC99000003A77C7 /* Frameworks */,
 			);
+			sourceTree = "<group>";
+		};
+		E1F2A3BA2EC99001003A77C7 /* Vendored Binaries */ = {
+			isa = PBXGroup;
+			children = (
+				E1F2A3B62EC99001003A77C7 /* ffmpeg */,
+				E1F2A3B72EC99001003A77C7 /* ffprobe */,
+			);
+			name = "Vendored Binaries";
 			sourceTree = "<group>";
 		};
 		E1F2A3A72EC99000003A77C7 /* Frameworks */ = {
@@ -183,6 +206,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1F2A3B82EC99001003A77C7 /* ffmpeg in Resources */,
+				E1F2A3B92EC99001003A77C7 /* ffprobe in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
