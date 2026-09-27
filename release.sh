@@ -4,7 +4,9 @@
 # Usage: ./release.sh <version> [--allow-red-ci] [--generated-notes]
 #   e.g. ./release.sh 1.2.0
 #
-# Requires: xcodebuild, hdiutil, gh (GitHub CLI), git
+# Requires: xcodebuild, hdiutil, gh (GitHub CLI), git, codesign, xcrun, curl,
+#   and python3 with dmgbuild; preflight checks each. prune-deployments (mrk's
+#   bin/) is used, when on PATH, to prune the Pages deployments.
 
 set -euo pipefail
 
