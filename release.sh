@@ -678,21 +678,21 @@ else
 fi
 
 # ── Remove old Pages deployments ─────────────────────────────────────────────
+# Delegated to prune-deployments (mrk's bin/, on PATH) rather than kept as a
+# copy here, as mrk-push does. The copy this replaced deleted every deployment
+# but the newest, which is wrong precisely when this runs: the push above has
+# just started a Pages deployment, so the newest can still be queued, building
+# or failed while the one serving the site is the older, successful one it then
+# deleted — taking the published pages offline until the new build finished, or
+# indefinitely if it failed. prune-deployments always protects the most recent
+# successful deployment and keeps ten, as the repo-standards skill asks. The
+# release is published by now, so a missing tool or a failed prune is reported
+# rather than failing the run.
 step "Removing old Pages deployments"
-ALL_DEPLOY_IDS=$(gh api "repos/$REPO/deployments?environment=github-pages&per_page=100" \
-    --jq '.[].id')
-OLD_DEPLOY_IDS=$(echo "$ALL_DEPLOY_IDS" | tail -n +2)
-if [[ -z "$OLD_DEPLOY_IDS" ]]; then
-    ok "No old deployments to remove"
-else
-    COUNT=0
-    while IFS= read -r deploy_id; do
-        gh api -X POST "repos/$REPO/deployments/${deploy_id}/statuses" \
-            -f state=inactive --silent 2>/dev/null || true
-        gh api -X DELETE "repos/$REPO/deployments/${deploy_id}" --silent 2>/dev/null || true
-        COUNT=$((COUNT + 1))
-    done <<< "$OLD_DEPLOY_IDS"
-    ok "Removed $COUNT old deployment(s)"
+if ! command -v prune-deployments &>/dev/null; then
+    warn "prune-deployments is not on PATH (it ships in mrk's bin/) — Pages deployments were not pruned"
+elif ! prune-deployments --repo "$REPO" --keep 10; then
+    warn "Pruning Pages deployments reported errors — the release itself is published"
 fi
 
 # ── Clean up temp files ───────────────────────────────────────────────────────
