@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
-# ClipHack, FilmStrip, KeyVault, Magic Backup Machine). Keep the copies
-# byte-identical: scripts/check-shared.sh compares them and a release preflight
-# fails when they drift. Anything app-specific belongs in that repo's
+# ClipHack, FilmStrip, KeyVault, Magic Backup Machine, Barkeep). Keep the
+# copies byte-identical: scripts/check-shared.sh compares them and a release
+# preflight fails when they drift. Anything app-specific belongs in that repo's
 # release.sh, not here.
 #
 # Reports files that are meant to be identical across the sibling repos but
@@ -32,7 +32,7 @@
 set -euo pipefail
 
 MARKER="Shared verbatim across the sibling app repos"
-SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack FilmStrip KeyVault "Magic Backup Machine")
+SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack FilmStrip KeyVault "Magic Backup Machine" Barkeep)
 
 # The repo this copy belongs to, found from the script's own location rather
 # than the working directory, so running it from inside another repo still
