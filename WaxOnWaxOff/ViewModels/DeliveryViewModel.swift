@@ -331,7 +331,8 @@ final class DeliveryViewModel {
 
         if let reason = DiskSpaceChecker.waxOffBatchBlockedReason(
             inputURLs: readyFiles.map(\.url),
-            outputDirectories: outputDirectories
+            outputDirectories: outputDirectories,
+            concurrentJobs: ProcessingConfig.deliveryConcurrency
         ) {
             alertMessage = reason
             return
