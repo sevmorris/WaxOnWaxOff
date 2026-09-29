@@ -515,6 +515,59 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "no deferred verification may run after cancellation")
     }
 
+    /// Cancelling during "Normalizing…" leaves no temp WAV behind. The cleanup
+    /// used to be registered only after the render returned, so a render that
+    /// was cancelled — or failed — part-way left ffmpeg's partial file in the
+    /// app's temp folder until the app quit.
+    func testCancelDuringRenderLeavesNoTempWAV() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "cancel_render.wav",
+            durationSeconds: 30.0, sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .wav
+        settings.outputDirectoryPath = workDir.path
+
+        // The render's temp file is named after the delivered stem, which no
+        // other test shares.
+        let tempDir = FileManager.waxonTempDirectory
+        let stem = DeliveryProcessor.deliveredStem(forSource: input, targetLUFS: settings.targetLUFS)
+        func tempWAVs() -> [String] {
+            ((try? FileManager.default.contentsOfDirectory(atPath: tempDir.path)) ?? [])
+                .filter { $0.hasPrefix(stem + ".") && $0.hasSuffix(".wav") }
+        }
+
+        let task = Task {
+            try await DeliveryProcessor().run(
+                inputs: [DeliveryJobInput(id: UUID(), url: input)],
+                settings: settings
+            )
+        }
+
+        // Cancel once the render has started writing, so there is a partial
+        // file to leak — the temp WAV only exists during the render.
+        let deadline = Date().addingTimeInterval(60)
+        while tempWAVs().isEmpty {
+            guard Date() < deadline else {
+                task.cancel()
+                _ = try? await task.value
+                return XCTFail("the render never started writing its temp WAV")
+            }
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("expected CancellationError from a cancel during the render")
+        } catch is CancellationError {
+            // expected
+        }
+        XCTAssertEqual(tempWAVs(), [], "a cancelled render must not leave its temp WAV behind")
+    }
+
     /// Mixed-outcome batch: one input that fails outright, sat between two good
     /// ones. Pins three things the all-success and cancellation tests above do
     /// not reach. The failure aggregates into `failures` without tearing down

@@ -324,6 +324,14 @@ actor DeliveryProcessor {
         let wavTempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).wav")
         let wavFinalURL = outputDir.appendingPathComponent("\(outputStem).wav")
 
+        // Ensure wavTempURL is cleaned up on all exit paths — a render that fails
+        // or is cancelled part-way (ffmpeg leaves what it had written), MP3-only
+        // mode (where it is the source for encodeMP3), and WAV+Both mode (where it
+        // was already moved to wavFinalURL so removeItem is a benign no-op).
+        // Registered before the render, not after it: a partial file left by a
+        // throwing render would otherwise stay in temp until the app quit.
+        defer { try? FileManager.default.removeItem(at: wavTempURL) }
+
         let normalizationType = try await renderWAV(
             ffmpeg: ffmpeg,
             input: url,
@@ -364,11 +372,6 @@ actor DeliveryProcessor {
         guard FileManager.default.fileExists(atPath: wavTempURL.path) else {
             throw DeliveryError.outputNotCreated
         }
-
-        // Ensure wavTempURL is cleaned up on all exit paths — including MP3-only
-        // mode (where it is the source for encodeMP3) and WAV+Both mode (where it
-        // was already moved to wavFinalURL so removeItem is a benign no-op).
-        defer { try? FileManager.default.removeItem(at: wavTempURL) }
 
         var outputURLs: [URL] = []
 
