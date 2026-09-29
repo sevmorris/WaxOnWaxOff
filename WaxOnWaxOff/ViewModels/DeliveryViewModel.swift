@@ -38,8 +38,18 @@ final class DeliveryViewModel {
     var presetStore: WaxOffPresetStore
     var log = ProcessingLog()
 
-    private var processingTask: Task<Void, Never>?
+    /// Readable so a test can await a cancelled batch's unwind.
+    private(set) var processingTask: Task<Void, Never>?
     private var processingCancelled = false
+    /// The batch that owns the processing state, nil when none does.
+    ///
+    /// `cancelProcessing()` resets that state at once, but the cancelled task
+    /// goes on unwinding, and Cancel is replaced in place by Process — so a
+    /// double-click starts the next batch before the last one has finished.
+    /// Its end-of-run handling used to land on the new batch: `isProcessing`
+    /// false and `processingTask` nil while it rendered, with no Cancel and no
+    /// readout. A task now finishes the batch only if it still owns it.
+    private var currentBatch: UUID?
 
     var files: [FileItem] {
         get { fileQueue.files }
@@ -331,7 +341,8 @@ final class DeliveryViewModel {
 
         if let reason = DiskSpaceChecker.waxOffBatchBlockedReason(
             inputURLs: readyFiles.map(\.url),
-            outputDirectories: outputDirectories
+            outputDirectories: outputDirectories,
+            concurrentJobs: ProcessingConfig.deliveryConcurrency
         ) {
             alertMessage = reason
             return
@@ -343,6 +354,8 @@ final class DeliveryViewModel {
         log.clear()
         fileQueue.snapshotReadyStats()
 
+        let batchID = UUID()
+        currentBatch = batchID
         let currentSettings = settings
         let inputs = readyFiles.map { DeliveryJobInput(id: $0.id, url: $0.url, metadata: $0.metadata) }
 
@@ -420,6 +433,7 @@ final class DeliveryViewModel {
                     }
                 )
 
+                guard currentBatch == batchID else { return }
                 fileQueue.restoreProcessingRows()
 
                 let partials = batch.successes.filter { $0.mp3FailureMessage != nil }
@@ -437,12 +451,17 @@ final class DeliveryViewModel {
             } catch is CancellationError {
                 // User cancelled — cancelProcessing() already restored row state
             } catch {
+                guard currentBatch == batchID else { return }
                 logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
                 log.append("✗ \(error.localizedDescription)", level: .info)
                 fileQueue.restoreProcessingRows()
                 alertMessage = "Processing failed. Select the console button at the top right of the waveform area to see the details."
             }
 
+            // A cancelled batch lands here too, after cancelProcessing() has
+            // already done this — and possibly after the next batch started.
+            guard currentBatch == batchID else { return }
+            currentBatch = nil
             isProcessing = false
             isVerifying = false
             verificationsCompleted = nil
@@ -456,6 +475,7 @@ final class DeliveryViewModel {
 
     func cancelProcessing() {
         processingCancelled = true
+        currentBatch = nil
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false

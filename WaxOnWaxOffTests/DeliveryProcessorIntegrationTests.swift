@@ -515,6 +515,59 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
                       "no deferred verification may run after cancellation")
     }
 
+    /// Cancelling during "Normalizing…" leaves no temp WAV behind. The cleanup
+    /// used to be registered only after the render returned, so a render that
+    /// was cancelled — or failed — part-way left ffmpeg's partial file in the
+    /// app's temp folder until the app quit.
+    func testCancelDuringRenderLeavesNoTempWAV() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "cancel_render.wav",
+            durationSeconds: 30.0, sampleRate: 44100
+        )
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .wav
+        settings.outputDirectoryPath = workDir.path
+
+        // The render's temp file is named after the delivered stem, which no
+        // other test shares.
+        let tempDir = FileManager.waxonTempDirectory
+        let stem = DeliveryProcessor.deliveredStem(forSource: input, targetLUFS: settings.targetLUFS)
+        func tempWAVs() -> [String] {
+            ((try? FileManager.default.contentsOfDirectory(atPath: tempDir.path)) ?? [])
+                .filter { $0.hasPrefix(stem + ".") && $0.hasSuffix(".wav") }
+        }
+
+        let task = Task {
+            try await DeliveryProcessor().run(
+                inputs: [DeliveryJobInput(id: UUID(), url: input)],
+                settings: settings
+            )
+        }
+
+        // Cancel once the render has started writing, so there is a partial
+        // file to leak — the temp WAV only exists during the render.
+        let deadline = Date().addingTimeInterval(60)
+        while tempWAVs().isEmpty {
+            guard Date() < deadline else {
+                task.cancel()
+                _ = try? await task.value
+                return XCTFail("the render never started writing its temp WAV")
+            }
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("expected CancellationError from a cancel during the render")
+        } catch is CancellationError {
+            // expected
+        }
+        XCTAssertEqual(tempWAVs(), [], "a cancelled render must not leave its temp WAV behind")
+    }
+
     /// Mixed-outcome batch: one input that fails outright, sat between two good
     /// ones. Pins three things the all-success and cancellation tests above do
     /// not reach. The failure aggregates into `failures` without tearing down
@@ -769,6 +822,49 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
 
         let wavChannels = try await channelCount(ffprobe: tools.ffprobe, of: wav)
         XCTAssertEqual(wavChannels, 2, "a stereo source must remain stereo regardless of the mono-delivery setting")
+    }
+
+    /// (d) A source with more than two channels fails on its own: WaxOff takes
+    /// mono or stereo voice recordings only. Nothing is written for it, in the
+    /// output folder or in temp, and the rest of the batch still delivers.
+    func testSourceWithMoreThanTwoChannelsFailsThatFileOnly() async throws {
+        let tools = try XCTUnwrap(tools)
+        let sixChannel = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "six_channel.wav",
+            durationSeconds: 4.0, sampleRate: 48000, channels: 6
+        )
+        let twoChannel = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "two_channel.wav",
+            durationSeconds: 4.0, sampleRate: 44100, channels: 2
+        )
+        let rejected = DeliveryJobInput(id: UUID(), url: sixChannel)
+        let accepted = DeliveryJobInput(id: UUID(), url: twoChannel)
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .both
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(inputs: [rejected, accepted], settings: settings)
+
+        XCTAssertEqual(result.failures.count, 1, "only the six-channel file may fail")
+        let failure = try XCTUnwrap(result.failures.first)
+        XCTAssertEqual(failure.id, rejected.id)
+        XCTAssertEqual(failure.message, "The file has 6 channels. WaxOff accepts mono or stereo sources.")
+
+        XCTAssertEqual(result.successes.count, 1, "the stereo file in the same batch must still deliver")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertEqual(job.id, accepted.id)
+        XCTAssertEqual(job.outputURLs.count, 2)
+        for url in job.outputURLs {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "\(url.lastPathComponent) missing")
+        }
+
+        // Every output and temp file is named after the delivered stem.
+        let rejectedStem = DeliveryProcessor.deliveredStem(forSource: sixChannel, targetLUFS: settings.targetLUFS)
+        let outputs = try FileManager.default.contentsOfDirectory(atPath: workDir.path)
+        XCTAssertEqual(outputs.filter { $0.hasPrefix(rejectedStem) }, [], "no output for the rejected file")
+        let temps = (try? FileManager.default.contentsOfDirectory(atPath: FileManager.waxonTempDirectory.path)) ?? []
+        XCTAssertEqual(temps.filter { $0.hasPrefix(rejectedStem) }, [], "no temp file for the rejected file")
     }
 
     // MARK: -

@@ -21,8 +21,19 @@ final class ContentViewModel {
     private var pendingWaxonFiles: [URL] = []
     var presetStore: WaxOnPresetStore
     var log = ProcessingLog()
-    private var processingTask: Task<Void, Never>?
+    /// Readable so a test can await a cancelled batch's unwind.
+    private(set) var processingTask: Task<Void, Never>?
     private var processingCancelled = false
+    /// The batch that owns the processing state, nil when none does.
+    ///
+    /// `cancelProcessing()` resets that state at once, but the cancelled task
+    /// goes on unwinding, and Cancel is replaced in place by Process — so a
+    /// double-click starts the next batch before the last one has finished.
+    /// Its end-of-run handling used to land on the new batch: `isProcessing`
+    /// false and `processingTask` nil while it rendered, which hid Cancel and
+    /// left nothing able to stop it. A task now finishes the batch only if it
+    /// still owns it.
+    private var currentBatch: UUID?
 
     var files: [FileItem] {
         get { fileQueue.files }
@@ -196,6 +207,8 @@ final class ContentViewModel {
         log.clear()
         fileQueue.snapshotReadyStats()
 
+        let batchID = UUID()
+        currentBatch = batchID
         let currentSettings = settings
 
         // `[self]` states what the Task already did implicitly: it holds the view
@@ -236,6 +249,7 @@ final class ContentViewModel {
                     })
                 let batch = try await processor.run(inputs: inputs)
 
+                guard currentBatch == batchID else { return }
                 fileQueue.restoreProcessingRows()
 
                 if batch.failures.isEmpty {
@@ -249,12 +263,17 @@ final class ContentViewModel {
             } catch is CancellationError {
                 // User cancelled — cancelProcessing() already restored row state
             } catch {
+                guard currentBatch == batchID else { return }
                 logger.error("Processing failed: \(error.localizedDescription, privacy: .public)")
                 log.append("✗ \(error.localizedDescription)", level: .info)
                 fileQueue.restoreProcessingRows()
                 alertMessage = "Processing failed. Select the console button at the top right of the waveform area to see the details."
             }
 
+            // A cancelled batch lands here too, after cancelProcessing() has
+            // already done this — and possibly after the next batch started.
+            guard currentBatch == batchID else { return }
+            currentBatch = nil
             isProcessing = false
             processingTask = nil
         }
@@ -262,6 +281,7 @@ final class ContentViewModel {
 
     func cancelProcessing() {
         processingCancelled = true
+        currentBatch = nil
         processingTask?.cancel()
         processingTask = nil
         isProcessing = false

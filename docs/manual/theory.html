@@ -990,7 +990,7 @@
   <section id="analysis-vs-processing">
     <h2>Analysis vs Processing</h2>
 
-    <p>The file stats panel (RMS, Peak, ISP (est.), Crest, LUFS, FLOOR) and the FFmpeg processing pipeline both implement ITU-R BS.1770 concepts, but they are separate code paths and are not guaranteed to match exactly.</p>
+    <p>The file stats panel (RMS, Peak, Crest, LUFS, FLOOR) and the FFmpeg processing pipeline both implement ITU-R BS.1770 concepts, but they are separate code paths and are not guaranteed to match exactly.</p>
 
     <h3>Stats Panel: Native Analyzer</h3>
     <p>When you drop a file into WaxOn or WaxOff, the app analyzes it with an in-process Swift implementation (<code>AudioAnalyzer</code>): K-weighting coefficients computed via the bilinear transform at the file's sample rate, 400 ms / 75%-overlap gating for LUFS, and the 10th-percentile noise-floor estimate described in <a href="#noise-floor">Noise Floor Estimation</a>. This runs once at load time and costs no extra FFmpeg passes. The analyzer and the waveform view are vectorized with Accelerate/vDSP, and the post-processing refresh (stats plus output waveform for a rendered file) is fed from a single decode of that file.</p>
@@ -1148,7 +1148,7 @@
     </ul>
 
     <h3>Multichannel Input (&gt;2 channels)</h3>
-    <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output on sources with more than two channels downmixes to two channels via FFmpeg's default matrix; a mono source is duplicated into both channels. A warning is logged.</p>
+    <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output on sources with more than two channels downmixes to two channels via FFmpeg's default matrix; a mono source is duplicated into both channels. A warning is logged. WaxOff accepts only mono or stereo sources: a file with more than two channels fails with an error, and the rest of the batch continues.</p>
 
     
 

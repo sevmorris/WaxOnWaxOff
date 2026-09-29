@@ -245,8 +245,8 @@ enum AudioAnalyzer {
 }
 
 /// vDSP-accelerated engine for the stats analysis: BS.1770 K-weighting via two
-/// cascaded biquads, 400 ms / 75%-overlap gating blocks, sample +
-/// 2×-interpolated peak, mono RMS, and HP-filtered noise-floor blocks. Filters
+/// cascaded biquads, 400 ms / 75%-overlap gating blocks, sample peak,
+/// mono RMS, and HP-filtered noise-floor blocks. Filters
 /// run through vDSP_deq22D with an explicit two-sample history carried across
 /// chunks (zero-initialized); energy sums use vDSP_svesqD per hop/block segment
 /// so gating boundaries land on exact frame counts.
@@ -269,7 +269,6 @@ private struct VDSPAnalysisAccumulator {
     private var monoF: [Float]
     private var monoD: [Double]
     private var nfBuf: [Double]
-    private var mids: [Double]
 
     // Gating state — identical semantics to the scalar engine.
     private let hopFrames: Int
@@ -286,7 +285,6 @@ private struct VDSPAnalysisAccumulator {
 
     private var sumSquares: Double = 0
     private var peak: Double = 0
-    private var truePeak: Double = 0
     private(set) var totalFrames: Int = 0
 
     init(format: AVAudioFormat, noiseFloorHighPassHz: Double, chunkCapacity: Int) {
@@ -307,7 +305,6 @@ private struct VDSPAnalysisAccumulator {
         monoF = [Float](repeating: 0, count: chunkCapacity)
         monoD = [Double](repeating: 0, count: padded)
         nfBuf = [Double](repeating: 0, count: padded)
-        mids = [Double](repeating: 0, count: chunkCapacity)
 
         hopFrames = max(1, Int((sr * 0.1).rounded()))
         hopChannelSumSq = [Double](repeating: 0, count: channels)
@@ -335,21 +332,6 @@ private struct VDSPAnalysisAccumulator {
                 var chunkPeak = 0.0
                 vDSP_maxmgvD(x.baseAddress! + 2, 1, &chunkPeak, count)
                 peak = max(peak, chunkPeak)
-                truePeak = max(truePeak, chunkPeak)
-
-                // ISP estimate: midpoints of adjacent samples, including the
-                // chunk-boundary pair via the history slot. Before any history
-                // exists the slot is zero and its phantom midpoint is ≤ |x[0]|/2,
-                // which can never exceed the sample peak already tracked — so it
-                // matches the scalar engine's hasLastSample skip.
-                mids.withUnsafeMutableBufferPointer { m in
-                    vDSP_vaddD(x.baseAddress! + 1, 1, x.baseAddress! + 2, 1, m.baseAddress!, 1, count)
-                    var half = 0.5
-                    vDSP_vsmulD(m.baseAddress!, 1, &half, m.baseAddress!, 1, count)
-                    var midPeak = 0.0
-                    vDSP_maxmgvD(m.baseAddress!, 1, &midPeak, count)
-                    truePeak = max(truePeak, midPeak)
-                }
             }
 
             // Stage 1 pre-filter, then stage 2 RLB weighting. y1's history
@@ -486,7 +468,6 @@ private struct VDSPAnalysisAccumulator {
         let rms = sqrt(sumSquares / Double(totalFrames))
         let rmsDb = 20 * log10(max(rms, 1e-12))
         let peakDb = 20 * log10(max(peak, 1e-12))
-        let truePeakDb = 20 * log10(max(truePeak, 1e-12))
         let crestDb = peakDb - rmsDb
         let lufs = AudioAnalyzer.computeGatedLUFS(blockEnergies: blockLoudnessEnergies)
 
@@ -508,8 +489,7 @@ private struct VDSPAnalysisAccumulator {
             peak: peakDb,
             crest: crestDb,
             lufs: lufs,
-            noiseFloor: noiseFloor,
-            truePeak: truePeakDb
+            noiseFloor: noiseFloor
         )
     }
 }

@@ -13,10 +13,10 @@ enum DiskSpaceChecker {
     /// If stages are added to AudioProcessor, update this multiplier to match.
     private static let waxOnTempMultiplier: Int64 = 3
 
-    /// WaxOff holds at most two temp files per job: (1) wavTempURL — the normalized WAV
-    /// before it is moved to the final location, and (2) mp3TempURL — the encoded MP3 temp
-    /// (only present when MP3 output is requested). If stages are added to DeliveryProcessor,
-    /// update this multiplier to match.
+    /// WaxOff holds at most two temp files per concurrent job: (1) wavTempURL — the
+    /// normalized WAV before it is moved to the final location, and (2) mp3TempURL — the
+    /// encoded MP3 temp (only present when MP3 output is requested). If stages are added
+    /// to DeliveryProcessor, update this multiplier to match.
     private static let waxOffTempMultiplier: Int64 = 2
 
     static func waxOnBatchBlockedReason(
@@ -63,7 +63,8 @@ enum DiskSpaceChecker {
 
     static func waxOffBatchBlockedReason(
         inputURLs: [URL],
-        outputDirectories: [URL]
+        outputDirectories: [URL],
+        concurrentJobs: Int
     ) -> String? {
         guard !inputURLs.isEmpty else { return nil }
 
@@ -71,7 +72,13 @@ enum DiskSpaceChecker {
         guard decodedSizes.contains(where: { $0 > 0 }) else { return nil }
 
         let largestDecoded = decodedSizes.max() ?? 0
-        let tempRequired = largestDecoded * waxOffTempMultiplier + tempHeadroomBytes
+        let workers = max(1, min(concurrentJobs, inputURLs.count))
+
+        // The temp WAV is stereo even for a mono source — the dual-mono upmix runs
+        // before loudnorm — so the temp estimate counts every source at stereo size
+        // or more. The output estimate below keeps the source's own size.
+        let largestTemp = inputURLs.map { decodedPCMBytes(for: $0, minimumChannels: 2) }.max() ?? 0
+        let tempRequired = largestTemp * waxOffTempMultiplier * Int64(workers) + tempHeadroomBytes
         if let reason = insufficientSpaceReason(
             requiredBytes: tempRequired,
             at: FileManager.waxonTempDirectory,
@@ -132,9 +139,12 @@ enum DiskSpaceChecker {
     /// This gives an accurate size regardless of input container/codec (e.g., a
     /// 64 kbps MP3 decodes to ~17× its container size). Falls back to the
     /// container file size if AVAudioFile cannot open the URL.
-    private static func decodedPCMBytes(for url: URL) -> Int64 {
+    ///
+    /// `minimumChannels` counts a source with fewer channels as having that many,
+    /// for an estimate of what gets written rather than of the source itself.
+    private static func decodedPCMBytes(for url: URL, minimumChannels: Int64 = 1) -> Int64 {
         if let file = try? AVAudioFile(forReading: url) {
-            let channels = Int64(max(1, file.processingFormat.channelCount))
+            let channels = max(minimumChannels, Int64(file.processingFormat.channelCount))
             let frames = file.length
             if frames > 0 {
                 return frames * 3 * channels

@@ -181,6 +181,7 @@ struct HelpView: View {
 
                 section("Supported Formats") {
                     text("WAV, AIFF, AIF, AIFC, MP3, FLAC, M4A, CAF, AAC, MP4, MOV.")
+                    text("WaxOff accepts mono or stereo sources. WaxOff shows an error for a file that has more than two channels.")
                     text("All processing uses FFmpeg. FFmpeg is included in the app. You do not install it separately.")
                 }
 

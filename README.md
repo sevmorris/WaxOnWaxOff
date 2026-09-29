@@ -87,7 +87,7 @@ Either way you get the same notarized build. Requires macOS 14.0+ on Apple Silic
 
 ## Operational Specifications
 * **Waveform Audit:** Real-time waveform preview with dB scaling.
-* **Metadata Stats:** RMS, Peak, ISP (est.), Crest Factor, Integrated LUFS, and Floor estimation.
+* **Metadata Stats:** RMS, Peak, Crest Factor, Integrated LUFS, and Floor estimation.
 * **Concurrency:** Adaptive batch processing — scales with available CPU cores.
 * **Environment:** macOS 14.0+ (Sonoma) on **Apple Silicon (M-series) Macs** (arm64). Intel Macs are not supported.
 * **Dependencies:** Bundled FFmpeg; no external installation required.

@@ -165,10 +165,9 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 ok "Working tree clean"
 
-# Resolve the tracked remote/branch so this works from any branch (e.g. a
-# worktree branch whose name differs from its upstream). Fall back to
-# `origin` + current branch when no upstream is configured; `-u` sets it
-# on first push so subsequent runs resolve cleanly.
+# Resolve the tracked remote/branch. Fall back to `origin` + current branch
+# when no upstream is configured; `-u` sets it on first push so subsequent
+# runs resolve cleanly.
 if UPSTREAM=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null); then
     REMOTE="${UPSTREAM%%/*}"
     BRANCH="${UPSTREAM#*/}"
@@ -176,6 +175,18 @@ else
     REMOTE="origin"
     BRANCH=$(git branch --show-current)
 fi
+
+# Releases are cut from main, and only from main. Work happens on branches
+# that reach main when the owner merges them, and a release from one of those
+# would publish unmerged code as "latest" — its pull request's CI run is green
+# for the same SHA, so the CI gate below would not stop it. Both the branch
+# checked out and the branch the push lands on have to be main: a session
+# branch that tracks main would otherwise push its own commits straight onto it.
+CURRENT_BRANCH=$(git branch --show-current)
+if [[ "$CURRENT_BRANCH" != "main" || "$BRANCH" != "main" ]]; then
+    fail "Releases are cut from main only — HEAD is on '${CURRENT_BRANCH:-a detached HEAD}' and would push to $REMOTE/$BRANCH. Switch to main and re-run"
+fi
+ok "Releasing from main"
 
 # The remote's tags are the record, not this clone's. A clone that has not seen
 # a release — made on another Mac, or one whose tag push failed — passes a

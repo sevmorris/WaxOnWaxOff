@@ -256,6 +256,11 @@ actor DeliveryProcessor {
         // Probe source duration for proportional ffmpeg timeouts (FFmpegRunner.effectiveTimeoutSeconds).
         let fileDuration = await probeFileDuration(ffprobe: tools.ffprobe, url: url)
         let channelCount = await probeChannelCount(ffprobe: tools.ffprobe, url: url)
+        // WaxOff takes voice recordings, which are mono or stereo. A source with
+        // more channels fails here, on its own, before anything is written for it.
+        if let channelCount, channelCount > 2 {
+            throw DeliveryError.tooManyChannels(channelCount)
+        }
         let isMono = channelCount == 1
         // True single-channel delivery only when the source is itself mono and the user
         // opted in. For mono delivery there is no dual-mono pair to create the +3 LU
@@ -324,6 +329,14 @@ actor DeliveryProcessor {
         let wavTempURL = FileManager.waxonTempDirectory.appendingPathComponent("\(outputStem).\(UUID().uuidString.prefix(8)).wav")
         let wavFinalURL = outputDir.appendingPathComponent("\(outputStem).wav")
 
+        // Ensure wavTempURL is cleaned up on all exit paths — a render that fails
+        // or is cancelled part-way (ffmpeg leaves what it had written), MP3-only
+        // mode (where it is the source for encodeMP3), and WAV+Both mode (where it
+        // was already moved to wavFinalURL so removeItem is a benign no-op).
+        // Registered before the render, not after it: a partial file left by a
+        // throwing render would otherwise stay in temp until the app quit.
+        defer { try? FileManager.default.removeItem(at: wavTempURL) }
+
         let normalizationType = try await renderWAV(
             ffmpeg: ffmpeg,
             input: url,
@@ -365,15 +378,9 @@ actor DeliveryProcessor {
             throw DeliveryError.outputNotCreated
         }
 
-        // Ensure wavTempURL is cleaned up on all exit paths — including MP3-only
-        // mode (where it is the source for encodeMP3) and WAV+Both mode (where it
-        // was already moved to wavFinalURL so removeItem is a benign no-op).
-        defer { try? FileManager.default.removeItem(at: wavTempURL) }
-
         var outputURLs: [URL] = []
 
         if settings.outputMode == .wav || settings.outputMode == .both {
-            try? FileManager.default.removeItem(at: wavFinalURL)
             try FileManager.moveAtomically(at: wavTempURL, to: wavFinalURL)
             // wavTempURL is now gone (moved or deleted after cross-volume copy); defer is a no-op
             outputURLs.append(wavFinalURL)
@@ -417,7 +424,6 @@ actor DeliveryProcessor {
                     throw DeliveryError.encodingFailed("MP3 file was not created")
                 }
 
-                try? FileManager.default.removeItem(at: mp3FinalURL)
                 try FileManager.moveAtomically(at: mp3TempURL, to: mp3FinalURL)
                 outputURLs.append(mp3FinalURL)
                 onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)
@@ -918,11 +924,14 @@ enum DeliveryError: Error, LocalizedError {
     case outputNotCreated
     case processingFailed(String)
     case encodingFailed(String)
+    case tooManyChannels(Int)
 
     var errorDescription: String? {
         switch self {
         case .outputNotCreated:
             return "WaxOff did not create the output file."
+        case .tooManyChannels(let count):
+            return "The file has \(count) channels. WaxOff accepts mono or stereo sources."
         case .processingFailed(let msg):
             return "The processing failed. \(msg)"
         case .encodingFailed(let msg):
