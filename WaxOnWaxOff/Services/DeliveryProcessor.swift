@@ -263,6 +263,10 @@ actor DeliveryProcessor {
         // rather than applied and undone. A stereo source ignores the setting outright.
         let deliverMono = isMono && settings.monoDelivery
         let upmixToStereo = isMono && !deliverMono
+        // A source with more than two channels (5.1 from a video, say) is folded to
+        // stereo before loudnorm, in both passes, so what gets measured is what ships.
+        // Folding it down after the limiter instead left the delivery ~9 LU under target.
+        let downmixToStereo = (channelCount ?? 0) > 2
         let outputChannelCount = deliverMono ? 1 : 2
         if deliverMono { onLog?("  mono delivery: single channel (dual-mono upmix skipped)", .verbose) }
 
@@ -283,7 +287,7 @@ actor DeliveryProcessor {
         onPhase?("Analyzing loudness…")
         try Task.checkCancellation()
         onLog?("  loudnorm: analyzing…", .verbose)
-        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, upmixToStereo: upmixToStereo, fileDuration: fileDuration)
+        let measurements = try await analyzeAudio(ffmpeg: ffmpeg, input: url, settings: settings, upmixToStereo: upmixToStereo, downmixToStereo: downmixToStereo, fileDuration: fileDuration)
         if let m = measurements {
             onLog?("  \(m.formattedSummary)", .info)
             onLog?(String(format: "  offset: %.2f dB  |  thresh %.1f LUFS", m.targetOffset, m.inputThresh), .verbose)
@@ -338,6 +342,7 @@ actor DeliveryProcessor {
             output: wavTempURL,
             settings: settings,
             upmixToStereo: upmixToStereo,
+            downmixToStereo: downmixToStereo,
             outputChannelCount: outputChannelCount,
             measurements: measurements,
             fileDuration: fileDuration
@@ -513,6 +518,7 @@ actor DeliveryProcessor {
         input: URL,
         settings: WaxOffSettings,
         upmixToStereo: Bool,
+        downmixToStereo: Bool,
         fileDuration: TimeInterval?
     ) async throws -> LoudnormMeasurements? {
         let lufs = Self.formatNumber(settings.targetLUFS)
@@ -521,10 +527,13 @@ actor DeliveryProcessor {
         // A mono source delivered as stereo is upmixed to dual-mono first so loudnorm
         // measures the stereo signal — matching what renderWAV will produce. (Skipped
         // for true mono delivery, where both passes operate on the native single channel.)
+        // A source with more than two channels is downmixed to stereo first, for the
+        // same reason, using FFmpeg's default matrix.
         // Phase rotation runs next so loudnorm's TP measurement reflects the post-rotation
         // waveform; without that the pass-2 gain correction overshoots target.
-        let upmix = upmixToStereo ? "pan=stereo|c0=c0|c1=c0," : ""
-        let filterChain = "\(upmix)allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
+        let channelMix = upmixToStereo ? "pan=stereo|c0=c0|c1=c0,"
+            : downmixToStereo ? "aformat=channel_layouts=stereo," : ""
+        let filterChain = "\(channelMix)allpass=f=200:t=q:w=0.707,loudnorm=I=\(lufs):TP=\(tp):LRA=\(lra):print_format=json"
 
         let args = [
             "-hide_banner", "-nostats", "-y",
@@ -653,6 +662,7 @@ actor DeliveryProcessor {
         output: URL,
         settings: WaxOffSettings,
         upmixToStereo: Bool,
+        downmixToStereo: Bool,
         outputChannelCount: Int,
         measurements: LoudnormMeasurements?,
         fileDuration: TimeInterval?
@@ -660,10 +670,13 @@ actor DeliveryProcessor {
         // A mono source delivered as stereo is upmixed to dual-mono first — matching the
         // analyzeAudio filter chain so measured_I / offset remain valid for the stereo
         // signal. (Skipped for true mono delivery; both passes then use the native channel.)
+        // A source with more than two channels is downmixed to stereo here, matching
+        // analyzeAudio the same way.
         // Phase rotation always runs. Loudnorm only runs when measurements
         // are available — silent inputs skip it to avoid pass-2 errors.
-        let upmix = upmixToStereo ? "pan=stereo|c0=c0|c1=c0," : ""
-        var filterChain = "\(upmix)allpass=f=200:t=q:w=0.707"
+        let channelMix = upmixToStereo ? "pan=stereo|c0=c0|c1=c0,"
+            : downmixToStereo ? "aformat=channel_layouts=stereo," : ""
+        var filterChain = "\(channelMix)allpass=f=200:t=q:w=0.707"
         // NOTE: loudnorm pass-2 runs at the source file's native sample rate — no pre-loudnorm
         // resample in this filter chain. If you add one here, update analyzeAudio to apply the
         // same resample before its pass-1 analysis so measured_I / offset remain valid.
@@ -692,7 +705,7 @@ actor DeliveryProcessor {
         filterChain += ",alimiter=limit=\(limitAmp):attack=5:release=50:level=disabled"
         filterChain += ",\(FFmpegFilters.aresample(to: settings.sampleRate))"
 
-        let args = [
+        var args = [
             "-hide_banner", "-nostats", "-y",
             "-i", input.path, "-map", "0:a:0",
             "-af", filterChain,
@@ -701,8 +714,14 @@ actor DeliveryProcessor {
             // graphs is to strip global metadata; a podcast delivery workflow
             // usually wants it preserved.
             "-map_metadata", "0",
-            "-ar", String(settings.sampleRate),
-            "-ac", String(outputChannelCount),
+            "-ar", String(settings.sampleRate)
+        ]
+        // A downmixed source already leaves the chain as stereo. `-ac` is what
+        // used to fold it down, after the limiter, so it has no place there.
+        if !downmixToStereo {
+            args += ["-ac", String(outputChannelCount)]
+        }
+        args += [
             "-c:a", "pcm_s24le",
             "-f", "wav",
             output.path
