@@ -376,7 +376,6 @@ actor DeliveryProcessor {
         var outputURLs: [URL] = []
 
         if settings.outputMode == .wav || settings.outputMode == .both {
-            try? FileManager.default.removeItem(at: wavFinalURL)
             try FileManager.moveAtomically(at: wavTempURL, to: wavFinalURL)
             // wavTempURL is now gone (moved or deleted after cross-volume copy); defer is a no-op
             outputURLs.append(wavFinalURL)
@@ -420,7 +419,6 @@ actor DeliveryProcessor {
                     throw DeliveryError.encodingFailed("MP3 file was not created")
                 }
 
-                try? FileManager.default.removeItem(at: mp3FinalURL)
                 try FileManager.moveAtomically(at: mp3TempURL, to: mp3FinalURL)
                 outputURLs.append(mp3FinalURL)
                 onLog?("✓ \(mp3FinalURL.lastPathComponent)", .info)

@@ -297,7 +297,6 @@ actor AudioProcessor {
             throw ProcessingError.outputMissing
         }
 
-        try? fm.removeItem(at: finalURL)
         try FileManager.moveAtomically(at: tmpURL, to: finalURL)
 
         onLog?("✓ \(outName)", .info)

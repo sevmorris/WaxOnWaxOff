@@ -20,13 +20,14 @@ extension FileManager {
     /// Moves `source` to `destination`, guaranteeing no partial file is left at
     /// `destination` if the transfer fails mid-way.
     ///
-    /// Same-volume: delegates to `moveItem`, which is an atomic rename. Different
-    /// volumes (external drive, secondary disk): copies `source` to a dot-prefixed
-    /// UUID temp inside the destination directory (same volume as `destination`),
-    /// then atomically renames that temp into place. The destination-side temp is
-    /// removed before any error propagates. The caller must remove any pre-existing
-    /// file at `destination` before calling — `moveItem` fails if the destination
-    /// already exists.
+    /// Same-volume: an atomic rename. Different volumes (external drive, secondary
+    /// disk): copies `source` to a dot-prefixed UUID temp inside the destination
+    /// directory (same volume as `destination`), then atomically renames that temp
+    /// into place. The destination-side temp is removed before any error propagates.
+    ///
+    /// A file already at `destination` is overwritten, but only in that final step:
+    /// it is swapped out by `replaceItemAt` rather than removed ahead of the move, so
+    /// a transfer that fails leaves it exactly as it was instead of leaving nothing.
     nonisolated static func moveAtomically(at source: URL, to destination: URL) throws {
         let dstDir = destination.deletingLastPathComponent()
         let srcVol = try? source.resourceValues(forKeys: [.volumeIdentifierKey]).volumeIdentifier
@@ -38,7 +39,7 @@ extension FileManager {
             sameVolume = true  // can't determine volumes — fall back to plain rename
         }
         if sameVolume {
-            try FileManager.default.moveItem(at: source, to: destination)
+            try place(source, at: destination)
         } else {
             // Copy to a hidden temp in the destination directory so the final rename
             // is same-volume and atomic. Clean up the temp on any failure.
@@ -47,12 +48,23 @@ extension FileManager {
             let dstTemp = dstDir.appendingPathComponent(".\(UUID().uuidString)\(suffix)")
             do {
                 try FileManager.default.copyItem(at: source, to: dstTemp)
-                try FileManager.default.moveItem(at: dstTemp, to: destination)
+                try place(dstTemp, at: destination)
             } catch {
                 try? FileManager.default.removeItem(at: dstTemp)
                 throw error
             }
             try? FileManager.default.removeItem(at: source)
+        }
+    }
+
+    /// The final step of `moveAtomically`: a rename when `destination` is free, an
+    /// atomic replace when something is already there. The replace keeps only the
+    /// new file's metadata, as removing the old file and moving the new one did.
+    private nonisolated static func place(_ item: URL, at destination: URL) throws {
+        if FileManager.default.fileExists(atPath: destination.path) {
+            _ = try FileManager.default.replaceItemAt(destination, withItemAt: item, options: .usingNewMetadataOnly)
+        } else {
+            try FileManager.default.moveItem(at: item, to: destination)
         }
     }
 }
