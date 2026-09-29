@@ -2,7 +2,7 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
-## [Unreleased]
+## [2.14.0] — 2026-09-29
 
 **Changed**
 - **WaxOff accepts mono or stereo sources only.** A file with more than two channels now fails with an error in its row, and the rest of the batch continues. Before, WaxOff processed such a file and folded it down to stereo after the limiter, so the delivered file was far below the target loudness. The manual, the theory page and the in-app Help now give the limit.
