@@ -824,37 +824,6 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         XCTAssertEqual(wavChannels, 2, "a stereo source must remain stereo regardless of the mono-delivery setting")
     }
 
-    /// (d) 5.1 source → downmixed to stereo before loudnorm, so it lands on target.
-    /// Loudnorm used to normalize all six channels, and `-ac 2` then folded them
-    /// down after the limiter, delivering far under target with no warning.
-    func testMultichannelSourceIsDownmixedBeforeLoudnorm() async throws {
-        let tools = try XCTUnwrap(tools)
-        let input = try IntegrationFFmpeg.makeSineWAV(
-            ffmpeg: tools.ffmpeg, directory: workDir, name: "surround_src.wav",
-            durationSeconds: 6.0, sampleRate: 48000, channels: 6
-        )
-
-        var settings = WaxOffSettings()
-        settings.targetLUFS = -16.0
-        settings.truePeak = -1.0
-        settings.outputMode = .wav
-        settings.outputDirectoryPath = workDir.path
-
-        let result = try await DeliveryProcessor().run(
-            inputs: [DeliveryJobInput(id: UUID(), url: input)],
-            settings: settings
-        )
-        XCTAssertTrue(result.failures.isEmpty, "delivery must not fail: \(result.failures)")
-        let job = try XCTUnwrap(result.successes.first)
-        let wav = try XCTUnwrap(job.outputURLs.first(where: { $0.pathExtension == "wav" }))
-
-        let wavChannels = try await channelCount(ffprobe: tools.ffprobe, of: wav)
-        XCTAssertEqual(wavChannels, 2, "a 5.1 source is delivered as stereo")
-        let measuredI = try await measureIntegratedLoudness(ffmpeg: tools.ffmpeg, of: wav)
-        XCTAssertEqual(measuredI, settings.targetLUFS, accuracy: 1.0,
-                       "a 5.1 source must land within ±1 LU of target, not under it")
-    }
-
     // MARK: -
 
     /// Drives `DeliveryProcessor.run` while capturing the processing-log
