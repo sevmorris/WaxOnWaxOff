@@ -62,6 +62,24 @@ enum IntegrationFFmpeg {
         }
     }
 
+    /// How many running processes carry `path` in their command line. A batch's
+    /// ffmpeg and ffprobe runs all name their input, so this counts what a
+    /// batch working on files under `path` still has running.
+    static func processCount(mentioning path: String) throws -> Int {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-axo", "command="]
+        let out = Pipe()
+        process.standardOutput = out
+        try process.run()
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return String(decoding: data, as: UTF8.self)
+            .split(separator: "\n")
+            .filter { $0.contains(path) }
+            .count
+    }
+
     private static func projectRoot() -> URL {
         let testsDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         return testsDir.deletingLastPathComponent()

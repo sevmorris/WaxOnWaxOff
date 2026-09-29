@@ -132,6 +132,40 @@ final class DeliveryViewModelRestartWindowTests: XCTestCase {
         }
     }
 
+    /// Cancel, then Process in the same turn — a double-click on Cancel, which
+    /// the toolbar replaces in place with Process. The cancelled batch finishes
+    /// unwinding after the new one has started, and its cleanup used to reset
+    /// `isProcessing` and `processingTask` underneath it: the new batch went on
+    /// rendering with the toolbar offering Process and nothing able to cancel it.
+    func testCancelledBatchCleanupLeavesTheNextBatchAlone() async throws {
+        let vm = try makeViewModel(named: ["a", "b"], durationSeconds: 120)
+
+        vm.process()
+        let deadline = Date().addingTimeInterval(60)
+        while !vm.files.contains(where: { $0.status == .processing }) {
+            guard Date() < deadline else { return XCTFail("the first batch never started a file") }
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        let first = try XCTUnwrap(vm.processingTask)
+
+        vm.cancelProcessing()
+        vm.process()
+        XCTAssertTrue(vm.isProcessing, "the second press must start a batch")
+
+        // Let the cancelled batch finish unwinding, cleanup included.
+        _ = await first.value
+
+        XCTAssertTrue(vm.isProcessing, "the cancelled batch's cleanup must not end the new batch")
+        XCTAssertEqual(vm.toolbarState, .delivering)
+        let second = try XCTUnwrap(vm.processingTask, "the new batch must still be cancellable")
+
+        vm.cancelProcessing()
+        _ = await second.value
+        XCTAssertFalse(vm.isProcessing)
+        XCTAssertEqual(try IntegrationFFmpeg.processCount(mentioning: workDir.path), 0,
+                       "cancelling the new batch must leave no ffmpeg running")
+    }
+
     // MARK: - Fixtures
 
     /// A view model holding real, already-analysed inputs, so `process()` runs a
@@ -141,21 +175,21 @@ final class DeliveryViewModelRestartWindowTests: XCTestCase {
     /// output lands there, which would hang the run. Changing the settings saves
     /// them, so the view model gets a store of its own. Without one, this saved
     /// a temp folder as the output folder in the developer's real settings.
-    private func makeViewModel(named names: [String]) throws -> DeliveryViewModel {
+    private func makeViewModel(named names: [String], durationSeconds: Double = 3.0) throws -> DeliveryViewModel {
         let vm = DeliveryViewModel(defaults: scratch.defaults)
         vm.settings.outputDirectoryPath = workDir.path
         vm.settings.outputMode = .wav
-        vm.files = try names.map { try makeReadyItem(named: $0) }
+        vm.files = try names.map { try makeReadyItem(named: $0, durationSeconds: durationSeconds) }
         return vm
     }
 
-    private func makeReadyItem(named name: String) throws -> FileItem {
+    private func makeReadyItem(named name: String, durationSeconds: Double = 3.0) throws -> FileItem {
         let tools = try IntegrationFFmpeg.locate()
         let url = try IntegrationFFmpeg.makeSineWAV(
             ffmpeg: tools.ffmpeg,
             directory: workDir,
             name: "\(name).wav",
-            durationSeconds: 3.0,
+            durationSeconds: durationSeconds,
             sampleRate: 44100
         )
         var item = FileItem(url: url)
@@ -165,7 +199,7 @@ final class DeliveryViewModelRestartWindowTests: XCTestCase {
         item.status = .ready(AudioStats(rms: -20, peak: -3, crest: 17, lufs: -20))
         item.fileInfo = FileInfo(
             format: "wav", sampleRate: 44100, channelCount: 1,
-            bitDepth: 16, duration: 3.0, bitRate: nil
+            bitDepth: 16, duration: durationSeconds, bitRate: nil
         )
         return item
     }
