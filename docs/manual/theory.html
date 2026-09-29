@@ -1148,7 +1148,7 @@
     </ul>
 
     <h3>Multichannel Input (&gt;2 channels)</h3>
-    <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output on sources with more than two channels downmixes to two channels via FFmpeg's default matrix; a mono source is duplicated into both channels. A warning is logged.</p>
+    <p>WaxOn mono output on sources with more than two channels (5.1, 7.1, ambisonic) uses FFmpeg's default mono downmix rather than left/right channel pick — so center dialogue on surround stems is not accidentally discarded. A warning is logged. Stereo output on sources with more than two channels downmixes to two channels via FFmpeg's default matrix; a mono source is duplicated into both channels. A warning is logged. WaxOff accepts only mono or stereo sources: a file with more than two channels fails with an error, and the rest of the batch continues.</p>
 
     
 
