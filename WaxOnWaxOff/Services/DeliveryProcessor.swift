@@ -256,6 +256,11 @@ actor DeliveryProcessor {
         // Probe source duration for proportional ffmpeg timeouts (FFmpegRunner.effectiveTimeoutSeconds).
         let fileDuration = await probeFileDuration(ffprobe: tools.ffprobe, url: url)
         let channelCount = await probeChannelCount(ffprobe: tools.ffprobe, url: url)
+        // WaxOff takes voice recordings, which are mono or stereo. A source with
+        // more channels fails here, on its own, before anything is written for it.
+        if let channelCount, channelCount > 2 {
+            throw DeliveryError.tooManyChannels(channelCount)
+        }
         let isMono = channelCount == 1
         // True single-channel delivery only when the source is itself mono and the user
         // opted in. For mono delivery there is no dual-mono pair to create the +3 LU
@@ -919,11 +924,14 @@ enum DeliveryError: Error, LocalizedError {
     case outputNotCreated
     case processingFailed(String)
     case encodingFailed(String)
+    case tooManyChannels(Int)
 
     var errorDescription: String? {
         switch self {
         case .outputNotCreated:
             return "WaxOff did not create the output file."
+        case .tooManyChannels(let count):
+            return "The file has \(count) channels. WaxOff accepts mono or stereo sources."
         case .processingFailed(let msg):
             return "The processing failed. \(msg)"
         case .encodingFailed(let msg):

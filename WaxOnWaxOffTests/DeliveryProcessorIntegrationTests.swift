@@ -824,6 +824,49 @@ final class DeliveryProcessorIntegrationTests: XCTestCase {
         XCTAssertEqual(wavChannels, 2, "a stereo source must remain stereo regardless of the mono-delivery setting")
     }
 
+    /// (d) A source with more than two channels fails on its own: WaxOff takes
+    /// mono or stereo voice recordings only. Nothing is written for it, in the
+    /// output folder or in temp, and the rest of the batch still delivers.
+    func testSourceWithMoreThanTwoChannelsFailsThatFileOnly() async throws {
+        let tools = try XCTUnwrap(tools)
+        let sixChannel = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "six_channel.wav",
+            durationSeconds: 4.0, sampleRate: 48000, channels: 6
+        )
+        let twoChannel = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "two_channel.wav",
+            durationSeconds: 4.0, sampleRate: 44100, channels: 2
+        )
+        let rejected = DeliveryJobInput(id: UUID(), url: sixChannel)
+        let accepted = DeliveryJobInput(id: UUID(), url: twoChannel)
+
+        var settings = WaxOffSettings()
+        settings.outputMode = .both
+        settings.outputDirectoryPath = workDir.path
+
+        let result = try await DeliveryProcessor().run(inputs: [rejected, accepted], settings: settings)
+
+        XCTAssertEqual(result.failures.count, 1, "only the six-channel file may fail")
+        let failure = try XCTUnwrap(result.failures.first)
+        XCTAssertEqual(failure.id, rejected.id)
+        XCTAssertEqual(failure.message, "The file has 6 channels. WaxOff accepts mono or stereo sources.")
+
+        XCTAssertEqual(result.successes.count, 1, "the stereo file in the same batch must still deliver")
+        let job = try XCTUnwrap(result.successes.first)
+        XCTAssertEqual(job.id, accepted.id)
+        XCTAssertEqual(job.outputURLs.count, 2)
+        for url in job.outputURLs {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "\(url.lastPathComponent) missing")
+        }
+
+        // Every output and temp file is named after the delivered stem.
+        let rejectedStem = DeliveryProcessor.deliveredStem(forSource: sixChannel, targetLUFS: settings.targetLUFS)
+        let outputs = try FileManager.default.contentsOfDirectory(atPath: workDir.path)
+        XCTAssertEqual(outputs.filter { $0.hasPrefix(rejectedStem) }, [], "no output for the rejected file")
+        let temps = (try? FileManager.default.contentsOfDirectory(atPath: FileManager.waxonTempDirectory.path)) ?? []
+        XCTAssertEqual(temps.filter { $0.hasPrefix(rejectedStem) }, [], "no temp file for the rejected file")
+    }
+
     // MARK: -
 
     /// Drives `DeliveryProcessor.run` while capturing the processing-log
