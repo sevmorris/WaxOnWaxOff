@@ -13,15 +13,6 @@ struct AudioStats: Equatable, Sendable {
     let rms: Double
     /// Sample peak (dBFS) — max absolute sample value.
     let peak: Double
-    /// Inter-sample peak *lower bound* from 2× linear interpolation between
-    /// adjacent samples. This is NOT a BS.1770-compliant true-peak measurement
-    /// (which requires 4× polyphase oversampling); a linear midpoint can
-    /// significantly underestimate true peak on near-Nyquist content. Use the
-    /// `measured_TP` value FFmpeg's loudnorm prints to the processing log for
-    /// a broadcast-accurate number. Surfaced in the UI as "ISP (est.)" only
-    /// when this estimate exceeds the sample peak — i.e., when there is
-    /// detectable energy between samples.
-    let truePeak: Double
     let crest: Double
     let lufs: Double
     /// Estimated noise floor in dBFS (10th percentile of block RMS values).
@@ -33,22 +24,13 @@ struct AudioStats: Equatable, Sendable {
         peak: Double,
         crest: Double,
         lufs: Double,
-        noiseFloor: Double? = nil,
-        truePeak: Double? = nil
+        noiseFloor: Double? = nil
     ) {
         self.rms = rms
         self.peak = peak
-        self.truePeak = truePeak ?? peak
         self.crest = crest
         self.lufs = lufs
         self.noiseFloor = noiseFloor
-    }
-
-    /// True when the 2× linear ISP estimate exceeds the sample peak by a
-    /// visible margin — a hint that inter-sample peaks may be present.
-    /// Lower bound only; real true peak may be higher than this estimate.
-    var hasElevatedTruePeak: Bool {
-        truePeak > peak + 0.1
     }
 }
 

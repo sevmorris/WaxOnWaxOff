@@ -56,11 +56,6 @@ struct FileInfoStatsView: View {
                 statBlock("PEAK", stats.map { String(format: "%.1f dBFS", $0.peak) } ?? "---",
                           valueColor: stats.map { peakColor($0.peak) } ?? .primary,
                           help: "Sample peak (max absolute sample). Orange ≥ −3 dBFS; red ≥ 0 dBFS.")
-                if let s = stats, s.hasElevatedTruePeak {
-                    statBlock("ISP (est.)", String(format: "%.1f dBFS", s.truePeak),
-                              valueColor: peakColor(s.truePeak),
-                              help: "Inter-sample peak lower bound from 2× linear interpolation. NOT a BS.1770 true peak — the real true peak may be higher. For broadcast-accurate TP, see the “measured” line in the Console after processing.")
-                }
                 statBlock("CREST", stats.map { String(format: "%.1f dB",   $0.crest) } ?? "---")
                 statBlock(showingOutput ? "LUFS" : "LUFS (src)", stats.map { String(format: "%.1f", $0.lufs) } ?? "---",
                           help: showingOutput
