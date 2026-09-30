@@ -8,9 +8,6 @@
   <br />
   <a href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.14.0.dmg"><strong>Download Latest (DMG)</strong></a>
   <br />
-  or <code>brew install --cask sevmorris/tap/waxonwaxoff</code>
-  <br />
-  <br />
   <a href="https://sevmorris.github.io/WaxOnWaxOff/">App Page</a>
   ·
   <a href="https://sevmorris.github.io/WaxOnWaxOff/manual/">Manual</a>
