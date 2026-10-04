@@ -70,7 +70,7 @@ Download the notarized DMG from the link above, open it, and drag **WaxOn/WaxOff
 
 Updates come from the app itself: it checks GitHub for a new version at launch and from **Help → Check for Updates…**. Its **Download** button gets the new DMG, which installs the same way.
 
-Requires macOS 15.0+ on Apple Silicon.
+Requires macOS 15.0+ on Apple Silicon. On macOS 14 (Sonoma), use [WaxOn/WaxOff 2.14.1](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/v2.14.1), the last version for it.
 
 ---
 
