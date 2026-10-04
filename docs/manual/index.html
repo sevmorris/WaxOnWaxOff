@@ -190,8 +190,7 @@
       border-radius: 3px;
       border: 1px solid var(--border);
       /* SF Mono ligates `--` into a single long dash. Copying a command still
-         yields two hyphens, but anyone typing what they see gets it wrong —
-         and the Homebrew commands in Installation are meant to be typed. */
+         yields two hyphens, but anyone typing what they see gets it wrong. */
       font-variant-ligatures: none;
     }
 
@@ -432,7 +431,7 @@
 <nav>
   <div class="nav-brand">
     <span>WaxOn/WaxOff</span>
-    <small>Manual — v2.14.0</small>
+    <small>Manual — v2.14.1</small>
   </div>
   <a class="section-head" href="#">Overview</a>
   <a href="#overview">Introduction</a>
@@ -468,7 +467,7 @@
     <p>Podcast audio utility for macOS. Signal conditioning for ingest and broadcast normalization for delivery.</p>
     <p style="margin-top:10px; font-size:0.95rem;"><strong>WaxOn</strong> prepares raw recordings for ingest. <strong>WaxOff</strong> finalizes your mixed audio for distribution. Both share the same drag-and-drop workflow, waveform viewer, and file stats panel.</p>
     <div class="hero-actions">
-      <a class="btn btn-primary" href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.14.0.dmg">Download v2.14.0</a>
+      <a class="btn btn-primary" href="https://github.com/sevmorris/WaxOnWaxOff/releases/latest/download/WaxOnWaxOff-v2.14.1.dmg">Download v2.14.1</a>
       <a class="btn btn-secondary" href="https://github.com/sevmorris/WaxOnWaxOff">GitHub</a>
       <a class="btn btn-secondary" href="theory.html">Theory of Operation →</a>
     </div>
@@ -485,21 +484,19 @@
       <li>FFmpeg is included in the app. You do not install it separately.</li>
     </ul>
 
-    <h3>Installation</h3>
+    <h3 id="installation">Installation</h3>
     <ol>
       <li>Download the DMG file from the link above.</li>
       <li>Open the DMG file.</li>
       <li>Drag <strong>WaxOn/WaxOff</strong> to your Applications folder.</li>
     </ol>
 
-
     <h3>First Launch: Mode Picker</h3>
     <p>A mode picker appears when you start the app for the first time. Choose <strong>WaxOn</strong> to prepare your raw recordings. Choose <strong>WaxOff</strong> to complete a mix. The app then remembers your last mode and opens in that mode. You can change the mode at any time with the <strong>WaxOn | WaxOff</strong> control in the toolbar. Each mode keeps its own file list. A change of mode does not disturb your work in the other mode.</p>
 
     <h3>Updates</h3>
     <p>WaxOn/WaxOff looks for updates when it starts. It tells you when a new version is available. You can also look for updates at any time. Select <strong>Help → Check for Updates…</strong></p>
-    <p>The <strong>Download</strong> button in that message gets the DMG file. It does not install the file for you. If you installed the app with Homebrew, use Homebrew to update it instead. Use this command:</p>
-    <pre><code>brew upgrade --cask waxonwaxoff</code></pre>
+    <p>The <strong>Download</strong> button in that message gets the DMG file. It does not install the file for you. To install the update, quit WaxOn/WaxOff. Then do the steps in <a href="#installation">Installation</a> with the new DMG file.</p>
   </section>
 
   <!-- Interface -->
