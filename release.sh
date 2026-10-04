@@ -459,6 +459,14 @@ BUILT_VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersi
     fail "App version mismatch: expected $VERSION, got $BUILT_VERSION"
 ok "App reports $BUILT_VERSION"
 
+# The macOS this release needs, read from the app as built, for the notes'
+# "Requires macOS" line and the update check's marker below. Read here, before
+# notarizing, so a build without it stops before anything leaves the machine.
+MIN_MACOS=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)
+[[ "$MIN_MACOS" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] \
+    || fail "Built app has no usable LSMinimumSystemVersion ('${MIN_MACOS}') — the release notes and the update check need it"
+ok "Requires macOS $MIN_MACOS"
+
 # ── Notarize app ──────────────────────────────────────────────────────────────
 step "Notarizing app"
 # Stapling the DMG alone leaves the app unstapled once it is dragged out, which
@@ -638,6 +646,14 @@ ok "Pushed $TAG to $REMOTE/$BRANCH"
 
 # ── GitHub release ────────────────────────────────────────────────────────────
 step "Creating GitHub release"
+# Every release says which macOS it needs: a line people read, and a marker the
+# app's update check reads, which GitHub does not render. A Mac below it is told
+# so instead of being offered a DMG whose app will not open there.
+REQUIRES_FOOTER="
+
+---
+Requires macOS ${MIN_MACOS} or later.
+<!-- minimum-macos: ${MIN_MACOS} -->"
 # A curated description at release-notes/v<version>.md wins over the generated
 # commit list. Use it when the release needs prose the log can't produce —
 # licensing notes, a known-gap disclosure, an explanation of what changed and
@@ -651,7 +667,7 @@ if [[ -f "$NOTES_FILE" ]]; then
     gh release create "$TAG" "$DMG" \
         --repo "$REPO" \
         --title "WaxOn/WaxOff $TAG" \
-        --notes-file "$NOTES_FILE"
+        --notes "$(<"$NOTES_FILE")${REQUIRES_FOOTER}"
 else
     # App tags only: the ffmpeg-deps-* tags are cut at main's head whenever a
     # deps build is published, and one newer than the last release would
@@ -674,7 +690,7 @@ ${CHANGES}"
     gh release create "$TAG" "$DMG" \
         --repo "$REPO" \
         --title "WaxOn/WaxOff $TAG" \
-        --notes "$RELEASE_NOTES"
+        --notes "${RELEASE_NOTES}${REQUIRES_FOOTER}"
 fi
 ok "Release published"
 
