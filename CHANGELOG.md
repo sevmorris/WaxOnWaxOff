@@ -2,6 +2,15 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.15.0] — 2026-10-04
+
+**Changed**
+- **WaxOn/WaxOff now requires macOS 15 (Sequoia) or later.** It ran on macOS 14 until now. GitHub no longer offers macOS 14 to test on, so nothing could check WaxOn/WaxOff there any more. On an older Mac, keep 2.14.1: from that version on, the update check sees that this release needs macOS 15 and doesn't offer it.
+
+**Developer**
+- The deployment target is 15.0 in every configuration, and the README, landing page and manual say macOS 15 (Sequoia) or later.
+- The manual's Updates section says what Check for Updates… does with a release that needs a newer macOS than the Mac has.
+
 ## [2.14.1] — 2026-10-04
 
 **Changed**
