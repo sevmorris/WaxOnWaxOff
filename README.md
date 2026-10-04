@@ -78,7 +78,7 @@ Upgrade the same way you installed — `brew upgrade --cask waxonwaxoff`. The ap
 
 Download from the link above, open it, and drag **WaxOn/WaxOff** to your Applications folder.
 
-Either way you get the same notarized build. Requires macOS 14.0+ on Apple Silicon; the cask declares both, so Homebrew refuses rather than installing an app that cannot launch.
+Either way you get the same notarized build. Requires macOS 15.0+ on Apple Silicon.
 
 ---
 
@@ -86,7 +86,7 @@ Either way you get the same notarized build. Requires macOS 14.0+ on Apple Silic
 * **Waveform Audit:** Real-time waveform preview with dB scaling.
 * **Metadata Stats:** RMS, Peak, Crest Factor, Integrated LUFS, and Floor estimation.
 * **Concurrency:** Adaptive batch processing — scales with available CPU cores.
-* **Environment:** macOS 14.0+ (Sonoma) on **Apple Silicon (M-series) Macs** (arm64). Intel Macs are not supported.
+* **Environment:** macOS 15.0+ (Sequoia) on **Apple Silicon (M-series) Macs** (arm64). Intel Macs are not supported.
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
 ### Security model
