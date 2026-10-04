@@ -70,7 +70,7 @@ Download the notarized DMG from the link above, open it, and drag **WaxOn/WaxOff
 
 Updates come from the app itself: it checks GitHub for a new version at launch and from **Help → Check for Updates…**. Its **Download** button gets the new DMG, which installs the same way.
 
-Requires macOS 14.0+ on Apple Silicon.
+Requires macOS 15.0+ on Apple Silicon.
 
 ---
 
@@ -78,7 +78,7 @@ Requires macOS 14.0+ on Apple Silicon.
 * **Waveform Audit:** Real-time waveform preview with dB scaling.
 * **Metadata Stats:** RMS, Peak, Crest Factor, Integrated LUFS, and Floor estimation.
 * **Concurrency:** Adaptive batch processing — scales with available CPU cores.
-* **Environment:** macOS 14.0+ (Sonoma) on **Apple Silicon (M-series) Macs** (arm64). Intel Macs are not supported.
+* **Environment:** macOS 15.0+ (Sequoia) on **Apple Silicon (M-series) Macs** (arm64). Intel Macs are not supported.
 * **Dependencies:** Bundled FFmpeg; no external installation required.
 
 ### Security model
