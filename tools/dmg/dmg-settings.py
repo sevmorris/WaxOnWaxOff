@@ -1,8 +1,8 @@
 # Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
-# ClipHack, FilmStrip, KeyVault, Magic Backup Machine, Barkeep). Keep the
-# copies byte-identical: scripts/check-shared.sh compares them and a release
-# preflight fails when they drift. Anything app-specific belongs in that repo's
-# release.sh, not here.
+# ClipHack, FilmStrip, KeyVault, Magic Backup Machine, Barkeep, PasswordGen).
+# Keep the copies byte-identical: scripts/check-shared.sh compares them and a
+# release preflight fails when they drift. Anything app-specific belongs in
+# that repo's release.sh, not here.
 #
 # dmgbuild settings for an app's installer window.
 #
