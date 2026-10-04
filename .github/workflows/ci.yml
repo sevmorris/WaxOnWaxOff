@@ -41,10 +41,24 @@ jobs:
     # FFmpeg binaries aborted at launch under macOS 26.7's dyld (no LC_UUID)
     # while this job stayed green. The integration tests exec the bundled
     # binaries, so that class of failure turns this leg red.
+    #
+    # xcode-27 because releases are built with Xcode 27 on the owner's Mac, and
+    # the 26.3 legs never compile what ships: the macOS 27 SDK and Swift 6.4.
+    # Its image is macOS 27, the OS users move to next. GitHub calls it a public
+    # preview, with no uptime promise.
+    #
+    # macos-15 is the oldest image left: GitHub retires macos-14 on 2026-11-02,
+    # which ended the job that ran the bundled FFmpeg at the deployment target.
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, macos-26]
+        include:
+          - os: macos-15
+            xcode: '26.3'
+          - os: macos-26
+            xcode: '26.3'
+          - os: xcode-27
+            xcode: '27.0'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -53,7 +67,7 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           # Floor is Swift 6.2 — SE-0371 nonisolated deinit, load-bearing since 8d4f0ae; 16.4 ships Swift 6.1.
-          xcode-version: '26.3'
+          xcode-version: ${{ matrix.xcode }}
 
       - name: Fetch FFmpeg
         run: ./scripts/fetch-ffmpeg.sh
@@ -66,29 +80,3 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS,arch=arm64' \
             test
-
-  ffmpeg-deployment-floor:
-    # The app cannot be built or tested on macOS 14 (Xcode 26 needs 15.6+), but
-    # the bundled FFmpeg can be run there, and it is the part not covered by
-    # Swift's availability checking. Exercises the same pieces the app relies
-    # on: the libmp3lame encoder, the oversampling resampler, loudnorm, ffprobe.
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Fetch FFmpeg
-        run: ./scripts/fetch-ffmpeg.sh
-
-      - name: Run bundled binaries at the deployment target
-        run: |
-          set -euo pipefail
-          sw_vers
-          cd WaxOnWaxOff
-          ./ffmpeg -hide_banner -version
-          ./ffprobe -hide_banner -version
-          ./ffmpeg -nostdin -hide_banner -loglevel error -y \
-            -f lavfi -i "sine=frequency=440:duration=5:sample_rate=44100" \
-            -af "aresample=88200:filter_size=512:cutoff=0.97:phase_shift=10,loudnorm=I=-16:TP=-1:LRA=11,aresample=44100:filter_size=512:cutoff=0.97:phase_shift=10" \
-            -ac 2 -c:a libmp3lame -b:a 128k "$RUNNER_TEMP/floor.mp3"
-          ./ffprobe -v error -show_entries stream=codec_name,sample_rate,channels \
-            -of default=nw=1 "$RUNNER_TEMP/floor.mp3"
