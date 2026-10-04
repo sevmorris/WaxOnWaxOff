@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # release.sh — Build, verify, package, and publish a WaxOn/WaxOff release.
 #
-# Usage: ./release.sh <version> [--allow-red-ci] [--generated-notes]
+# Usage: ./release.sh <version> [--allow-red-ci] [--generated-notes] [--skip-tests]
 #   e.g. ./release.sh 1.2.0
 #
 # Requires: xcodebuild, hdiutil, gh (GitHub CLI), git, codesign, xcrun, curl,
@@ -24,22 +24,26 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool}"
 # flag — still fails with usage, as it did before the flags existed.
 ALLOW_RED_CI=0
 ALLOW_GENERATED_NOTES=0
+SKIP_TESTS=0
 ARGS=()
 for arg in "$@"; do
     case "$arg" in
         --allow-red-ci)    ALLOW_RED_CI=1 ;;
         --generated-notes) ALLOW_GENERATED_NOTES=1 ;;
+        --skip-tests)      SKIP_TESTS=1 ;;
         *)                 ARGS+=("$arg") ;;
     esac
 done
 
 if [[ ${#ARGS[@]} -ne 1 ]]; then
-    echo "Usage: $0 <version> [--allow-red-ci] [--generated-notes]"
+    echo "Usage: $0 <version> [--allow-red-ci] [--generated-notes] [--skip-tests]"
     echo "  e.g. $0 1.2.0"
     echo ""
     echo "  --allow-red-ci     Release even when CI is not green for HEAD."
     echo "  --generated-notes  Release without a curated release-notes file,"
     echo "                     generating notes from commit subjects instead."
+    echo "  --skip-tests       Skip the test suite (not recommended; use only when"
+    echo "                     tests are known-broken and you need an emergency release)."
     exit 1
 fi
 
@@ -57,6 +61,7 @@ MOUNT="/tmp/waxon_verify_${VERSION}"
 MANUAL_IDX="$PROJECT_DIR/docs/manual/index.html"
 LANDING_IDX="$PROJECT_DIR/docs/index.html"
 NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
+TEST_LOG="/tmp/waxon_test_${VERSION}.log"
 
 # Set once project.pbxproj has been rewritten in place and cleared once that
 # rewrite is committed. While it is 1 the working tree carries an uncommitted
@@ -105,6 +110,7 @@ cleanup() {
     [[ -d "${DERIVED_DATA:-}" ]] && rm -rf -- "$DERIVED_DATA" || true
     [[ -f "${DMG:-}" ]]          && rm -f  -- "$DMG"          || true
     [[ -f "${APP_ZIP:-}" ]]      && rm -f  -- "$APP_ZIP"      || true
+    [[ -f "${TEST_LOG:-}" ]]     && rm -f  -- "$TEST_LOG"     || true
 }
 # A zsh EXIT trap does not fire on a signal, so Ctrl-C or a closed terminal
 # during the long notarization wait used to leave the version bump sitting in
@@ -342,6 +348,34 @@ else
     ok "$CI_URL"
 fi
 
+# ── Tests ─────────────────────────────────────────────────────────────────────
+# CI proves the commit green on Xcode 26.3 and on the xcode-27 runner. This runs
+# the suite with the Xcode on this Mac, the one that builds the release, which
+# CI cannot vouch for. FilmStrip's step, with its escape hatch.
+#
+# The integration tests exec the bundled FFmpeg, so its fetch moved up here from
+# after the version bump. Both stay ahead of the bump, like every gate above: a
+# failure here leaves nothing committed and nothing to undo.
+step "Fetching FFmpeg binaries"
+chmod +x "$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
+"$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
+ok "FFmpeg present"
+
+step "Running unit tests"
+if (( SKIP_TESTS )); then
+    warn "Skipping tests (--skip-tests)"
+else
+    if ! xcodebuild test \
+        -project "$PROJECT" \
+        -scheme "$SCHEME" \
+        -destination 'platform=macOS,arch=arm64' \
+        -quiet > "$TEST_LOG" 2>&1; then
+        cat "$TEST_LOG" >&2
+        fail "Tests failed — fix before releasing, or pass --skip-tests for an emergency release"
+    fi
+    ok "Tests passed"
+fi
+
 # ── Version bump ──────────────────────────────────────────────────────────────
 step "Bumping version to $VERSION"
 # project.pbxproj carries MARKETING_VERSION once per build configuration. Taking
@@ -383,11 +417,6 @@ NEXT_BUILD=$((BUILD_NUM + 1))
 sed -i '' "s/CURRENT_PROJECT_VERSION = ${BUILD_NUM};/CURRENT_PROJECT_VERSION = ${NEXT_BUILD};/g" \
     "$PROJECT/project.pbxproj"
 ok "Build number ${BUILD_NUM} → ${NEXT_BUILD} (commit deferred until after notarization)"
-
-step "Fetching FFmpeg binaries"
-chmod +x "$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
-"$PROJECT_DIR/scripts/fetch-ffmpeg.sh"
-ok "FFmpeg present"
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 step "Building (clean, Release)"
