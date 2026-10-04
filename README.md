@@ -66,19 +66,11 @@ The app runs in two stages that map onto the two moments in podcast production w
 
 ## Install
 
-**Homebrew**
+Download the notarized DMG from the link above, open it, and drag **WaxOn/WaxOff** to your Applications folder.
 
-```sh
-brew install --cask sevmorris/tap/waxonwaxoff
-```
+Updates come from the app itself: it checks GitHub for a new version at launch and from **Help → Check for Updates…**. Its **Download** button gets the new DMG, which installs the same way.
 
-Upgrade the same way you installed — `brew upgrade --cask waxonwaxoff`. The app also checks GitHub for new versions and offers a **Download** button, but that opens the DMG rather than installing it, so following it leaves Homebrew's records stale.
-
-**DMG**
-
-Download from the link above, open it, and drag **WaxOn/WaxOff** to your Applications folder.
-
-Either way you get the same notarized build. Requires macOS 14.0+ on Apple Silicon; the cask declares both, so Homebrew refuses rather than installing an app that cannot launch.
+Requires macOS 14.0+ on Apple Silicon.
 
 ---
 
