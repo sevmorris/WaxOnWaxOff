@@ -49,6 +49,17 @@ struct WaxOnSettings: Codable, Equatable, Sendable {
     }
 }
 
+extension WaxOnSettings {
+    /// What a preset holds: these settings less the output folder. Where the
+    /// files go is not part of a preset, so choosing one never moves them,
+    /// and choosing a folder never makes the settings differ from one.
+    var withoutOutputDirectory: WaxOnSettings {
+        var settings = self
+        settings.outputDirectoryPath = nil
+        return settings
+    }
+}
+
 // Custom decoder lives in an extension so the synthesized memberwise initializer
 // remains available. Any missing key falls back to the property default — adding
 // a new field to a persisted struct won't invalidate existing UserDefaults blobs.

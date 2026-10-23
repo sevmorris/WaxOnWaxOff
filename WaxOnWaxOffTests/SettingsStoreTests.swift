@@ -61,17 +61,15 @@ final class SettingsStoreTests: XCTestCase {
     }
 
     /// The path that reached the real settings at every launch and in every
-    /// test that built a view model: a selected preset is applied on init, and
-    /// applying it saves.
-    func testTheViewModelAppliesAndSavesTheSelectedPresetInItsOwnStore() {
+    /// test that built a view model: applying a preset saves, and so does every
+    /// change after it.
+    func testTheViewModelSavesAPresetAndItsChangesInItsOwnStore() {
         var settings = WaxOffSettings()
         settings.targetLUFS = -14
         settings.outputMode = .wav
-        let preset = WaxOffPreset(name: "Scratch", settings: settings)
-        WaxOffPresetStore(defaults: scratch.defaults).savePreset(preset)
-
         let vm = DeliveryViewModel(defaults: scratch.defaults)
-        XCTAssertEqual(vm.settings, settings)
+        vm.applyPreset(WaxOffPreset(name: "Scratch", settings: settings))
+        XCTAssertEqual(WaxOffSettings.load(from: scratch.defaults), settings)
 
         vm.settings.mp3Bitrate = 192
         XCTAssertEqual(WaxOffSettings.load(from: scratch.defaults), vm.settings)

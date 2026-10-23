@@ -126,7 +126,7 @@ struct HelpView: View {
                     text("Output: a 24-bit WAV file at the selected sample rate, an MP3 file, or both. The default is stereo. If you select Mono delivery for a mono source, the output has one channel.")
                 }
                 section("WaxOff — Settings") {
-                    definition("Preset", "A preset applies a saved group of settings with one click. The app includes three built-in presets. You can save your own presets from the Preset menu.")
+                    definition("Preset", "A preset applies a saved group of settings with one click. The app includes three built-in presets. You can save your own presets from the Preset menu. If you change a setting after you select a preset, the menu shows (Modified), and the app keeps your changes when you restart it. Select the preset again to go back to it. A preset does not include the output directory.")
                     definition("Sample Rate", "Select 44.1 kHz or 48 kHz for the output WAV file. WaxOff always encodes MP3 at 44.1 kHz. This setting has no effect on the MP3 file. The control is not available when Output is MP3 only.")
                     definition("Output", "Select WAV only, MP3 only, or both. The WAV file is always 24-bit PCM.")
                     definition("Channels", "Select Mono or Stereo delivery for mono sources. Stereo is the default. Stereo upmixes a mono source to dual-mono stereo. Mono delivers one channel. The control is available only when all the loaded sources are mono. WaxOff does not downmix a stereo source.")

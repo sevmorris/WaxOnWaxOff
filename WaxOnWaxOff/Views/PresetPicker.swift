@@ -44,12 +44,13 @@ struct WaxOffPresetPicker: View {
                     Image(systemName: "slider.horizontal.3")
                     Text(currentPresetName)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .frame(minWidth: 120, maxWidth: 200, alignment: .leading)
-            .help(currentPresetName)
+            .help(pickerHelp)
         }
         .sheet(isPresented: $showingSaveSheet) {
             SavePresetSheet(presetName: $newPresetName) {
@@ -66,8 +67,18 @@ struct WaxOffPresetPicker: View {
         }
     }
 
+    /// "(Modified)" is the part that has to survive a long name, so the
+    /// label truncates in the middle.
     private var currentPresetName: String {
-        viewModel.presetStore.selectedPreset?.name ?? "Custom"
+        guard let preset = viewModel.presetStore.selectedPreset else { return "Custom" }
+        return viewModel.presetIsModified ? "\(preset.name) (Modified)" : preset.name
+    }
+
+    private var pickerHelp: String {
+        guard let preset = viewModel.presetStore.selectedPreset else { return "Custom" }
+        return viewModel.presetIsModified
+            ? "The settings differ from \(preset.name). Choose it again to go back to it."
+            : preset.name
     }
 }
 

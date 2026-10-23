@@ -2,6 +2,14 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [Unreleased]
+
+**Fixed**
+- **A change made after choosing a preset is no longer lost when you restart the app.** WaxOn and WaxOff applied the selected preset again at every launch, which replaced every setting changed since you chose it. For example, after you chose a preset and then an output folder, the next launch put the folder back to the source folder. Now the app opens with the settings you last had. When they differ from the selected preset, the Preset menu shows the preset name followed by "(Modified)". Choosing the preset again goes back to it.
+
+**Changed**
+- **A preset no longer includes the output folder.** Choosing a preset leaves the output folder as it is, and choosing a folder does not count as a change to the preset. A preset you save or update no longer stores the folder. A custom preset saved before this change keeps the folder it stored, but the app ignores it. The manual and the in-app Help describe both changes.
+
 ## [2.15.0] — 2026-10-04
 
 **Changed**
