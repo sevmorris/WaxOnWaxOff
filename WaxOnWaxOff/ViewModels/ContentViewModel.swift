@@ -17,9 +17,8 @@ final class ContentViewModel {
     }
     /// Whether a batch sends each source to the Trash once its outputs are
     /// written. Kept out of `WaxOnSettings` on purpose: that struct is what a
-    /// preset stores and applies, and launching with a preset selected
-    /// re-applies it, so choosing a preset — or relaunching — would be what
-    /// starts or stops the app removing files.
+    /// preset stores and applies, so choosing a preset would be what starts
+    /// or stops the app removing files.
     var trashOriginals: Bool {
         didSet { defaults.set(trashOriginals, forKey: Self.trashOriginalsKey) }
     }
@@ -85,9 +84,11 @@ final class ContentViewModel {
         self.settings = WaxOnSettings.load(from: defaults)
         self.trashOriginals = defaults.bool(forKey: Self.trashOriginalsKey)
         syncNoiseFloorHPF()
-        if let preset = presetStore.selectedPreset {
-            settings = preset.settings
-        }
+        // The selected preset is not applied here. Every change is saved as it
+        // is made, so what was saved is what the user last had. Applying the
+        // preset at launch threw away every change made since choosing it, and
+        // left the menu naming a preset the settings no longer matched.
+        // `presetIsModified` now says when they differ.
     }
 
     private func syncNoiseFloorHPF() {
@@ -166,8 +167,19 @@ final class ContentViewModel {
     func moveFiles(from source: IndexSet, to destination: Int) { fileQueue.moveFiles(from: source, to: destination) }
 
     func applyPreset(_ preset: WaxOnPreset) {
-        settings = preset.settings
+        var applied = preset.settings
+        applied.outputDirectoryPath = settings.outputDirectoryPath
+        settings = applied
         presetStore.selectPreset(preset.id)
+    }
+
+    /// Whether the settings have moved away from the selected preset. The
+    /// selection stays, so the Preset menu still names where they started, and
+    /// choosing that preset again goes back to it. The output folder is not
+    /// part of a preset, so it does not count.
+    var presetIsModified: Bool {
+        guard let preset = presetStore.selectedPreset else { return false }
+        return settings.withoutOutputDirectory != preset.settings.withoutOutputDirectory
     }
 
     func saveCurrentAsPreset(name: String) {

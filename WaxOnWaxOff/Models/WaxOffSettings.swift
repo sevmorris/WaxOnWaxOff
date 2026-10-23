@@ -21,6 +21,15 @@ struct WaxOffSettings: Codable, Equatable, Sendable {
 
     static let `default` = WaxOffSettings()
 
+    /// What a preset holds: these settings less the output folder. Where the
+    /// files go is not part of a preset, so choosing one never moves them,
+    /// and choosing a folder never makes the settings differ from one.
+    var withoutOutputDirectory: WaxOffSettings {
+        var settings = self
+        settings.outputDirectoryPath = nil
+        return settings
+    }
+
     private static let storageKey = "WaxOffSettings"
 
     static func load(from defaults: UserDefaults = .app) -> WaxOffSettings {

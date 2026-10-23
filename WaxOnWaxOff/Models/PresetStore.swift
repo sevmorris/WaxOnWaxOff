@@ -83,6 +83,8 @@ final class WaxOnPresetStore {
     }
 
     func savePreset(_ preset: WaxOnPreset) {
+        var preset = preset
+        preset.settings = preset.settings.withoutOutputDirectory
         presets.append(preset)
         persist()
         selectPreset(preset.id)
@@ -94,6 +96,8 @@ final class WaxOnPresetStore {
         persist()
     }
 
+    /// Settings are stored without the output folder, as `savePreset` stores
+    /// them: Manage Presets passes the current settings, folder and all.
     func updatePreset(id: UUID, name: String?, settings: WaxOnSettings?) {
         guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
         if let name {
@@ -102,7 +106,7 @@ final class WaxOnPresetStore {
             presets[index].name = trimmed
         }
         if let settings {
-            presets[index].settings = settings
+            presets[index].settings = settings.withoutOutputDirectory
         }
         persist()
     }
@@ -159,6 +163,8 @@ final class WaxOffPresetStore {
     }
 
     func savePreset(_ preset: WaxOffPreset) {
+        var preset = preset
+        preset.settings = preset.settings.withoutOutputDirectory
         presets.append(preset)
         persist()
         selectPreset(preset.id)
@@ -170,6 +176,8 @@ final class WaxOffPresetStore {
         persist()
     }
 
+    /// Settings are stored without the output folder, as `savePreset` stores
+    /// them: Manage Presets passes the current settings, folder and all.
     func updatePreset(id: UUID, name: String?, settings: WaxOffSettings?) {
         guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
         if let name {
@@ -178,7 +186,7 @@ final class WaxOffPresetStore {
             presets[index].name = trimmed
         }
         if let settings {
-            presets[index].settings = settings
+            presets[index].settings = settings.withoutOutputDirectory
         }
         persist()
     }

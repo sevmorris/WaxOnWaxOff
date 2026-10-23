@@ -101,8 +101,8 @@ final class TrashOriginalsTests: XCTestCase {
         XCTAssertTrue(ContentViewModel(defaults: scratch.defaults).trashOriginals)
     }
 
-    /// A preset is applied on every launch it is selected for, so a switch
-    /// stored in `WaxOnSettings` would be turned off, or on, by that.
+    /// A preset applies a whole `WaxOnSettings`, so a switch stored there
+    /// would be turned off, or on, by choosing one.
     func testAPresetNeverChangesTheSwitch() throws {
         let vm = ContentViewModel(defaults: scratch.defaults)
         vm.trashOriginals = true
