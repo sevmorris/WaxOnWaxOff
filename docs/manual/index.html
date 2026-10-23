@@ -546,7 +546,7 @@
     <p>A toggle button in the top-right corner changes between the waveform view and the <strong>Console</strong>. The Console is a scrollable log. It shows what WaxOn does during processing. The Verbose checkbox shows more detail, such as the filter parameters and the loudnorm measurements for each file. The app keeps the Verbose setting after you restart it.</p>
 
     <h3>Settings Sidebar</h3>
-    <p>A collapsible panel on the right edge of the window holds the output format settings for the current mode. These are the sample rate, the channels, and the output directory. To open or close the panel, click the sliders icon at the far right of the toolbar.</p>
+    <p>A collapsible panel on the right edge of the window holds the output format settings for the current mode. These are the sample rate, the channels, and the output directory. In WaxOn it also holds Original Files, which sets what happens to the source files after a batch. To open or close the panel, click the sliders icon at the far right of the toolbar.</p>
 
     <h3>Processor Strip</h3>
     <p>The bar across the bottom of the window holds all the processing controls for the current mode. In WaxOn these are high-pass, phase rotation, Dynamic Leveling, and loudness normalization. In WaxOff these are true peak and target loudness. A toggle shows orange when it is on. To adjust a knob, drag it vertically, use the scroll wheel, or press the arrow keys when the knob has focus. A knob moves in discrete steps. Most controls show a short helper line below them. Every control has a tooltip. The app keeps all the values between sessions, and a preset records them.</p>
@@ -569,7 +569,7 @@
 
   <section id="waxon-presets">
     <h2>WaxOn Presets <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>A preset saves and restores a complete group of WaxOn settings with one click. The Preset menu is in the toolbar, to the right of the mode switcher.</p>
+    <p>A preset saves and restores a complete group of WaxOn settings with one click. The Preset menu is in the toolbar, to the right of the mode switcher. <strong>Original Files</strong> is not part of a preset: a preset does not change it.</p>
 
     <h3>Built-In Presets</h3>
     <table class="presets-table">
@@ -684,6 +684,11 @@
           <td>Path or empty</td>
           <td>This is the folder for the output files. If it is empty, WaxOn uses the folder of the source file. Set a path to collect all the output files in one place.</td>
         </tr>
+        <tr>
+          <td>Original Files</td>
+          <td>Keep · Trash · default Keep</td>
+          <td>Keep leaves the source files where they are. Trash moves each source file to the Trash when the batch is complete, if WaxOn wrote all its output files. Refer to <a href="#waxon-originals">Original Files</a> below. A preset does not change this setting.</td>
+        </tr>
       </tbody>
     </table>
 
@@ -737,6 +742,10 @@
 
     <h3>Location</h3>
     <p>By default, WaxOn writes the output files to the folder of the source file. If you set a custom output directory, WaxOn writes all the files to that directory. If it cannot write to either location, WaxOn uses <code>~/Music/WaxOnWaxOff/</code> instead. If it cannot create or write to that folder, WaxOn uses the Desktop as the last choice. WaxOn asks you to confirm this if more than one file in the batch goes there. WaxOn overwrites an existing file with the same name.</p>
+
+    <h3 id="waxon-originals">Original Files</h3>
+    <p>When <strong>Original Files</strong> is set to Trash, WaxOn moves the source files to the Trash after the batch is complete. It moves a source file only if WaxOn wrote all of its output files. For Split L/R, that is both files. A file that fails keeps its original. If you add the same file two times and one of the jobs fails, WaxOn keeps the original.</p>
+    <p>If you cancel a batch, WaxOn keeps all the originals, including those of the files that are complete. If the volume of a source file has no Trash, as on many network shares, WaxOn does not delete the file. It writes a warning to the Console, and the file stays in its folder. The Console shows each file that WaxOn moves to the Trash. To restore a file, open the Trash in the Finder.</p>
   </section>
 
   <!-- WaxOff Mode -->

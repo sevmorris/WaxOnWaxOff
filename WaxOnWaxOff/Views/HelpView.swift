@@ -92,6 +92,7 @@ struct HelpView: View {
                     definition("Loudness Norm", "This setting turns on EBU R128 loudness normalization. When it is off, WaxOn applies only the filters and downward-only peak normalization.")
                     definition("Target", "This is the integrated loudness target when Loudness Norm is on. The default is −30 LUFS. The range is −35 to −16 LUFS. A lower value gives more headroom for editing.")
                     definition("Output Dir", "This is the folder for the output files. The default is the folder of the source file.")
+                    definition("Original Files", "Keep leaves the source files where they are. Trash moves each source file to the Trash when the batch is complete, if WaxOn wrote all its output files. A file that fails, or a batch that you cancel, keeps its originals. A preset does not change this setting. The default is Keep.")
                 }
 
                 dividerRow

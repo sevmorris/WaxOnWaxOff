@@ -10,17 +10,27 @@ struct JobInput: Sendable {
 
 actor AudioProcessor {
     let settings: WaxOnSettings
+    /// Whether a finished batch sends its sources to the Trash. See
+    /// `sourcesToTrash` for which ones.
+    let trashOriginals: Bool
+    /// How a source reaches the Trash. Tests pass their own, so a run never
+    /// fills the developer's Trash.
+    let moveToTrash: @Sendable (URL) throws -> Void
     let onFileStarted: (@Sendable (UUID) -> Void)?
     let onFileCompleted: (@Sendable (JobResult) -> Void)?
     let onFileFailed: (@Sendable (WaxOnJobFailure) -> Void)?
     let onLog: (@Sendable (String, LogLevel) -> Void)?
 
     init(settings: WaxOnSettings,
+         trashOriginals: Bool = false,
+         moveToTrash: @escaping @Sendable (URL) throws -> Void = AudioProcessor.moveToFinderTrash,
          onFileStarted: (@Sendable (UUID) -> Void)? = nil,
          onFileCompleted: (@Sendable (JobResult) -> Void)? = nil,
          onFileFailed: (@Sendable (WaxOnJobFailure) -> Void)? = nil,
          onLog: (@Sendable (String, LogLevel) -> Void)? = nil) {
         self.settings = settings
+        self.trashOriginals = trashOriginals
+        self.moveToTrash = moveToTrash
         self.onFileStarted = onFileStarted
         self.onFileCompleted = onFileCompleted
         self.onFileFailed = onFileFailed
@@ -75,7 +85,53 @@ actor AudioProcessor {
             case .failure(let f): failures.append(f)
             }
         }
+
+        // After the whole batch rather than as each job finishes: the same
+        // source can be queued twice, and trashing it after the first job
+        // would fail the second. A batch cancelled before this point keeps
+        // every original.
+        if trashOriginals, !Task.isCancelled {
+            for source in Self.sourcesToTrash(inputs: inputs, successes: successes, failures: failures) {
+                do {
+                    try moveToTrash(source)
+                    onLog?("🗑 \(source.lastPathComponent) moved to the Trash", .info)
+                } catch {
+                    // The outputs are written, so the job still succeeded; the
+                    // original simply stays where it was. Never fall back to
+                    // deleting it: a volume with no Trash gets no exception.
+                    onLog?("⚠ \(source.lastPathComponent) was not moved to the Trash and is still in its folder: \(error.localizedDescription)", .info)
+                }
+            }
+        }
+
         return WaxOnBatchRunResult(successes: successes, failures: failures)
+    }
+
+    /// The sources a finished batch may send to the Trash, in queue order:
+    /// each one whose every job succeeded, listed once. A source queued twice
+    /// keeps its original if either job failed, and so does a source that is
+    /// also one of the batch's outputs, since that file is then the output.
+    nonisolated static func sourcesToTrash(
+        inputs: [JobInput],
+        successes: [JobResult],
+        failures: [WaxOnJobFailure]
+    ) -> [URL] {
+        let failedIDs = Set(failures.map(\.id))
+        let failed = Set(inputs.filter { failedIDs.contains($0.id) }.map(\.url.standardizedFileURL))
+        let succeeded = Set(successes.map(\.input.standardizedFileURL))
+        let outputs = Set(successes.flatMap(\.outputs).map(\.standardizedFileURL))
+        var listed = Set<URL>()
+        return inputs.map(\.url).filter { url in
+            let key = url.standardizedFileURL
+            return succeeded.contains(key) && !failed.contains(key) && !outputs.contains(key)
+                && listed.insert(key).inserted
+        }
+    }
+
+    /// Moves `url` to the Trash of its volume. Throws on a volume that has
+    /// no Trash, such as many network shares.
+    nonisolated static func moveToFinderTrash(_ url: URL) throws {
+        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
     }
 
     /// Renders exactly one output file. Called once for Mono and Stereo, and

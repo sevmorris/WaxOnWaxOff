@@ -4,11 +4,14 @@ All notable changes to WaxOn/WaxOff are documented here. Every version below has
 
 ## [Unreleased]
 
-**Fixed**
-- **A change made after choosing a preset is no longer lost when you restart the app.** WaxOn and WaxOff applied the selected preset again at every launch, which replaced every setting changed since you chose it. For example, after you chose a preset and then an output folder, the next launch put the folder back to the source folder. Now the app opens with the settings you last had. When they differ from the selected preset, the Preset menu shows the preset name followed by "(Modified)". Choosing the preset again goes back to it.
+**Added**
+- **WaxOn can move the source files to the Trash.** A new **Original Files** switch in WaxOn's settings sidebar, Keep or Trash, is Keep by default. Set to Trash, WaxOn moves each source file to the Trash when the batch is complete, if it wrote all of that file's output files. A file that fails keeps its original, and so does every file in a batch that you cancel. If a source file's volume has no Trash, WaxOn leaves the file where it is and says so on the Console; it never deletes a file. A preset does not change the switch. The manual and the in-app Help describe it.
 
 **Changed**
-- **A preset no longer includes the output folder.** Choosing a preset leaves the output folder as it is, and choosing a folder does not count as a change to the preset. A preset you save or update no longer stores the folder. A custom preset saved before this change keeps the folder it stored, but the app ignores it. The manual and the in-app Help describe both changes.
+- **A preset no longer includes the output folder.** Choosing a preset leaves the output folder as it is, and choosing a folder does not count as a change to the preset. A preset you save or update no longer stores the folder. A custom preset saved before this change keeps the folder it stored, but the app ignores it. The manual and the in-app Help describe this change and the next.
+
+**Fixed**
+- **A change made after choosing a preset is no longer lost when you restart the app.** WaxOn and WaxOff applied the selected preset again at every launch, which replaced every setting changed since you chose it. For example, after you chose a preset and then an output folder, the next launch put the folder back to the source folder. Now the app opens with the settings you last had. When they differ from the selected preset, the Preset menu shows the preset name followed by "(Modified)". Choosing the preset again goes back to it.
 
 ## [2.15.0] — 2026-10-04
 

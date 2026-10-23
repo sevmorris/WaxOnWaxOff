@@ -88,10 +88,38 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 2)
+
+                Divider().padding(.vertical, 6)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ORIGINAL FILES")
+                        .font(AppFont.sectionLabel)
+                        .foregroundStyle(Color.brandAccent.opacity(0.8))
+                        .kerning(0.4)
+                    LabeledToggleSwitch(
+                        selection: $viewModel.trashOriginals,
+                        leftLabel: "Keep",
+                        leftValue: false,
+                        rightLabel: "Trash",
+                        rightValue: true
+                    )
+                    .frame(maxWidth: .infinity)
+                    Text(originalsCaption)
+                        .font(AppFont.help)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 2)
             }
             .padding(12)
         }
         .background(.thinMaterial)
+    }
+
+    private var originalsCaption: String {
+        viewModel.trashOriginals
+            ? "When the batch finishes, each source whose files were written goes to the Trash. A file that fails keeps its original."
+            : "Source files stay where they are."
     }
 
     /// One sentence for the mode in effect rather than all three at once. The
