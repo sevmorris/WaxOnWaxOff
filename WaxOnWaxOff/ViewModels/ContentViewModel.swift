@@ -15,6 +15,15 @@ final class ContentViewModel {
             syncNoiseFloorHPF()
         }
     }
+    /// Whether a batch sends each source to the Trash once its outputs are
+    /// written. Kept out of `WaxOnSettings` on purpose: that struct is what a
+    /// preset stores and applies, and launching with a preset selected
+    /// re-applies it, so choosing a preset — or relaunching — would be what
+    /// starts or stops the app removing files.
+    var trashOriginals: Bool {
+        didSet { defaults.set(trashOriginals, forKey: Self.trashOriginalsKey) }
+    }
+    private static let trashOriginalsKey = "WaxOnTrashOriginals"
     var isProcessing = false
     var alertMessage: String?
     var showWaxonWarning = false
@@ -74,6 +83,7 @@ final class ContentViewModel {
         self.defaults = defaults
         self.presetStore = WaxOnPresetStore(defaults: defaults)
         self.settings = WaxOnSettings.load(from: defaults)
+        self.trashOriginals = defaults.bool(forKey: Self.trashOriginalsKey)
         syncNoiseFloorHPF()
         if let preset = presetStore.selectedPreset {
             settings = preset.settings
@@ -210,12 +220,14 @@ final class ContentViewModel {
         let batchID = UUID()
         currentBatch = batchID
         let currentSettings = settings
+        let trashOriginals = trashOriginals
 
         // `[self]` states what the Task already did implicitly: it holds the view
         // model for the whole run. The callbacks below still capture it weakly.
         processingTask = Task { [self] in
             do {
                 let processor = AudioProcessor(settings: currentSettings,
+                    trashOriginals: trashOriginals,
                     onFileStarted: { [weak self] id in
                         guard let self else { return }
                         Task { @MainActor [self] in

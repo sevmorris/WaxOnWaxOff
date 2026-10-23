@@ -378,6 +378,99 @@ final class AudioProcessorIntegrationTests: XCTestCase {
                       "the fallback should be announced; got: \(collector.infoMessages)")
     }
 
+    // MARK: - Trash originals
+
+    /// A Trash of the test's own, so a run never fills the developer's.
+    private func scratchTrash() throws -> (folder: URL, move: @Sendable (URL) throws -> Void) {
+        let folder = workDir.appendingPathComponent("Trash", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return (folder, { url in
+            try FileManager.default.moveItem(at: url, to: folder.appendingPathComponent(url.lastPathComponent))
+        })
+    }
+
+    func testTrashOriginalsMovesTheSourceOnceItsOutputIsWritten() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "trash_me.wav",
+            durationSeconds: 0.5, sampleRate: 44100
+        )
+        let trash = try scratchTrash()
+
+        let collector = LogCollector()
+        let processor = AudioProcessor(settings: WaxOnSettings(), trashOriginals: true,
+                                       moveToTrash: trash.move, onLog: { collector.append($0, $1) })
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.failures.count, 0, batch.failures.map(\.message).joined(separator: "; "))
+
+        let output = try XCTUnwrap(batch.successes.first?.outputs.first)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: output.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: input.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: trash.folder.appendingPathComponent("trash_me.wav").path))
+        XCTAssertTrue(collector.infoMessages.contains("🗑 trash_me.wav moved to the Trash"),
+                      "the move should be on the Console; got: \(collector.infoMessages)")
+    }
+
+    func testOriginalsStayWhenTheSwitchIsOff() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "keep_me.wav",
+            durationSeconds: 0.5, sampleRate: 44100
+        )
+        let trash = try scratchTrash()
+
+        let processor = AudioProcessor(settings: WaxOnSettings(), moveToTrash: trash.move)
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.successes.count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: input.path))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: trash.folder.path), [])
+    }
+
+    func testAFailedFileKeepsItsOriginalWhileTheRestAreTrashed() async throws {
+        let tools = try XCTUnwrap(tools)
+        let good = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "good.wav",
+            durationSeconds: 0.5, sampleRate: 44100
+        )
+        let bad = workDir.appendingPathComponent("not_audio.wav")
+        try Data("not audio".utf8).write(to: bad)
+        let trash = try scratchTrash()
+
+        let processor = AudioProcessor(settings: WaxOnSettings(), trashOriginals: true, moveToTrash: trash.move)
+        let batch = try await processor.run(inputs: [
+            JobInput(id: UUID(), url: good),
+            JobInput(id: UUID(), url: bad),
+        ])
+        XCTAssertEqual(batch.successes.count, 1)
+        XCTAssertEqual(batch.failures.count, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: good.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: bad.path), "a failed file must keep its original")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: trash.folder.path), ["good.wav"])
+    }
+
+    /// A volume with no Trash: the job still succeeded, the original stays,
+    /// and the Console says so.
+    func testATrashThatRefusesLeavesTheJobASuccessAndTheOriginalInPlace() async throws {
+        let tools = try XCTUnwrap(tools)
+        let input = try IntegrationFFmpeg.makeSineWAV(
+            ffmpeg: tools.ffmpeg, directory: workDir, name: "no_trash_here.wav",
+            durationSeconds: 0.5, sampleRate: 44100
+        )
+
+        let collector = LogCollector()
+        let processor = AudioProcessor(
+            settings: WaxOnSettings(), trashOriginals: true,
+            moveToTrash: { _ in throw CocoaError(.featureUnsupported) },
+            onLog: { collector.append($0, $1) }
+        )
+        let batch = try await processor.run(inputs: [JobInput(id: UUID(), url: input)])
+        XCTAssertEqual(batch.successes.count, 1)
+        XCTAssertEqual(batch.failures.count, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: input.path))
+        XCTAssertTrue(collector.infoMessages.contains { $0.hasPrefix("⚠ no_trash_here.wav was not moved to the Trash") },
+                      "the refusal should be on the Console; got: \(collector.infoMessages)")
+    }
+
     private func channelCount(ffprobe: String, of url: URL) async throws -> Int {
         let out = try await FFmpegRunner.captureStdout(exe: ffprobe, args: [
             "-v", "error", "-select_streams", "a:0",

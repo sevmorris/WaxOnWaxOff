@@ -2,6 +2,11 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [Unreleased]
+
+**Added**
+- **WaxOn can move the source files to the Trash.** A new **Original Files** switch in WaxOn's settings sidebar, Keep or Trash, is Keep by default. Set to Trash, WaxOn moves each source file to the Trash when the batch is complete, if it wrote all of that file's output files. A file that fails keeps its original, and so does every file in a batch that you cancel. If a source file's volume has no Trash, WaxOn leaves the file where it is and says so on the Console; it never deletes a file. A preset does not change the switch, so selecting one, or opening the app with one selected, cannot turn it on or off. The manual and the in-app Help describe it.
+
 ## [2.15.0] — 2026-10-04
 
 **Changed**
