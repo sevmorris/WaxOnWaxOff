@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
 # ClipHack, FilmStrip, KeyVault, Magic Backup Machine, Barkeep, PasswordGen,
-# Dipstick, Gearbox). Keep the copies byte-identical: scripts/check-shared.sh
+# Dipstick). Keep the copies byte-identical: scripts/check-shared.sh
 # compares them and a release preflight fails when they drift. Anything
 # app-specific belongs in that repo's release.sh, not here.
 #
@@ -32,7 +32,7 @@
 set -euo pipefail
 
 MARKER="Shared verbatim across the sibling app repos"
-SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack FilmStrip KeyVault "Magic Backup Machine" Barkeep PasswordGen Dipstick Gearbox)
+SIBLINGS=(DoublEnder WaxOnWaxOff ClipHack FilmStrip KeyVault "Magic Backup Machine" Barkeep PasswordGen Dipstick)
 
 # The repo this copy belongs to, found from the script's own location rather
 # than the working directory, so running it from inside another repo still
