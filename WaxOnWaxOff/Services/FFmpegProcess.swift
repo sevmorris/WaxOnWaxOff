@@ -1,7 +1,7 @@
-// Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
-// ClipHack). Keep the copies byte-identical: scripts/check-shared.sh compares
-// them and a release preflight fails when they drift. Anything app-specific
-// belongs in that repo's release.sh, not here.
+// Shared verbatim across the sibling app repos (WaxOnWaxOff, ClipHack). Keep
+// the copies byte-identical: scripts/check-shared.sh compares them and a
+// release preflight fails when they drift. Anything app-specific belongs in
+// that app's FFmpegRunner, not here.
 //
 // This file is the mechanism of running one ffmpeg process — launch, capture,
 // watchdog, cancellation, crash triage — and nothing about policy. How long a
