@@ -9,6 +9,14 @@ on:
   # with zero runs against its head SHA.
   pull_request:
 
+# A new push to a pull request cancels the run for the commit before it, which
+# nobody would read. Every other run has a group of its own, by run_id, so each
+# push to the default branch is tested to the end. repo-standards holds every
+# workflow to this (ci-cancel).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   lint-shell:
     # Ubuntu rather than macOS: shellcheck ships on the runner image, and this
