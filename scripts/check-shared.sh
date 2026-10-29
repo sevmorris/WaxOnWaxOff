@@ -64,8 +64,8 @@ yellow(){ printf '\033[33m%s\033[0m\n' "$*"; }
 dim()   { printf '\033[2m%s\033[0m\n' "$*"; }
 
 # Tracked files carrying the marker. -I keeps binaries out; the marker is only
-# ever in text. --no-color because a colorized path is not a path, and this
-# user's gitconfig sets color.grep=always, which color.ui cannot override. A
+# ever in text. --no-color because a colorized path is not a path, and a
+# gitconfig can set color.grep=always, which color.ui cannot override. A
 # read loop rather than mapfile so /bin/bash 3.2 can run this too.
 SHARED=()
 while IFS= read -r line; do
