@@ -2,6 +2,18 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [2.17.0] — 2026-11-01
+
+**Added**
+- **WaxOn/WaxOff updates itself.** The update prompt now offers **Update and Relaunch**. WaxOn/WaxOff downloads the new version, checks that it's a signed release, replaces itself and reopens, with no disk image to open or app to drag. This starts with the update after this one: to get this version, download it as usual.
+- **An update never interrupts a batch.** If you start an update while WaxOn/WaxOff is working, it waits for the work to finish, then asks before relaunching, since a relaunch clears the results on screen.
+
+**Changed**
+- **If WaxOn/WaxOff can't update itself, it says why.** A copy running from the disk image, or one you don't have permission to change, still offers **Download**, with the reason. So does any update that fails, and the installed app is left as it was.
+
+**Developer**
+- `SelfUpdater.swift` is shared verbatim with the sibling apps and needs no update feed or new key: it relies on the Developer ID signature that release DMGs and apps already carry.
+
 ## [2.16.0] — 2026-10-23
 
 **Added**
