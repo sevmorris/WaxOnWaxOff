@@ -12,7 +12,9 @@ final class DeliveryViewModel {
     var settings: WaxOffSettings {
         didSet { settings.save(to: defaults) }
     }
-    var isProcessing = false
+    var isProcessing = false {
+        didSet { BatchActivity.set(self, running: isProcessing || isRestarting) }
+    }
     /// Live processing phase per file, keyed by `FileItem.id`. Delivery runs
     /// concurrently, so a single shared phase string would show whichever file
     /// emitted last, attributed to none of them (#23). An entry goes in on
@@ -74,7 +76,9 @@ final class DeliveryViewModel {
     /// one. Without this flag that gap reads as idle: the toolbar falls through
     /// to an enabled Process button, and a second press takes the start path,
     /// producing a batch that the *outstanding* task's cleanup then clobbers.
-    private(set) var isRestarting = false
+    private(set) var isRestarting = false {
+        didSet { BatchActivity.set(self, running: isProcessing || isRestarting) }
+    }
 
     /// Whether `process()` will start a batch rather than return.
     ///
