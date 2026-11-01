@@ -68,7 +68,7 @@ The app runs in two stages that map onto the two moments in podcast production w
 
 Download the notarized DMG from the link above, open it, and drag **WaxOn/WaxOff** to your Applications folder.
 
-Updates come from the app itself: it checks GitHub for a new version at launch and from **Help → Check for Updates…**. Its **Download** button gets the new DMG, which installs the same way.
+Updates come from the app itself: it checks GitHub for a new version at launch and from **Help → Check for Updates…**. **Update and Relaunch** installs the new version over the old one. A copy that can't replace itself, such as one still running from the disk image, offers the DMG instead, which installs the same way.
 
 Requires macOS 15.0+ on Apple Silicon. On macOS 14 (Sonoma), use [WaxOn/WaxOff 2.14.1](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/v2.14.1), the last version for it.
 

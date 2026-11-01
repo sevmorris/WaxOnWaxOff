@@ -23,7 +23,9 @@ final class ContentViewModel {
         didSet { defaults.set(trashOriginals, forKey: Self.trashOriginalsKey) }
     }
     private static let trashOriginalsKey = "WaxOnTrashOriginals"
-    var isProcessing = false
+    var isProcessing = false {
+        didSet { BatchActivity.set(self, running: isProcessing) }
+    }
     var alertMessage: String?
     var showWaxonWarning = false
     private var pendingWaxonFiles: [URL] = []
