@@ -19,7 +19,7 @@
 
 **WaxOn/WaxOff** solves a specific problem: you receive a guest recording that's quiet, uneven, or poorly leveled, and you need a consistent prep WAV before you open your session—or a finished mix normalized to your delivery spec. No import-normalize-export dance. No sending audio to a cloud service.
 
-WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, optional EBU R128 gain, true-peak control). For plosives, clicks, and heavy noise, use a repair tool (e.g. iZotope RX) before WaxOn.
+WaxOn **conditions** level and dynamics (high-pass, optional dynamic leveling, optional EBU R128 gain, a fixed −1.0 peak ceiling). For plosives, clicks, and heavy noise, use a repair tool (e.g. iZotope RX) before WaxOn.
 
 <p align="center">
   <img src="docs/images/waxon-waveform.png" width="49%" alt="WaxOn — waveform audit and signal conditioning" />
@@ -48,8 +48,10 @@ The app runs in two stages that map onto the two moments in podcast production w
 * **Floor Monitoring:** Estimated noise floor detection with color-coded warning badges.
 * **Peak Control:** Fixed −1.0 ceiling, applied two ways. With Loudness Norm on, a brick-wall limiter holds sample peaks at −1.0 dBFS. With it off, a single downward gain brings true peak to −1.0 dBTP and nothing is limited (transparent when the source is already under ceiling).
 * **Phase Rotation:** Optional 200 Hz allpass filter to reduce peak asymmetry and maximize headroom (default on).
+* **Channels:** Mono (left or right channel), Stereo, or **Split L/R** — for one file holding two microphones with a different speaker on each channel. Split L/R preps each channel on its own and writes two mono files, each measured and gained independently, so a speaker who sat farther from the mic arrives at the same level.
+* **Original Files:** Keep (default) or Trash. Trash moves each source to the Trash once all of its output files are written; a file that fails, or a cancelled batch, keeps its originals. Nothing is ever deleted outright.
 
-**Output Logic:** `{name}-{44k|48k}waxon.wav` (24-bit)
+**Output Logic:** `{name}-{44k|48k}waxon.wav` (24-bit); Split L/R writes `{name}-L-{44k|48k}waxon.wav` and `{name}-R-…`
 
 ## II. WaxOff — Broadcast Delivery
 *Use on finished mixes to ensure broadcast compliance.*
@@ -97,7 +99,7 @@ open WaxOnWaxOff.xcodeproj
 Xcode runs `scripts/fetch-ffmpeg.sh` automatically before each build, so the very first build will pull pinned `ffmpeg` and `ffprobe` (~45 MB combined) from a [GitHub release asset](https://github.com/sevmorris/WaxOnWaxOff/releases/tag/ffmpeg-deps-9.0.2-audio-arm64-r5) and verify SHA-256s. You can also run the script standalone for CI or to re-verify checksums. Those binaries are built by `scripts/build-ffmpeg.sh` in this repository — audio-only, LGPL, no GPL components. See `Vendor/README.md` for the manifest, licenses, and update instructions.
 
 ## Technical Origin
-I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — two-pass loudnorm per the FFmpeg spec and ITU-R BS.1770-compliant K-weighting — reflects deliberate choices, not defaults.
+I designed the signal chain and DSP parameters. The Swift implementation was built with AI assistance. The audio processing logic — WaxOff's two-pass loudnorm per the FFmpeg spec, WaxOn's single `ebur128` measurement and constant gain, and ITU-R BS.1770-compliant K-weighting — reflects deliberate choices, not defaults.
 
 ---
 
