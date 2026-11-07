@@ -520,7 +520,7 @@
       <li><strong>Output: …</strong> — the file is processed. A green ✓ Complete indicator shows next to the filename. Click the folder icon to show the output file in the Finder</li>
       <li><strong>Error</strong> — the process failed and the message shows in the row</li>
     </ul>
-    <p>In WaxOn, a file with a high estimated noise floor shows an orange warning triangle next to the filename. Put the pointer on the badge to see the detail. WaxOn also shows a badge for a channel conversion. A stereo source with Channels set to Mono shows a <strong>STEREO→MONO L</strong> or <strong>STEREO→MONO R</strong> badge. A source with more than two channels shows <strong>MULTI→MONO</strong>. In WaxOff, a mono source shows a <strong>MONO</strong> badge. By default WaxOff upmixes the file to dual-mono stereo before it processes the audio. If you select Mono delivery, WaxOff does not upmix the file. In WaxOff, a file that has podcast metadata also shows a tag badge next to the filename. Refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>.</p>
+    <p>In WaxOn, a file with a high estimated noise floor shows an orange warning triangle next to the filename. Put the pointer on the badge to see the detail. WaxOn also shows a badge for a channel conversion. A stereo source with Channels set to Mono shows a <strong>STEREO→MONO L</strong> or <strong>STEREO→MONO R</strong> badge. With Channels set to Mono or Split L/R, a source with more than two channels shows <strong>MULTI→MONO</strong>. With Channels set to Stereo, it shows <strong>MULTI→STEREO</strong>. With Split L/R, a mono source shows <strong>1 FILE</strong>, because WaxOn writes one mono file for it. Put the pointer on a badge to see what WaxOn will do. In WaxOff, a mono source shows a <strong>MONO</strong> badge. By default WaxOff upmixes the file to dual-mono stereo before it processes the audio. If you select Mono delivery, WaxOff does not upmix the file. In WaxOff, a file that has podcast metadata also shows a tag badge next to the filename. Refer to <a href="#waxoff-metadata">WaxOff Episode Metadata</a>.</p>
 
     <p>An advisory banner shows above the list when two or more files are in the WaxOn queue and Phase Rotation is on. If you recorded the files at the same time in the same room, apply phase rotation once at the mix bus instead of once for each track. Refer to <a href="theory.html#phase-rotation">Phase Rotation</a> in the Theory of Operation.</p>
 
@@ -544,7 +544,7 @@
       <li><strong>Nothing selected</strong> — the panel shows a prompt to select a file</li>
     </ul>
     <p>When a job writes more than one file — WaxOn's <strong>Split L/R</strong>, or WaxOff's <strong>Both</strong> format — small tags appear above the waveform (<strong>L</strong> / <strong>R</strong>, or <strong>WAV</strong> / <strong>MP3</strong>). Click one to show that output's waveform and stats. The app measures each output the first time you look at it, so the second tag fills in a moment after you select it.</p>
-    <p>A toggle button in the top-right corner changes between the waveform view and the <strong>Console</strong>. The Console is a scrollable log. It shows what WaxOn does during processing. The Verbose checkbox shows more detail, such as the filter parameters and the loudnorm measurements for each file. The app keeps the Verbose setting after you restart it.</p>
+    <p>A toggle button in the top-right corner changes between the waveform view and the <strong>Console</strong>. The Console is a scrollable log. It shows what the app does during processing. The Verbose checkbox shows more detail, such as the filter parameters and the loudness measurements for each file. The app keeps the Verbose setting after you restart it.</p>
 
     <h3>Settings Sidebar</h3>
     <p>A collapsible panel on the right edge of the window holds the output format settings for the current mode. These are the sample rate, the channels, and the output directory. In WaxOn it also holds Original Files, which sets what happens to the source files after a batch. To open or close the panel, click the sliders icon at the far right of the toolbar.</p>
@@ -556,7 +556,7 @@
   <!-- WaxOn Mode -->
   <section id="waxon-overview">
     <h2>WaxOn Mode <span class="mode-badge mode-waxon">WaxOn</span></h2>
-    <p>WaxOn prepares raw podcast recordings for editing in a DAW. WaxOn does high-pass filtering, optional Dynamic Leveling, loudness normalization, phase rotation, and true-peak ceiling control. The output is 24-bit WAV files for Logic Pro, Reaper, or a different editor.</p>
+    <p>WaxOn prepares raw podcast recordings for editing in a DAW. WaxOn does high-pass filtering, optional Dynamic Leveling, optional loudness normalization, phase rotation, and a fixed −1.0 peak ceiling. The output is 24-bit WAV files for Logic Pro, Reaper, or a different editor.</p>
     <p>WaxOn is a first-step ingest processor. It puts your raw recordings into a consistent format before you edit them. WaxOn does not do spectral repair, noise reduction, or multiband restoration. For a recording with noise problems, de-essing needs, or other surgical work, use a dedicated tool such as iZotope RX.</p>
 
     <h3>Quick Start</h3>
@@ -648,7 +648,7 @@
         <tr>
           <td>Source Channel</td>
           <td>Left · Right</td>
-          <td>This setting applies in Mono mode only. It selects the channel that WaxOn extracts. If the source is already mono, WaxOn ignores this setting and writes a note to the console. Use Left for a standard single-mic recording on channel 1. The control is not available when Channels is Stereo.</td>
+          <td>This setting applies in Mono mode only. It selects the channel that WaxOn extracts. If the source is already mono, WaxOn ignores this setting and writes a note to the console. Use Left for a standard single-mic recording on channel 1. The control is not available when Channels is Stereo or Split L/R.</td>
         </tr>
         <tr>
           <td>High Pass</td>
@@ -717,7 +717,7 @@
       <li>
         <div>
           <strong>Loudness Normalization <span class="tag">Optional</span></strong>
-          <span>This stage is EBU R128 normalization in two passes. The first pass measures the integrated loudness, the true peak, the LRA, and the threshold. The second pass applies a linear gain to reach the configured target. Linear mode keeps the natural dynamic shape of the recording. There is no compression and no change to the transients. If the true-peak headroom does not permit a constant gain, loudnorm applies dynamic normalization for that file instead.</span>
+          <span>This stage is EBU R128 loudness normalization. WaxOn measures the integrated loudness of the file one time, with the FFmpeg <code>ebur128</code> filter. WaxOn then applies one constant gain to reach the configured target. The recording keeps its natural dynamic shape. There is no compression and no change to the transients. A silent or near-silent file reads at the −70 LUFS floor of the measurement. WaxOn applies no gain to that file and writes a warning to the console.</span>
         </div>
       </li>
       <li>
@@ -738,6 +738,7 @@
     <h3>Individual Files</h3>
     <pre><code>{original-name}-{rate}waxon.wav</code></pre>
     <p>Examples: <code>episode-01-44kwaxon.wav</code> &nbsp; <code>guest-48kwaxon.wav</code></p>
+    <p>Split L/R writes two files for each source. WaxOn puts <code>L</code> or <code>R</code> before the type suffix, for example <code>interview-L-44kwaxon.wav</code> and <code>interview-R-44kwaxon.wav</code>. The row shows <strong>L</strong> and <strong>R</strong> tags above the waveform. Refer to <a href="#interface">The Interface</a>.</p>
     <p>Two files in the same batch can produce the same output name. WaxOn then adds a short hash tag before the type suffix, for example <code>episode-a1b2c3-44kwaxon.wav</code>. Thus one file does not overwrite the other.</p>
     <p>A file with a name that already agrees with this pattern shows an <strong>Already Processed?</strong> confirmation when you add it. If you process a prep WAV file again, the audio quality can decrease.</p>
 
@@ -1114,14 +1115,14 @@ HH:MM:SS Title</code></pre>
     <h3>Reading the Noise Floor</h3>
     <p>The <strong>FLOOR</strong> stat estimates the background noise level. A value below −60 dBFS usually shows a clean recording. Between −60 and −50 dBFS you can possibly hear the noise, but it usually has no effect on the processing. Above −50 dBFS (orange) the noise floor can change the loudness measurements. Above −40 dBFS (red) it almost certainly changes the results. For the best result, also use a dedicated noise-reduction tool such as iZotope RX on the source before WaxOn.</p>
 
-    <h3>WaxOn: Loudnorm On or Off?</h3>
+    <h3>WaxOn: Loudness Norm On or Off?</h3>
     <p>Turn Loudness Norm on for consistent batch ingest when you recorded the files at different gain levels. Loudness Norm makes sure that every file has the same integrated loudness before the limiter. Turn Loudness Norm off for a single file, or when you want to keep the original level relation between takes. Downward-only linear peak normalization then controls the ceiling only. There is no limiting.</p>
 
     <h3>WaxOff: Choosing a LUFS Target</h3>
     <p>−18 LUFS is a safe, conservative delivery target. The platforms do not use this level themselves. It is below the targets of the major platforms: Spotify uses −14 LUFS and Apple Podcasts uses −16 LUFS. Thus both platforms increase the level of your file by a small quantity and do not decrease it. −16 LUFS gives a louder result and stays in the usual platform limits. A level above −14 LUFS can cause clipping, and some platforms can reject the file. If you are not sure, use the Podcast Standard preset.</p>
 
     <h3>WaxOn: Mono vs. Stereo for Podcasts</h3>
-    <p>Most podcast editing workflows use one mono track for each speaker. A mono track is easier to pan, to balance, and to process. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your interface records both microphones in one stereo file, set Channels to Stereo and process the file before you put it in your DAW.</p>
+    <p>Most podcast editing workflows use one mono track for each speaker. A mono track is easier to pan, to balance, and to process. Use <strong>Mono / Left</strong> for a standard single-mic recording on channel 1. If your recorder or interface puts one speaker on the left channel and a different speaker on the right channel, set Channels to <strong>Split L/R</strong>. WaxOn writes one mono file for each speaker and sets the level of each file separately. Thus a speaker who sat farther from the microphone arrives at the same level as the other speaker. Use <strong>Stereo</strong> only for a real stereo recording, such as a room recorded with a stereo pair, where the two channels make one image.</p>
 
     <h3>Phase Rotation (WaxOn)</h3>
     <p>Keep Phase Rotation on unless you have a specific reason to turn it off. The 200 Hz allpass filter reduces the crest factor of a voice recording. Thus the limiter has more headroom. You cannot hear the effect on speech.</p>

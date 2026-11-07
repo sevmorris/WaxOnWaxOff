@@ -2,6 +2,15 @@
 
 All notable changes to WaxOn/WaxOff are documented here. Every version below has a matching `v*` git tag. Not every version has a GitHub **release** page: `release.sh` keeps only the ten most recent, so older versions are reachable by tag but their release pages have been pruned.
 
+## [Unreleased]
+
+**Documentation**
+- **The manual and the theory page no longer describe WaxOn running a two-pass loudnorm.** WaxOn has measured once with `ebur128` and applied one constant gain since 2.9.0, but the manual's WaxOn pipeline still walked through two passes and a dynamic-mode fallback, and the theory page said "both WaxOn and WaxOff" run two passes and request `linear=true`, credited WaxOn with `LRA=20`, explained silent input through a loudnorm pass WaxOn never runs, and named loudnorm in WaxOn's stage-order rationale. The 2.9.0 correction fixed some sentences in these pages and missed these. The theory page also called WaxOn's ceiling a −1.0 dBTP true-peak ceiling in four places, including the limiter's own parameter list; with Loudness Norm on, it holds sample peaks at −1.0 dBFS, as the same page says elsewhere. A leftover comparison with the RNNoise stage, removed in 2.8.0, is gone.
+- **The manual's tip for two microphones in one stereo file now recommends Split L/R**, the mode 2.10.0 added for exactly that recording, instead of Stereo.
+- **The in-app Help describes WaxOn's presets**: the Preset setting, with "(Modified)" and what a preset leaves alone, and the three built-in presets. Only WaxOff's were there.
+- The README and the landing page list Split L/R, and the README lists Original Files. The manual and Help show Split L/R's output names, the manual lists the `MULTI→STEREO` and `1 FILE` badges, and both say Source Channel is unavailable in Split L/R as well as Stereo. The WaxOn screenshot shows the Original Files switch.
+- `audit/DOC-DRIFT-2026-11-06.md` records the review.
+
 ## [2.17.0] — 2026-11-01
 
 **Added**

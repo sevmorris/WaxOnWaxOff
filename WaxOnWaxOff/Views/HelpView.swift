@@ -61,7 +61,7 @@ struct HelpView: View {
                 }
                 section("WaxOn — Quick Start") {
                     steps([
-                        "Set the sample rate and the output channels in Settings. The toggles and the knobs are in the control bar.",
+                        "Select a preset from the Preset menu in the toolbar. As an alternative, set the sample rate and the output channels in Settings, and the toggles and the knobs in the control bar.",
                         "Drag your audio files onto the window or onto the file list. As an alternative, click the plus button in the bar below the file list.",
                         "Click Process. WaxOn writes the output files to the folder of the source files."
                     ])
@@ -69,6 +69,7 @@ struct HelpView: View {
                 section("WaxOn — Output Naming") {
                     code("{original-name}-{44k|48k}waxon.wav")
                     text("Example: interview-44kwaxon.wav")
+                    text("Split L/R writes two files: interview-L-44kwaxon.wav and interview-R-44kwaxon.wav.")
                 }
                 section("WaxOn — Processing Pipeline") {
                     numberedList([
@@ -83,9 +84,10 @@ struct HelpView: View {
                     text("Output: 24-bit WAV.")
                 }
                 section("WaxOn — Settings") {
+                    definition("Preset", "A preset applies a saved group of settings with one click. The app includes three built-in presets. You can save your own presets from the Preset menu. If you change a setting after you select a preset, the menu shows (Modified), and the app keeps your changes when you restart it. Select the preset again to go back to it. A preset does not include the output directory or Original Files.")
                     definition("Sample Rate", "Select 44.1 kHz or 48 kHz. Use the same value as your DAW project.")
                     definition("Channels", "Select Mono, Stereo, or Split L/R. Mono extracts one channel. Stereo sends the two channels of a stereo source through with no change. Split L/R is for a file holding two microphones with a different speaker on each channel: WaxOn preps each channel separately and writes two mono files, tagged -L- and -R-, so each speaker lands at a consistent level. Split L/R needs a two-channel source; anything else is written as one mono file with a warning. For a different channel count in Mono or Stereo, FFmpeg converts the source with its default matrix and the app writes a warning to the console.")
-                    definition("Source Channel", "Select Left or Right. This is the channel that WaxOn extracts in Mono mode.")
+                    definition("Source Channel", "Select Left or Right. This is the channel that WaxOn extracts in Mono mode. The control is not available when Channels is Stereo or Split L/R.")
                     definition("High Pass", "On uses 80 Hz. It removes rumble and proximity-effect bass. Off uses a 20 Hz DC floor only. WaxOn always removes the DC offset.")
                     definition("Phase Rotation", "WaxOn applies a 200 Hz allpass filter before normalization. The filter reduces the crest factor on asymmetric voice recordings. This gives 1–4 dB more headroom before the limiter. You cannot hear an effect on the audio character. The default is on.")
                     definition("Dynamic Leveling", "This setting turns on dynaudnorm. It increases the level of quiet voices. It decreases the level of loud voices. Use it for panel recordings, live Q&As, or multi-guest interviews. Do not use it for a solo voice. Strength controls the speed and the quantity of the adjustment.")
@@ -93,6 +95,12 @@ struct HelpView: View {
                     definition("Target", "This is the integrated loudness target when Loudness Norm is on. The default is −30 LUFS. The range is −35 to −16 LUFS. A lower value gives more headroom for editing.")
                     definition("Output Dir", "This is the folder for the output files. The default is the folder of the source file.")
                     definition("Original Files", "Keep leaves the source files where they are. Trash moves each source file to the Trash when the batch is complete, if WaxOn wrote all its output files. A file that fails, or a batch that you cancel, keeps its originals. A preset does not change this setting. The default is Keep.")
+                }
+                section("WaxOn — Built-in Presets") {
+                    definition("Defaults", "The factory values: 80 Hz high-pass, phase rotation on, Dynamic Leveling and Loudness Norm off, mono from the left channel, 44.1 kHz. Use this preset to start again.")
+                    definition("Edit Prep", "Loudness Norm on at −30 LUFS, mono from the left channel, 44.1 kHz. Use this preset for single-mic recordings that you will edit in a DAW.")
+                    definition("ATSC A/85", "Loudness Norm on at −24 LUFS, mono from the left channel, 44.1 kHz. This is the dialog reference level for US broadcast and video. The fixed WaxOn ceiling of −1.0 is above the −2 dBTP maximum that A/85 recommends. For strict A/85 delivery, check the result against your deliverable spec.")
+                    text("To save your own preset, use the Preset menu › Save Current Settings…. Custom presets stay available after you restart the app. To delete a custom preset, use Manage Presets… in the same menu.")
                 }
 
                 dividerRow
@@ -107,7 +115,7 @@ struct HelpView: View {
                 }
                 section("WaxOff — Quick Start") {
                     steps([
-                        "Select a preset from the menu in the header. As an alternative, set your own values.",
+                        "Select a preset from the Preset menu in the toolbar. As an alternative, set your own values.",
                         "Drag your finished mix file onto the window. As an alternative, click the plus button in the bar below the file list.",
                         "Click Process. WaxOff writes the output files to the folder of the source file."
                     ])
