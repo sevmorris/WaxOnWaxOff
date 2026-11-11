@@ -719,12 +719,31 @@ step "Removing old app release pages (keeping ${KEEP_RELEASES} most recent v* re
 # release's notes end with, newest first; a release from before the marker
 # carries none and is pruned as before. The newest release overall is listed
 # too, harmlessly, since KEEP_RELEASES already keeps it.
-PROTECTED_TAGS=$(gh api "repos/${REPO}/releases?per_page=100" \
-    --jq '.[] | select(.tag_name | test("^v[0-9]")) | [.published_at, .tag_name, (((.body // "") | capture("<!-- minimum-macos: (?<m>[0-9.]+) -->") | .m) // "")] | @tsv' \
-    | sort -r | awk -F'\t' '$3 != "" && !seen[$3]++ { print $2 }' || true)
+# The protection is only as good as the query behind it. That query used to end
+# in `|| true`, so when it failed (no network, a rate limit, an expired token)
+# PROTECTED_TAGS came back empty and the loop below pruned with nothing
+# protected. ClipHack v1.27.1, the last build for macOS 14, lost its page that
+# way or some other way nobody could reconstruct. So the answer has to prove
+# itself: every release this script publishes ends with the marker, so the one
+# published moments ago must be listed. The query gets three tries, a few
+# seconds apart, in case GitHub's list lags behind the release just created.
+# Without that proof nothing is pruned this time, and the next release prunes.
+PROTECTED_TAGS=""
+for attempt in 1 2 3; do
+    if PROTECTED_TAGS=$(gh api "repos/${REPO}/releases?per_page=100" \
+            --jq '.[] | select(.tag_name | test("^v[0-9]")) | [.published_at, .tag_name, (((.body // "") | capture("<!-- minimum-macos: (?<m>[0-9.]+) -->") | .m) // "")] | @tsv' \
+            | sort -r | awk -F'\t' '$3 != "" && !seen[$3]++ { print $2 }') \
+       && grep -qxF -- "$TAG" <<<"$PROTECTED_TAGS"; then
+        break
+    fi
+    PROTECTED_TAGS=""
+    if (( attempt < 3 )); then sleep 5; fi
+done
 OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
     --jq '.[].tagName' | grep -E '^v[0-9]' | tail -n +$((KEEP_RELEASES + 1)) || true)
-if [[ -z "$OLD_TAGS" ]]; then
+if [[ -z "$PROTECTED_TAGS" ]]; then
+    warn "Could not confirm which releases are the last for an older macOS, so no release pages were pruned this time (the release itself is published)"
+elif [[ -z "$OLD_TAGS" ]]; then
     ok "No old app release pages to remove"
 else
     while IFS= read -r old_tag; do
