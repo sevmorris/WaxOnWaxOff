@@ -43,6 +43,8 @@ nonisolated enum SelfUpdater {
         case diskImage
         case copy
         case swap(String)
+        case noSpace
+        case timedOut
 
         var errorDescription: String? {
             switch self {
@@ -65,6 +67,10 @@ nonisolated enum SelfUpdater {
                 return "The new version couldn't be copied out of its disk image."
             case .swap(let reason):
                 return "The app couldn't be replaced: \(reason)."
+            case .noSpace:
+                return "There isn't enough free disk space to install the new version."
+            case .timedOut:
+                return "Installing the new version took too long."
             }
         }
     }
@@ -101,8 +107,12 @@ nonisolated enum SelfUpdater {
 
     static func obstacle(for app: URL, requirement: String) -> Obstacle? {
         guard isSigned(app, requirement: requirement) else { return .notARelease }
-        let readOnly = (try? app.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false
-        if readOnly || isTranslocated(app) { return .readOnlyLocation }
+        let volume = try? app.resourceValues(forKeys: [.volumeIsReadOnlyKey, .volumeSupportsSwapRenamingKey])
+        if let obstacle = locationObstacle(readOnly: volume?.volumeIsReadOnly ?? false,
+                                           translocated: isTranslocated(app),
+                                           supportsSwap: volume?.volumeSupportsSwapRenaming) {
+            return obstacle
+        }
         let fm = FileManager.default
         guard fm.isWritableFile(atPath: app.path),
               fm.isWritableFile(atPath: app.deletingLastPathComponent().path) else { return .notWritable }
@@ -111,6 +121,14 @@ nonisolated enum SelfUpdater {
 
     static func isTranslocated(_ app: URL) -> Bool {
         app.path.contains("/AppTranslocation/")
+    }
+
+    /// Where the copy is, as an obstacle. A volume that cannot exchange two
+    /// items in one step (exFAT, a network share) counts with the read-only
+    /// ones: the update would download and stage, then fail at the swap, every
+    /// time. A volume that does not say is taken to be able to.
+    static func locationObstacle(readOnly: Bool, translocated: Bool, supportsSwap: Bool?) -> Obstacle? {
+        readOnly || translocated || supportsSwap == false ? .readOnlyLocation : nil
     }
 
     // MARK: - Vetting a new version
@@ -189,22 +207,112 @@ nonisolated enum SelfUpdater {
 
     // MARK: - Staging
 
+    /// How staging runs hdiutil and ditto. A test passes its own, to make a
+    /// tool fail, hang or be cancelled without a disk image that does so.
+    nonisolated struct Tools: Sendable {
+        nonisolated enum Outcome: Sendable, Equatable {
+            /// It exited with status 0.
+            case success
+            case failure
+            /// It was still running at its deadline, and was stopped.
+            case timedOut
+            /// `isCancelled` turned true while it ran, and it was stopped.
+            case cancelled
+        }
+
+        var run: @Sendable (_ tool: String, _ arguments: [String], _ deadline: TimeInterval,
+                            _ isCancelled: @Sendable () -> Bool) -> Outcome
+
+        static let system = Tools(run: { tool, arguments, deadline, isCancelled in
+            SelfUpdater.runTool(tool, arguments, deadline: deadline, isCancelled: isCancelled)
+        })
+    }
+
+    /// What a download may take. The defaults bound what had no bound: an idle
+    /// connection was given up after a minute, and a trickle never.
+    nonisolated struct DownloadLimits: Sendable {
+        /// Seconds without a byte before the download is given up.
+        var stallTimeout: TimeInterval = 30
+        /// Seconds for the whole download.
+        var resourceTimeout: TimeInterval = 15 * 60
+        /// A release is tens of megabytes. Anything past this is not one.
+        var maximumBytes: Int64 = 1 << 30
+        /// Free space that has to be left over, on top of what the update
+        /// needs: room for whatever else the app is writing meanwhile.
+        var reserve: Int64 = 0
+
+        init(stallTimeout: TimeInterval = 30, resourceTimeout: TimeInterval = 15 * 60,
+             maximumBytes: Int64 = 1 << 30, reserve: Int64 = 0) {
+            self.stallTimeout = stallTimeout
+            self.resourceTimeout = resourceTimeout
+            self.maximumBytes = maximumBytes
+            self.reserve = reserve
+        }
+    }
+
+    /// The scratch folders `stage(from:)` makes in the temporary directory start
+    /// with this, so an app can find the ones a quit or a crash left behind.
+    static let scratchPrefix = "SelfUpdate-"
+
+    /// Generous, since the largest sibling's image is some hundred megabytes on
+    /// what may be a slow disk; a tool past these is not slow but stuck.
+    private static let attachDeadline: TimeInterval = 120
+    private static let copyDeadline: TimeInterval = 300
+    private static let detachDeadline: TimeInterval = 30
+
+    /// The mount, copy and validation block their thread for seconds. They get a
+    /// queue of their own, at a priority that gives way to the app's own work,
+    /// rather than a thread of the concurrency pool.
+    private static let stagingQueue = DispatchQueue(label: "SelfUpdater.staging", qos: .utility)
+
+    nonisolated private final class CancelFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        var isSet: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return value
+        }
+        func set() {
+            lock.lock(); defer { lock.unlock() }
+            value = true
+        }
+    }
+
     /// Downloads a release and leaves a vetted copy of its app on the same
     /// volume as `installed`, where the swap can be a rename. The caller
     /// disposes of it with `discard`.
+    ///
+    /// Cancelling the task stops it wherever it is: the download, or the tool
+    /// that is running. `holder`, when given, is an existing folder on the
+    /// installed app's volume to stage into, so the caller knows where the copy
+    /// is before it exists; nil makes one.
     static func stage(from request: URLRequest, replacing installed: URL, expected: Expected,
+                      limits: DownloadLimits = DownloadLimits(), tools: Tools = .system,
+                      into holder: URL? = nil, configuration: URLSessionConfiguration? = nil,
                       progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let scratch = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SelfUpdate-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("\(scratchPrefix)\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         let dmg = scratch.appendingPathComponent("update.dmg")
-        try await UpdateDownload.fetch(request, to: dmg, progress: progress)
+        try await UpdateDownload.fetch(request, to: dmg, limits: limits, configuration: configuration,
+                                       progress: progress)
         try Task.checkCancellation()
-        let staged = try await Task.detached {
-            try stage(diskImage: dmg, replacing: installed, expected: expected)
-        }.value
+
+        let cancelled = CancelFlag()
+        let staged = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+                stagingQueue.async {
+                    continuation.resume(with: Result {
+                        try stage(diskImage: dmg, replacing: installed, expected: expected, tools: tools,
+                                  into: holder, reserve: limits.reserve, isCancelled: { cancelled.isSet })
+                    })
+                }
+            }
+        } onCancel: {
+            cancelled.set()
+        }
         do {
             try Task.checkCancellation()
         } catch {
@@ -215,26 +323,39 @@ nonisolated enum SelfUpdater {
     }
 
     /// The disk image half of `stage`. It blocks while the image mounts and copies.
-    static func stage(diskImage dmg: URL, replacing installed: URL, expected: Expected) throws -> URL {
+    static func stage(diskImage dmg: URL, replacing installed: URL, expected: Expected,
+                      tools: Tools = .system, into holder: URL? = nil, reserve: Int64 = 0,
+                      isCancelled: @escaping @Sendable () -> Bool = { false }) throws -> URL {
         // Before hdiutil has to parse it: an unsigned image is never mounted.
         guard isSigned(dmg, requirement: expected.diskImageRequirement) else { throw Failure.untrusted }
+        if isCancelled() { throw CancellationError() }
 
         let mountPoint = dmg.deletingLastPathComponent().appendingPathComponent("mount", isDirectory: true)
         try FileManager.default.createDirectory(at: mountPoint, withIntermediateDirectories: true)
-        guard run("/usr/bin/hdiutil", ["attach", dmg.path, "-mountpoint", mountPoint.path,
-                                       "-nobrowse", "-noautoopen", "-readonly", "-quiet"]) else {
-            throw Failure.diskImage
+        try check(tools.run("/usr/bin/hdiutil", ["attach", dmg.path, "-mountpoint", mountPoint.path,
+                                                 "-nobrowse", "-noautoopen", "-readonly", "-quiet"],
+                            attachDeadline, isCancelled),
+                  or: .diskImage)
+        // Whatever stopped the rest, the image comes off again.
+        defer {
+            _ = tools.run("/usr/bin/hdiutil", ["detach", mountPoint.path, "-force", "-quiet"],
+                          detachDeadline, { false })
         }
-        defer { _ = run("/usr/bin/hdiutil", ["detach", mountPoint.path, "-force", "-quiet"]) }
 
         let app = try app(in: mountPoint)
         try vet(app, against: expected)
+        if isCancelled() { throw CancellationError() }
 
-        let holder = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
-                                                 appropriateFor: installed, create: true)
-        let staged = holder.appendingPathComponent(installed.lastPathComponent)
+        let folder = try holder ?? FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
+                                                           appropriateFor: installed, create: true)
+        let staged = folder.appendingPathComponent(installed.lastPathComponent)
         do {
-            guard run("/usr/bin/ditto", [app.path, staged.path]) else { throw Failure.copy }
+            // Before the copy fills what is left of the disk.
+            if let free = freeSpace(at: folder), free < allocatedSize(of: app) + reserve {
+                throw Failure.noSpace
+            }
+            try check(tools.run("/usr/bin/ditto", [app.path, staged.path], copyDeadline, isCancelled),
+                      or: .copy)
             // The copy is what gets installed, so it is the one that has to pass.
             guard isSigned(staged, requirement: expected.appRequirement) else { throw Failure.copy }
         } catch {
@@ -244,25 +365,71 @@ nonisolated enum SelfUpdater {
         return staged
     }
 
+    private static func check(_ outcome: Tools.Outcome, or failure: Failure) throws {
+        switch outcome {
+        case .success: return
+        case .failure: throw failure
+        case .timedOut: throw Failure.timedOut
+        case .cancelled: throw CancellationError()
+        }
+    }
+
     /// Removes a staged copy and the folder made for it. After a swap, that
     /// copy is the previous version.
     static func discard(_ staged: URL) {
         try? FileManager.default.removeItem(at: staged.deletingLastPathComponent())
     }
 
-    private static func run(_ tool: String, _ arguments: [String]) -> Bool {
+    /// Free space on the volume holding `url`, as the system counts it for
+    /// work the user asked for; nil when the volume does not say.
+    static func freeSpace(at url: URL) -> Int64? {
+        (try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+            .volumeAvailableCapacityForImportantUsage
+    }
+
+    /// What `item` and everything in it takes up on disk.
+    static func allocatedSize(of item: URL) -> Int64 {
+        let keys: [URLResourceKey] = [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+        guard let files = FileManager.default.enumerator(at: item, includingPropertiesForKeys: keys) else { return 0 }
+        var total: Int64 = 0
+        for case let file as URL in files {
+            let values = try? file.resourceValues(forKeys: Set(keys))
+            total += Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
+        }
+        return total
+    }
+
+    /// Runs a tool to its end, its deadline or its cancellation, whichever is
+    /// first. A tool that is stopped is asked to quit and, two seconds on, made
+    /// to: a hung hdiutil used to hold the update, and its window, for ever.
+    static func runTool(_ tool: String, _ arguments: [String], deadline: TimeInterval,
+                        isCancelled: @Sendable () -> Bool) -> Tools.Outcome {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: tool)
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
+        // Never urgent, and the app may be busy with work that is.
+        process.qualityOfService = .utility
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
         do {
             try process.run()
         } catch {
-            return false
+            return .failure
         }
-        process.waitUntilExit()
-        return process.terminationStatus == 0
+        let end = Date().addingTimeInterval(deadline)
+        while exited.wait(timeout: .now() + 0.1) == .timedOut {
+            let cancelled = isCancelled()
+            guard cancelled || Date() >= end else { continue }
+            process.terminate()
+            if exited.wait(timeout: .now() + 2) == .timedOut {
+                kill(process.processIdentifier, SIGKILL)
+                _ = exited.wait(timeout: .now() + 5)
+            }
+            return cancelled ? .cancelled : .timedOut
+        }
+        return process.terminationStatus == 0 ? .success : .failure
     }
 
     // MARK: - Installing
@@ -339,6 +506,9 @@ enum SelfUpdateFlow {
         let app = Bundle.main.bundleURL
         let requirement = SelfUpdater.Expected.running(.main).appRequirement
         let obstacle = await Task.detached { SelfUpdater.obstacle(for: app, requirement: requirement) }.value
+        // Asked again: work may have begun while the copy was being checked,
+        // and from here to the prompt nothing suspends.
+        if silent && prompt.isBusy() { return false }
 
         let alert = makeAlert(prompt)
         alert.messageText = "Update Available"
@@ -463,18 +633,27 @@ enum SelfUpdateFlow {
 /// any, so this keeps to the delegate calls, which run on the session's serial queue.
 nonisolated private final class UpdateDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let destination: URL
+    private let limits: SelfUpdater.DownloadLimits
     private let progress: @Sendable (Double) -> Void
     private var continuation: CheckedContinuation<Void, Error>?
     private var failure: Error?
+    private var sizeChecked = false
 
-    private init(destination: URL, progress: @escaping @Sendable (Double) -> Void) {
+    private init(destination: URL, limits: SelfUpdater.DownloadLimits, progress: @escaping @Sendable (Double) -> Void) {
         self.destination = destination
+        self.limits = limits
         self.progress = progress
     }
 
-    static func fetch(_ request: URLRequest, to destination: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
-        let delegate = UpdateDownload(destination: destination, progress: progress)
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+    static func fetch(_ request: URLRequest, to destination: URL, limits: SelfUpdater.DownloadLimits,
+                      configuration: URLSessionConfiguration?, progress: @escaping @Sendable (Double) -> Void) async throws {
+        let delegate = UpdateDownload(destination: destination, limits: limits, progress: progress)
+        let configuration = configuration ?? .ephemeral
+        configuration.timeoutIntervalForRequest = limits.stallTimeout
+        configuration.timeoutIntervalForResource = limits.resourceTimeout
+        var request = request
+        request.timeoutInterval = limits.stallTimeout
+        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
         let task = session.downloadTask(with: request)
         session.finishTasksAndInvalidate()
         try await withTaskCancellationHandler {
@@ -489,15 +668,39 @@ nonisolated private final class UpdateDownload: NSObject, URLSessionDownloadDele
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        // Decided at the first bytes, when the size is known: something far too
+        // large to be a release, or too large for the disk, is not fetched whole
+        // to find that out.
+        let size = max(totalBytesExpectedToWrite, totalBytesWritten)
+        if !sizeChecked || totalBytesExpectedToWrite <= 0 {
+            sizeChecked = true
+            if size > limits.maximumBytes {
+                failure = SelfUpdater.Failure.untrusted
+            } else if let free = SelfUpdater.freeSpace(at: destination.deletingLastPathComponent()),
+                      free < size + limits.reserve {
+                failure = SelfUpdater.Failure.noSpace
+            }
+            if failure != nil {
+                downloadTask.cancel()
+                return
+            }
+        }
         guard totalBytesExpectedToWrite > 0 else { return }
         progress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
     }
 
     /// The file is deleted when this returns, so it has to move now.
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        guard failure == nil else { return }
         let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? -1
         guard status == 200 else {
             failure = SelfUpdater.Failure.http(status)
+            return
+        }
+        // A body shorter than the server said it would be.
+        let expected = downloadTask.countOfBytesExpectedToReceive
+        if expected > 0, downloadTask.countOfBytesReceived != expected {
+            failure = URLError(.networkConnectionLost)
             return
         }
         do {
@@ -507,8 +710,10 @@ nonisolated private final class UpdateDownload: NSObject, URLSessionDownloadDele
         }
     }
 
+    /// A failure this delegate found comes first: cancelling the task for it is
+    /// what produced `error`.
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let problem = error ?? failure {
+        if let problem = failure ?? error {
             continuation?.resume(throwing: problem)
         } else {
             continuation?.resume()
