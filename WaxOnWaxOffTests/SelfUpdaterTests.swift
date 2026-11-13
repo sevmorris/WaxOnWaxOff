@@ -264,4 +264,272 @@ final class SelfUpdaterTests: XCTestCase {
         // It stopped before the mount point was made.
         XCTAssertFalse(FileManager.default.fileExists(atPath: dmg.deletingLastPathComponent().appendingPathComponent("mount").path))
     }
+
+    // MARK: - Where the copy is
+
+    func testAVolumeThatCannotSwapIsAnObstacle() {
+        XCTAssertNil(SelfUpdater.locationObstacle(readOnly: false, translocated: false, supportsSwap: true))
+        // A volume that does not say is taken to be able to.
+        XCTAssertNil(SelfUpdater.locationObstacle(readOnly: false, translocated: false, supportsSwap: nil))
+        XCTAssertEqual(SelfUpdater.locationObstacle(readOnly: false, translocated: false, supportsSwap: false), .readOnlyLocation)
+        XCTAssertEqual(SelfUpdater.locationObstacle(readOnly: true, translocated: false, supportsSwap: true), .readOnlyLocation)
+        XCTAssertEqual(SelfUpdater.locationObstacle(readOnly: false, translocated: true, supportsSwap: true), .readOnlyLocation)
+    }
+
+    // MARK: - Tools that fail, hang or are cancelled
+
+    func testAToolReportsHowItEnded() {
+        XCTAssertEqual(SelfUpdater.runTool("/usr/bin/true", [], deadline: 10, isCancelled: { false }), .success)
+        XCTAssertEqual(SelfUpdater.runTool("/usr/bin/false", [], deadline: 10, isCancelled: { false }), .failure)
+        XCTAssertEqual(SelfUpdater.runTool("/no/such/tool", [], deadline: 10, isCancelled: { false }), .failure)
+    }
+
+    /// A hung hdiutil used to hold the update, and its window, for ever.
+    func testAToolPastItsDeadlineIsStopped() {
+        let started = Date()
+        XCTAssertEqual(SelfUpdater.runTool("/bin/sleep", ["30"], deadline: 0.3, isCancelled: { false }), .timedOut)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+    }
+
+    func testACancelledToolIsStopped() {
+        let started = Date()
+        let outcome = SelfUpdater.runTool("/bin/sleep", ["30"], deadline: 60,
+                                          isCancelled: { Date().timeIntervalSince(started) > 0.3 })
+        XCTAssertEqual(outcome, .cancelled)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+    }
+
+    /// Asked to quit and taking no notice: two seconds on, it is made to.
+    func testAToolThatIgnoresBeingAskedIsKilled() {
+        let started = Date()
+        let outcome = SelfUpdater.runTool("/bin/sh", ["-c", "trap '' TERM; sleep 8"], deadline: 0.3,
+                                          isCancelled: { false })
+        XCTAssertEqual(outcome, .timedOut)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 6)
+    }
+
+    private struct Fixture {
+        let dmg: URL
+        let installed: URL
+        let holder: URL
+        var mountPoint: URL { dmg.deletingLastPathComponent().appendingPathComponent("mount") }
+    }
+
+    private func makeFixture() throws -> Fixture {
+        let source = folder.appendingPathComponent("source", isDirectory: true)
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        _ = try makeApp(at: source.appendingPathComponent("Fake.app"))
+        let dmg = try makeDiskImage(holding: source.appendingPathComponent("Fake.app"))
+        let installed = try makeApp(at: folder.appendingPathComponent("Installed.app"), version: "1.0.0lr")
+        let holder = folder.appendingPathComponent("holder", isDirectory: true)
+        try FileManager.default.createDirectory(at: holder, withIntermediateDirectories: true)
+        return Fixture(dmg: dmg, installed: installed, holder: holder)
+    }
+
+    /// The real tools, except that `tool` (with `verb` as its first argument,
+    /// when given) ends as `outcome` without running.
+    private func tools(where tool: String, verb: String? = nil,
+                       endsAs outcome: SelfUpdater.Tools.Outcome) -> SelfUpdater.Tools {
+        SelfUpdater.Tools { name, arguments, deadline, isCancelled in
+            if name == tool, verb == nil || arguments.first == verb { return outcome }
+            return SelfUpdater.runTool(name, arguments, deadline: deadline, isCancelled: isCancelled)
+        }
+    }
+
+    private func assertNothingIsLeft(_ fixture: Fixture, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: fixture.mountPoint.path), [],
+                       "the image is still mounted", file: file, line: line)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.holder.path),
+                       "the staged copy's folder is still there", file: file, line: line)
+        XCTAssertTrue(SelfUpdater.isSigned(fixture.installed, requirement: Self.requirement),
+                      "the installed app changed", file: file, line: line)
+    }
+
+    /// Cancel and Skip used to wait for the copy to finish.
+    func testStagingCancelledDuringTheCopyStopsAndCleansUp() throws {
+        let fixture = try makeFixture()
+        XCTAssertThrowsError(try SelfUpdater.stage(diskImage: fixture.dmg, replacing: fixture.installed,
+                                                   expected: expected(),
+                                                   tools: tools(where: "/usr/bin/ditto", endsAs: .cancelled),
+                                                   into: fixture.holder)) {
+            XCTAssertTrue($0 is CancellationError, "\($0)")
+        }
+        assertNothingIsLeft(fixture)
+    }
+
+    func testACopyPastItsDeadlineFailsStagingAndCleansUp() throws {
+        let fixture = try makeFixture()
+        XCTAssertThrowsError(try SelfUpdater.stage(diskImage: fixture.dmg, replacing: fixture.installed,
+                                                   expected: expected(),
+                                                   tools: tools(where: "/usr/bin/ditto", endsAs: .timedOut),
+                                                   into: fixture.holder)) {
+            XCTAssertEqual($0 as? SelfUpdater.Failure, .timedOut)
+        }
+        assertNothingIsLeft(fixture)
+    }
+
+    func testAnImageThatDoesNotMountInTimeFailsStaging() throws {
+        let fixture = try makeFixture()
+        XCTAssertThrowsError(try SelfUpdater.stage(diskImage: fixture.dmg, replacing: fixture.installed,
+                                                   expected: expected(),
+                                                   tools: tools(where: "/usr/bin/hdiutil", verb: "attach", endsAs: .timedOut),
+                                                   into: fixture.holder)) {
+            XCTAssertEqual($0 as? SelfUpdater.Failure, .timedOut)
+        }
+        XCTAssertTrue(SelfUpdater.isSigned(fixture.installed, requirement: Self.requirement))
+    }
+
+    /// Already cancelled when it starts: the image is never mounted.
+    func testCancelledStagingMountsNothing() throws {
+        let fixture = try makeFixture()
+        XCTAssertThrowsError(try SelfUpdater.stage(diskImage: fixture.dmg, replacing: fixture.installed,
+                                                   expected: expected(), into: fixture.holder,
+                                                   isCancelled: { true })) {
+            XCTAssertTrue($0 is CancellationError, "\($0)")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.mountPoint.path))
+    }
+
+    /// The copy must not take the space a recording is about to need.
+    func testRefusesToStageWithoutRoomToSpare() throws {
+        let fixture = try makeFixture()
+        XCTAssertThrowsError(try SelfUpdater.stage(diskImage: fixture.dmg, replacing: fixture.installed,
+                                                   expected: expected(), into: fixture.holder,
+                                                   reserve: .max / 4)) {
+            XCTAssertEqual($0 as? SelfUpdater.Failure, .noSpace)
+        }
+        assertNothingIsLeft(fixture)
+    }
+
+    func testStagesIntoTheFolderTheCallerNames() throws {
+        let fixture = try makeFixture()
+        let staged = try SelfUpdater.stage(diskImage: fixture.dmg, replacing: fixture.installed,
+                                           expected: expected(), into: fixture.holder)
+        XCTAssertEqual(staged.standardizedFileURL, fixture.holder.appendingPathComponent("Installed.app").standardizedFileURL)
+        XCTAssertTrue(SelfUpdater.isSigned(staged, requirement: Self.requirement))
+        XCTAssertGreaterThan(SelfUpdater.allocatedSize(of: staged), 0)
+    }
+
+    // MARK: - Downloads that go wrong
+
+    private func stageFromStub(_ behaviour: StubDownload.Behaviour,
+                               limits: SelfUpdater.DownloadLimits = SelfUpdater.DownloadLimits()) async throws -> URL {
+        try await SelfUpdaterTests.stageFromStub(behaviour, replacing: folder.appendingPathComponent("Installed.app"),
+                                                 expected: expected(), limits: limits)
+    }
+
+    /// Takes only Sendable values, so a task can run it without capturing the
+    /// test case, which a test target in Swift 6 mode refuses.
+    private static func stageFromStub(_ behaviour: StubDownload.Behaviour, replacing installed: URL,
+                                      expected: SelfUpdater.Expected,
+                                      limits: SelfUpdater.DownloadLimits) async throws -> URL {
+        StubDownload.behaviour = behaviour
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubDownload.self]
+        let request = URLRequest(url: URL(string: "https://downloads.doublender.test/update.dmg")!)
+        return try await SelfUpdater.stage(from: request, replacing: installed, expected: expected,
+                                           limits: limits, configuration: configuration) { _ in }
+    }
+
+    private func leftoverScratchFolders() throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)
+            .filter { $0.hasPrefix(SelfUpdater.scratchPrefix) }
+    }
+
+    func testAnHTTPErrorIsReported() async throws {
+        let before = try leftoverScratchFolders()
+        do {
+            _ = try await stageFromStub(.status(404))
+            XCTFail("a 404 staged something")
+        } catch {
+            XCTAssertEqual(error as? SelfUpdater.Failure, .http(404))
+        }
+        XCTAssertEqual(try leftoverScratchFolders(), before)
+    }
+
+    /// A connection that goes quiet is given up at the limit, not a minute on.
+    func testAStalledDownloadIsGivenUp() async throws {
+        let started = Date()
+        do {
+            _ = try await stageFromStub(.stall, limits: SelfUpdater.DownloadLimits(stallTimeout: 1))
+            XCTFail("a stalled download staged something")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .timedOut, "\(error)")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(started), 15)
+    }
+
+    func testSomethingFarTooLargeToBeAReleaseIsStoppedAtItsFirstBytes() async throws {
+        do {
+            _ = try await stageFromStub(.announces(bytes: 1 << 40))
+            XCTFail("an oversized download staged something")
+        } catch {
+            XCTAssertEqual(error as? SelfUpdater.Failure, .untrusted, "\(error)")
+        }
+    }
+
+    func testADownloadTheDiskHasNoRoomForIsStoppedAtItsFirstBytes() async throws {
+        do {
+            _ = try await stageFromStub(.announces(bytes: 8 << 20),
+                                        limits: SelfUpdater.DownloadLimits(reserve: .max / 4))
+            XCTFail("a download with no room staged something")
+        } catch {
+            XCTAssertEqual(error as? SelfUpdater.Failure, .noSpace, "\(error)")
+        }
+    }
+
+    func testCancellingStopsADownload() async throws {
+        let before = try leftoverScratchFolders()
+        let installed = folder.appendingPathComponent("Installed.app")
+        let expected = expected()
+        let staging = Task {
+            try await SelfUpdaterTests.stageFromStub(.stall, replacing: installed, expected: expected,
+                                                     limits: SelfUpdater.DownloadLimits(stallTimeout: 60))
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        let started = Date()
+        staging.cancel()
+        let result = await staging.result
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        if case .success = result { XCTFail("a cancelled download staged something") }
+        XCTAssertEqual(try leftoverScratchFolders(), before)
+    }
+}
+
+/// Stands in for the server a release is fetched from.
+private final class StubDownload: URLProtocol {
+    enum Behaviour {
+        /// Answers with this status and a short body.
+        case status(Int)
+        /// Accepts the request and never answers.
+        case stall
+        /// Says the body is this long, sends its first bytes, and no more.
+        case announces(bytes: Int64)
+    }
+
+    nonisolated(unsafe) static var behaviour: Behaviour = .stall
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        func respond(_ status: Int, length: Int64, body: Data, finish: Bool) {
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+                                           headerFields: ["Content-Length": "\(length)"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: body)
+            if finish { client?.urlProtocolDidFinishLoading(self) }
+        }
+        switch Self.behaviour {
+        case .stall:
+            break
+        case .status(let status):
+            let body = Data("not here".utf8)
+            respond(status, length: Int64(body.count), body: body, finish: true)
+        case .announces(let bytes):
+            respond(200, length: bytes, body: Data(count: 64 * 1024), finish: false)
+        }
+    }
+
+    override func stopLoading() {}
 }
