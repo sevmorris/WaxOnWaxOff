@@ -119,6 +119,15 @@ cleanup() {
 # These handlers exit and let the EXIT trap do the cleanup, exactly once.
 trap 'exit 130' INT
 trap 'exit 143' TERM
+# POSIX_TRAPS makes the EXIT trap the shell's rather than the current
+# function's. Without it zsh puts the trap aside on entering any function, and a
+# command that fails there under `set -e` exits the script without running it,
+# stranding whatever the cleanup was meant to undo. On 2026-11-14 that left
+# DoublEnder's project.pbxproj Cloud-shaped after a test failed inside a
+# function of its Cloud scripts. Every step here runs at top level today; this
+# covers the first helper that does not. zsh reads the option when the trap is
+# set, so it must come first.
+setopt POSIX_TRAPS
 trap cleanup EXIT
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
