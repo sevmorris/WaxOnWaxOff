@@ -4,12 +4,27 @@ All notable changes to WaxOn/WaxOff are documented here. Every version below has
 
 ## [Unreleased]
 
+## [2.17.1] — 2026-11-13
+
+Updating is sturdier. Most of this takes effect from the update after this one, because the version you have now installs this one.
+
+**Changed**
+- **Cancel stops an update at once.** While WaxOn/WaxOff was checking a download, Cancel waited for the check to finish.
+- **A download that stalls is given up.** An update stops waiting when the download makes no progress for 30 seconds, or runs past 15 minutes, and offers the download instead. A slow connection could leave it waiting indefinitely.
+- **An update stops early when the disk can't hold it.** It checks the free space as the download starts and again before the new version is unpacked, rather than failing partway.
+- **A copy that can't update itself where it is says so up front.** On a drive that can't swap an app in one step, such as an exFAT or network drive, the prompt explains and offers **Download**. It used to download everything first and then fail.
+- **The update prompt at launch no longer lands on work you've just started.** If you start a batch while the check at launch is still getting ready, it says nothing, and the next launch offers the update again.
+
 **Documentation**
 - **The manual and the theory page no longer describe WaxOn running a two-pass loudnorm.** WaxOn has measured once with `ebur128` and applied one constant gain since 2.9.0, but the manual's WaxOn pipeline still walked through two passes and a dynamic-mode fallback, and the theory page said "both WaxOn and WaxOff" run two passes and request `linear=true`, credited WaxOn with `LRA=20`, explained silent input through a loudnorm pass WaxOn never runs, and named loudnorm in WaxOn's stage-order rationale. The 2.9.0 correction fixed some sentences in these pages and missed these. The theory page also called WaxOn's ceiling a −1.0 dBTP true-peak ceiling in four places, including the limiter's own parameter list; with Loudness Norm on, it holds sample peaks at −1.0 dBFS, as the same page says elsewhere. A leftover comparison with the RNNoise stage, removed in 2.8.0, is gone.
 - **The manual's tip for two microphones in one stereo file now recommends Split L/R**, the mode 2.10.0 added for exactly that recording, instead of Stereo.
 - **The in-app Help describes WaxOn's presets**: the Preset setting, with "(Modified)" and what a preset leaves alone, and the three built-in presets. Only WaxOff's were there.
 - The README and the landing page list Split L/R, and the README lists Original Files. The manual and Help show Split L/R's output names, the manual lists the `MULTI→STEREO` and `1 FILE` badges, and both say Source Channel is unavailable in Split L/R as well as Stereo. The WaxOn screenshot shows the Original Files switch.
 - `audit/DOC-DRIFT-2026-11-06.md` records the review.
+
+**Developer**
+- `SelfUpdater.swift`, shared verbatim with the sibling apps, runs hdiutil and ditto with a deadline and real cancellation, and limits downloads by stall time, size and free space. All ten copies changed together.
+- `release.sh` prunes no release pages unless the list of releases it must keep proves itself, and the shared-files check compares against Transcoder, the newest sibling app.
 
 ## [2.17.0] — 2026-11-01
 
