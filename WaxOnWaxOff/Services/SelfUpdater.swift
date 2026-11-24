@@ -1,8 +1,9 @@
 // Shared verbatim across the sibling app repos (DoublEnder, WaxOnWaxOff,
 // ClipHack, FilmStrip, KeyVault, Magic Backup Machine, Barkeep, PasswordGen,
-// Dipstick). Keep the copies byte-identical: scripts/check-shared.sh compares
-// them and a release preflight fails when they drift. Anything app-specific
-// belongs in that app's UpdateChecker, which fills in a SelfUpdatePrompt.
+// Dipstick, Transcoder). Keep the copies byte-identical: scripts/check-shared.sh
+// compares them and a release preflight fails when they drift. Anything
+// app-specific belongs in that app's UpdateChecker, which fills in a
+// SelfUpdatePrompt.
 
 import AppKit
 import Security
@@ -578,7 +579,7 @@ enum SelfUpdateFlow {
             }
             SelfUpdater.discard(staged)
             try? SelfUpdater.relaunch(installed)
-            NSApp.terminate(nil)
+            quitForRelaunch()
         }
         window.setCancelAction { work.cancel() }
 
@@ -595,6 +596,38 @@ enum SelfUpdateFlow {
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.open(prompt.downloadURL)
         }
+    }
+
+    /// Quits this copy, so the relaunch can open the new one, even while one of
+    /// the app's windows has a sheet open.
+    ///
+    /// `terminate` refuses, returning without asking the delegate and without
+    /// a beep, while a window shows a SwiftUI sheet or confirmation dialog or
+    /// an NSSavePanel sheet. (An NSAlert sheet, a SwiftUI alert, an open panel,
+    /// a popover and an app-modal alert all let it through: tried on macOS
+    /// 27.2, 2026-11-23.) By then the new copy is in place, and the relaunch,
+    /// waiting for this process to end, would give up after a minute, leaving
+    /// the old code running from a bundle that has been replaced. Ending the
+    /// sheet first does not help: its SwiftUI binding is still true, and
+    /// `terminate` redraws the window, so the sheet is back before AppKit
+    /// looks (found with KeyVault's passphrase prompt).
+    ///
+    /// A `terminate` that goes ahead never returns. One that returns with the
+    /// same sheet trouble it started with was refused for the sheet, and this
+    /// finishes the quit: the notice `terminate` would have posted, then exit.
+    /// Whatever the sheet held goes, as in any quit; the update has already
+    /// waited on `isBusy` and asked before relaunching. A refusal that leaves
+    /// no sheet attached is the app's delegate saying no, which AppKit asks
+    /// only after closing an NSAlert sheet, and that stands, as it always has.
+    /// (Dipstick refuses while its console runs a command, which is what its
+    /// `isBusy` reports, so an update never gets here then.)
+    private static func quitForRelaunch() {
+        func sheetAttached() -> Bool { NSApp.windows.contains { $0.attachedSheet != nil } }
+        let sheetBefore = sheetAttached()
+        NSApp.terminate(nil)
+        guard sheetBefore, sheetAttached() else { return }
+        NotificationCenter.default.post(name: NSApplication.willTerminateNotification, object: NSApp)
+        exit(0)
     }
 
     private static func confirmRelaunch(_ prompt: SelfUpdatePrompt) -> Bool {
